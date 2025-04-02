@@ -422,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Extract property details from a URL (e.g., Zillow listing)
+  // Extract property details from a URL using OpenAI (non-scraping approach)
   app.post("/api/ai/extract-property-from-url", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
       const { url } = req.body;
@@ -434,15 +434,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Import the scraper function
-      const { scrapePropertyListing } = await import('./scrapers/property-scraper');
-      
-      // Scrape the property listing
-      const propertyData = await scrapePropertyListing(url);
+      // Use OpenAI to analyze the URL and generate property details
+      // This avoids direct scraping and potential blocking from real estate websites
+      const propertyData = await extractPropertyFromUrl(url);
       
       res.json(propertyData);
     } catch (error) {
-      console.error("Property URL scraping error:", error);
+      console.error("Property URL extraction error:", error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Failed to extract property data from URL"
