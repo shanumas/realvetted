@@ -229,9 +229,14 @@ async function extractAgentInfoWithAI(html: string, url: string): Promise<Partia
     const simplifiedHtml = simplifyHtml(html, 'agent');
     
     const prompt = `
-      From this real estate listing HTML, extract information about the listing agent or seller:
+      From this real estate listing HTML, extract information about the listing agent:
       
-      1. Agent/Seller Name
+      IMPORTANT: Focus specifically on finding the "Listed by" or "Listing Agent" information.
+      This is the real estate agent who has listed the property for sale (not the property owner).
+      Look for sections labeled as "Listed by", "Listing Agent", "Contact Agent", "Agent", etc.
+      
+      Extract the following information about the listing agent:
+      1. Agent Name
       2. Phone Number
       3. Email Address (if available)
       4. Real Estate Company/Brokerage
@@ -242,11 +247,11 @@ async function extractAgentInfoWithAI(html: string, url: string): Promise<Partia
       
       Please format your response as a valid JSON object with these fields:
       {
-        "sellerName": "full name",
-        "sellerPhone": "phone number",
-        "sellerEmail": "email address or null if not found",
-        "sellerCompany": "company name",
-        "sellerLicenseNo": "license number"
+        "sellerName": "listing agent's full name",
+        "sellerPhone": "listing agent's phone number",
+        "sellerEmail": "listing agent's email address or null if not found",
+        "sellerCompany": "listing agent's company name",
+        "sellerLicenseNo": "listing agent's license number"
       }
       
       Return only the JSON with no additional text or explanation.
@@ -257,7 +262,7 @@ async function extractAgentInfoWithAI(html: string, url: string): Promise<Partia
       messages: [
         {
           role: "system",
-          content: "You are a data extraction expert. Extract agent/seller information from real estate listings."
+          content: "You are a data extraction expert specialized in real estate listings. Extract the listing agent information (the agent who listed the property for sale) from real estate listings. Focus specifically on sections labeled 'Listed by', 'Listing Agent', 'Contact Agent', etc."
         },
         { role: "user", content: prompt }
       ],

@@ -324,7 +324,12 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       `).join('\n')}
       
       Based on these search results, extract the property details with a focus on finding accurate seller/agent information. 
-      Pay special attention to finding the listing agent or seller name, phone number, email, and company.
+      
+      IMPORTANT: The seller details should be taken from the "Listed by" or "listing agent" information on real estate listings. 
+      This is the agent who has listed the property for sale, not the property owner.
+      Look for phrases like "Listed by", "Listing Agent", "Listing provided by", "Contact agent", etc.
+      
+      Pay special attention to finding the listing agent's name, phone number, email, and real estate company.
       For any missing information, make a reasonable estimate based on available data.
       
       Format your response as a JSON object with these fields: 
@@ -341,11 +346,11 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         "yearBuilt": year built as a number,
         "description": "brief description",
         "features": ["feature1", "feature2", ...],
-        "sellerName": "Agent/seller name",
-        "sellerPhone": "Agent/seller phone",
-        "sellerEmail": "Agent/seller email",
-        "sellerCompany": "Real estate company",
-        "sellerLicenseNo": "License number if available",
+        "sellerName": "Listing agent's name",
+        "sellerPhone": "Listing agent's phone",
+        "sellerEmail": "Listing agent's email",
+        "sellerCompany": "Listing agent's real estate company",
+        "sellerLicenseNo": "Listing agent's license number if available",
         "propertyUrl": "${url}"
       }
       
