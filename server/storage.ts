@@ -2,9 +2,7 @@ import {
   User, InsertUser, Property, InsertProperty, 
   Message, InsertMessage, AgentLead, InsertAgentLead,
   PropertyActivityLog, InsertPropertyActivityLog,
-  SystemSetting, InsertSystemSetting,
-  users, properties, messages, agentLeads, propertyActivityLogs,
-  systemSettings
+  users, properties, messages, agentLeads, propertyActivityLogs
 } from "@shared/schema";
 import { LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser } from "@shared/types";
 import { randomBytes } from "crypto";
@@ -55,12 +53,6 @@ export interface IStorage {
   // Property activity log methods
   getPropertyActivityLogs(propertyId: number): Promise<PropertyActivityLogWithUser[]>;
   createPropertyActivityLog(log: InsertPropertyActivityLog): Promise<PropertyActivityLog>;
-  
-  // System settings methods
-  getSetting(key: string): Promise<SystemSetting | undefined>;
-  getAllSettings(): Promise<SystemSetting[]>;
-  updateSetting(key: string, value: string, userId: number): Promise<SystemSetting>;
-  createSetting(setting: InsertSystemSetting): Promise<SystemSetting>;
   
   // Session store
   sessionStore: session.Store;
@@ -568,145 +560,6 @@ export class PgStorage implements IStorage {
     }).returning();
     
     return result[0];
-  }
-  
-  // System settings methods
-  async getSetting(key: string): Promise<SystemSetting | undefined> {
-    try {
-      // Make sure the table exists first
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS system_settings (
-          id SERIAL PRIMARY KEY,
-          key TEXT UNIQUE NOT NULL,
-          value TEXT NOT NULL,
-          description TEXT,
-          updated_at TIMESTAMP DEFAULT NOW(),
-          updated_by INTEGER
-        )
-      `);
-      
-      const result = await this.db.select().from(systemSettings).where(eq(systemSettings.key, key));
-      return result[0];
-    } catch (error) {
-      console.error(`Error retrieving setting for key ${key}:`, error);
-      // Try with raw query
-      const result = await this.pool.query(`SELECT * FROM system_settings WHERE key = $1`, [key]);
-      return result.rows[0];
-    }
-  }
-  
-  async getAllSettings(): Promise<SystemSetting[]> {
-    try {
-      // Make sure the table exists first
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS system_settings (
-          id SERIAL PRIMARY KEY,
-          key TEXT UNIQUE NOT NULL,
-          value TEXT NOT NULL,
-          description TEXT,
-          updated_at TIMESTAMP DEFAULT NOW(),
-          updated_by INTEGER
-        )
-      `);
-      
-      return await this.db.select().from(systemSettings);
-    } catch (error) {
-      console.error("Error retrieving all settings:", error);
-      // Try with raw query
-      const result = await this.pool.query(`SELECT * FROM system_settings`);
-      return result.rows;
-    }
-  }
-  
-  async updateSetting(key: string, value: string, userId: number): Promise<SystemSetting> {
-    try {
-      // Make sure the table exists first
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS system_settings (
-          id SERIAL PRIMARY KEY,
-          key TEXT UNIQUE NOT NULL,
-          value TEXT NOT NULL,
-          description TEXT,
-          updated_at TIMESTAMP DEFAULT NOW(),
-          updated_by INTEGER
-        )
-      `);
-      
-      // Check if setting exists
-      const existing = await this.getSetting(key);
-      
-      if (existing) {
-        // Update
-        const result = await this.db.update(systemSettings)
-          .set({
-            value,
-            updatedAt: new Date(),
-            updatedBy: userId
-          })
-          .where(eq(systemSettings.key, key))
-          .returning();
-        
-        return result[0];
-      } else {
-        // Insert
-        return await this.createSetting({
-          key,
-          value,
-          description: null,
-          updatedBy: userId
-        });
-      }
-    } catch (error) {
-      console.error(`Error updating setting for key ${key}:`, error);
-      // Try with raw query
-      await this.pool.query(`
-        INSERT INTO system_settings (key, value, updated_by, updated_at)
-        VALUES ($1, $2, $3, NOW())
-        ON CONFLICT (key)
-        DO UPDATE SET value = $2, updated_by = $3, updated_at = NOW()
-      `, [key, value, userId]);
-      
-      const result = await this.pool.query(`SELECT * FROM system_settings WHERE key = $1`, [key]);
-      return result.rows[0];
-    }
-  }
-  
-  async createSetting(setting: InsertSystemSetting): Promise<SystemSetting> {
-    try {
-      // Make sure the table exists first
-      await this.pool.query(`
-        CREATE TABLE IF NOT EXISTS system_settings (
-          id SERIAL PRIMARY KEY,
-          key TEXT UNIQUE NOT NULL,
-          value TEXT NOT NULL,
-          description TEXT,
-          updated_at TIMESTAMP DEFAULT NOW(),
-          updated_by INTEGER
-        )
-      `);
-      
-      const result = await this.db.insert(systemSettings).values({
-        key: setting.key,
-        value: setting.value,
-        description: setting.description || null,
-        updatedAt: new Date(),
-        updatedBy: setting.updatedBy || null
-      }).returning();
-      
-      return result[0];
-    } catch (error) {
-      console.error(`Error creating setting for key ${setting.key}:`, error);
-      // Try with raw query
-      await this.pool.query(`
-        INSERT INTO system_settings (key, value, description, updated_by, updated_at)
-        VALUES ($1, $2, $3, $4, NOW())
-        ON CONFLICT (key)
-        DO NOTHING
-      `, [setting.key, setting.value, setting.description || null, setting.updatedBy || null]);
-      
-      const result = await this.pool.query(`SELECT * FROM system_settings WHERE key = $1`, [setting.key]);
-      return result.rows[0];
-    }
   }
 }
 

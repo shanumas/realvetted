@@ -21,300 +21,419 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 
-// Define schema for settings forms
+// Define schema for email settings form
 const emailSettingsSchema = z.object({
   testEmail: z.string().email("Please enter a valid email address").or(z.literal("")),
   enableTestMode: z.boolean(),
 });
 
-const securitySettingsSchema = z.object({
-  emergencyPasswordEnabled: z.boolean(),
-});
-
 type EmailSettingsValues = z.infer<typeof emailSettingsSchema>;
-type SecuritySettingsValues = z.infer<typeof securitySettingsSchema>;
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("buyers");
+  const [userSubTab, setUserSubTab] = useState("buyers");
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
-  
-  // Fetch users
-  const { data: users = [], isLoading: isLoadingUsers, refetch: refetchUsers } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-    queryFn: getQueryFn<User[]>({ baseUrl: "" })
-  });
-  
-  // Fetch properties
-  const { data: properties = [], isLoading: isLoadingProperties, refetch: refetchProperties } = useQuery<Property[]>({
-    queryKey: ["/api/properties"],
-    queryFn: getQueryFn<Property[]>({ baseUrl: "" })
-  });
-  
-  // Fetch agents for reassignment
-  const { data: agents = [], isLoading: isLoadingAgents } = useQuery<User[]>({
-    queryKey: ["/api/users", "agent"],
-    queryFn: getQueryFn<User[]>({ baseUrl: "" })
-  });
-  
-  // Fetch system settings
-  const { data: settings = [] } = useQuery<{ key: string; value: string; description: string | null; }[]>({
-    queryKey: ["/api/admin/settings"],
-    queryFn: getQueryFn<{ key: string; value: string; description: string | null; }>({ baseUrl: "" })
-  });
-  
-  // Setup forms
+
+  // Initialize form for email settings
   const emailSettingsForm = useForm<EmailSettingsValues>({
     resolver: zodResolver(emailSettingsSchema),
     defaultValues: {
-      enableTestMode: false,
       testEmail: "",
+      enableTestMode: false,
     }
   });
-  
-  const securitySettingsForm = useForm<SecuritySettingsValues>({
-    resolver: zodResolver(securitySettingsSchema),
-    defaultValues: {
-      emergencyPasswordEnabled: false,
-    }
-  });
-  
-  // Update form values when settings are loaded
-  useEffect(() => {
-    if (settings && settings.length > 0) {
-      const emailTestMode = settings.find((s: { key: string; value: string }) => s.key === "email_test_mode");
-      const emailTestAddress = settings.find((s: { key: string; value: string }) => s.key === "email_test_address");
-      const emergencyPassword = settings.find((s: { key: string; value: string }) => s.key === "emergency_password_enabled");
-      
-      if (emailTestMode) {
-        emailSettingsForm.setValue("enableTestMode", emailTestMode.value === "true");
+
+  // Get current email settings (if set in localStorage for demo purposes or from server in production)
+  const { data: emailSettings, isLoading: isLoadingEmailSettings } = useQuery<{ testEmail: string, enableTestMode: boolean }>({
+    queryKey: ["/api/admin/email-settings"],
+    queryFn: async () => {
+      // For simplicity in demo, we'll use localStorage
+      const settings = localStorage.getItem("emailSettings");
+      if (settings) {
+        return JSON.parse(settings);
       }
-      
-      if (emailTestAddress) {
-        emailSettingsForm.setValue("testEmail", emailTestAddress.value);
-      }
-      
-      if (emergencyPassword) {
-        securitySettingsForm.setValue("emergencyPasswordEnabled", emergencyPassword.value === "true");
-      }
-    }
-  }, [settings, emailSettingsForm, securitySettingsForm]);
-  
-  // Mutations
-  const blockUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      const res = await apiRequest("POST", `/api/admin/users/${userId}/block`);
-      return await res.json();
-    },
-    onSuccess: () => {
-      refetchUsers();
-      toast({
-        title: "User blocked",
-        description: "The user has been blocked successfully.",
-      });
+      return { testEmail: "", enableTestMode: false };
     }
   });
   
-  const unblockUserMutation = useMutation({
-    mutationFn: async (userId: number) => {
-      const res = await apiRequest("POST", `/api/admin/users/${userId}/unblock`);
-      return await res.json();
-    },
-    onSuccess: () => {
-      refetchUsers();
-      toast({
-        title: "User unblocked",
-        description: "The user has been unblocked successfully.",
-      });
+  // Set form values when emailSettings load
+  React.useEffect(() => {
+    if (emailSettings) {
+      emailSettingsForm.reset(emailSettings);
     }
-  });
-  
-  const reassignAgentMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedProperty || !selectedAgentId) return null;
-      const res = await apiRequest("POST", `/api/admin/properties/${selectedProperty.id}/reassign`, {
-        agentId: selectedAgentId
-      });
-      return await res.json();
-    },
-    onSuccess: () => {
-      refetchProperties();
-      setReassignDialogOpen(false);
-      setSelectedProperty(null);
-      setSelectedAgentId(null);
-      toast({
-        title: "Agent reassigned",
-        description: "The property has been reassigned to the selected agent.",
-      });
-    }
-  });
-  
+  }, [emailSettings, emailSettingsForm]);
+
+  // Mutation for saving email settings
   const saveEmailSettingsMutation = useMutation({
     mutationFn: async (data: EmailSettingsValues) => {
-      const res = await apiRequest("POST", "/api/admin/settings/email", data);
-      return await res.json();
+      // For demo, save to localStorage
+      localStorage.setItem("emailSettings", JSON.stringify(data));
+      // In production, would call API:
+      // const response = await apiRequest("PUT", "/api/admin/email-settings", data);
+      // return response.json();
+      return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ["/api/admin/settings"]});
       toast({
         title: "Email settings saved",
-        description: "Your email settings have been saved successfully.",
+        description: "Your email settings have been updated successfully.",
       });
-    }
-  });
-  
-  const saveSecuritySettingsMutation = useMutation({
-    mutationFn: async (data: SecuritySettingsValues) => {
-      const res = await apiRequest("POST", "/api/admin/settings/security", data);
-      return await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/email-settings"] });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({queryKey: ["/api/admin/settings"]});
+    onError: (error) => {
       toast({
-        title: "Security settings saved",
-        description: "Your security settings have been saved successfully.",
+        title: "Failed to save settings",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
       });
-    }
+    },
   });
-  
-  // Form submit handlers
+
+  // Handle email settings form submission
   const onEmailSettingsSubmit = (data: EmailSettingsValues) => {
     saveEmailSettingsMutation.mutate(data);
   };
+
+  // Fetch all users
+  const { data: allUsers, isLoading: isLoadingAllUsers } = useQuery<User[]>({
+    queryKey: ["/api/admin/users"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+
+  // Filter users based on role
+  const buyers = allUsers?.filter(u => u.role === "buyer") || [];
+  const sellers = allUsers?.filter(u => u.role === "seller") || [];
+  const agentUsers = allUsers?.filter(u => u.role === "agent") || [];
   
-  const onSecuritySettingsSubmit = (data: SecuritySettingsValues) => {
-    saveSecuritySettingsMutation.mutate(data);
+  // Define current users based on selected tab
+  const users = userSubTab === "buyers" 
+    ? buyers 
+    : userSubTab === "sellers" 
+      ? sellers 
+      : userSubTab === "agents" 
+        ? agentUsers 
+        : allUsers;
+  
+  const isLoadingUsers = isLoadingAllUsers;
+
+  // Fetch properties
+  const { data: properties, isLoading: isLoadingProperties } = useQuery<Property[]>({
+    queryKey: ["/api/admin/properties"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: activeTab === "properties",
+  });
+
+  // Fetch agents for reassignment
+  const { data: agents, isLoading: isLoadingAgents } = useQuery<User[]>({
+    queryKey: ["/api/admin/agents"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: reassignDialogOpen,
+  });
+
+  // Block/Unblock user mutation
+  const toggleBlockMutation = useMutation({
+    mutationFn: async ({ userId, block }: { userId: number; block: boolean }) => {
+      const response = await apiRequest("PUT", `/api/admin/users/${userId}/block`, { block });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User status updated",
+        description: "The user's block status has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update user",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Reassign agent mutation
+  const reassignAgentMutation = useMutation({
+    mutationFn: async ({ propertyId, agentId }: { propertyId: number; agentId: number }) => {
+      const response = await apiRequest("PUT", `/api/admin/properties/${propertyId}/reassign`, { agentId });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Agent reassigned",
+        description: "The property has been assigned to a new agent.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/properties"] });
+      setReassignDialogOpen(false);
+      setSelectedProperty(null);
+      setSelectedAgentId(null);
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to reassign agent",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleBlock = (userId: number, currentlyBlocked: boolean) => {
+    toggleBlockMutation.mutate({ userId, block: !currentlyBlocked });
   };
-  
-  // Dialog handlers
+
   const openReassignDialog = (property: Property) => {
     setSelectedProperty(property);
     setReassignDialogOpen(true);
   };
-  
+
   const handleReassignAgent = () => {
-    reassignAgentMutation.mutate();
+    if (selectedProperty && selectedAgentId) {
+      reassignAgentMutation.mutate({
+        propertyId: selectedProperty.id,
+        agentId: selectedAgentId,
+      });
+    }
   };
-  
-  if (!user || user.role !== "admin") {
-    return (
-      <div className="flex flex-col min-h-screen">
-        <SiteHeader />
-        <main className="flex-1 p-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center">
-                <h2 className="text-xl font-bold">Access Denied</h2>
-                <p className="text-gray-500 mt-2">You don't have permission to access this page.</p>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-      </div>
-    );
-  }
-  
+
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <SiteHeader />
-      <main className="flex-1 p-6">
-        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+      
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        {/* Admin Header */}
+        <Card className="mb-6">
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <Shield className="h-6 w-6 mr-2 text-primary" />
+              <div>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  Admin Dashboard
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Manage users and properties across the platform
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         
-        <Tabs defaultValue={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="users" className="flex items-center gap-1">
-              <Users className="h-4 w-4" /> Users
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value="buyers" className="flex items-center">
+              <Users className="mr-2 h-4 w-4" /> Buyers
             </TabsTrigger>
-            <TabsTrigger value="properties" className="flex items-center gap-1">
-              <Home className="h-4 w-4" /> Properties
+            <TabsTrigger value="sellers" className="flex items-center">
+              <Home className="mr-2 h-4 w-4" /> Sellers
             </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-1">
-              <Settings className="h-4 w-4" /> Settings
+            <TabsTrigger value="agents" className="flex items-center">
+              <UserCog className="mr-2 h-4 w-4" /> Agents
+            </TabsTrigger>
+            <TabsTrigger value="properties" className="flex items-center">
+              <Home className="mr-2 h-4 w-4" /> Properties
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center">
+              <Settings className="mr-2 h-4 w-4" /> Settings
             </TabsTrigger>
           </TabsList>
           
-          {/* Users Tab */}
-          <TabsContent value="users">
+          {/* Buyers Tab */}
+          <TabsContent value="buyers">
             <Card>
               <CardHeader>
-                <CardTitle>Manage Users</CardTitle>
+                <CardTitle>Buyer Management</CardTitle>
                 <CardDescription>
-                  View and manage all users in the system.
+                  View and manage all buyer accounts
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingUsers ? (
-                  <div className="flex justify-center p-4">
+                  <div className="flex justify-center p-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
-                ) : !users || users.length === 0 ? (
-                  <div className="text-center p-4">
-                    <p className="text-gray-500">No users found</p>
+                ) : !buyers || buyers.length === 0 ? (
+                  <div className="text-center p-8 text-gray-500">
+                    <p>No buyers found.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Actions</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {buyers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>{user.firstName} {user.lastName}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              user.isBlocked ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                            }`}>
+                              {user.isBlocked ? "Blocked" : "Active"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant={user.isBlocked ? "outline" : "destructive"}
+                              size="sm"
+                              onClick={() => handleToggleBlock(user.id, user.isBlocked === true)}
+                              disabled={toggleBlockMutation.isPending && selectedUserId === user.id}
+                            >
+                              {toggleBlockMutation.isPending && selectedUserId === user.id ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : user.isBlocked ? (
+                                <UserCheck className="h-4 w-4 mr-1" />
+                              ) : (
+                                <UserX className="h-4 w-4 mr-1" />
+                              )}
+                              {user.isBlocked ? "Unblock" : "Block"}
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>{user.id}</TableCell>
-                            <TableCell>
-                              {user.firstName} {user.lastName}
-                            </TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell className="capitalize">{user.role}</TableCell>
-                            <TableCell>
-                              {user.isBlocked ? (
-                                <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
-                                  Blocked
-                                </span>
-                              ) : (
-                                <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
-                                  Active
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              {user.isBlocked ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => unblockUserMutation.mutate(user.id)}
-                                  disabled={unblockUserMutation.isPending}
-                                >
-                                  <UserCheck className="h-4 w-4 mr-1" />
-                                  Unblock
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => blockUserMutation.mutate(user.id)}
-                                  disabled={blockUserMutation.isPending}
-                                >
-                                  <UserX className="h-4 w-4 mr-1" />
-                                  Block
-                                </Button>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Sellers Tab */}
+          <TabsContent value="sellers">
+            <Card>
+              <CardHeader>
+                <CardTitle>Seller Management</CardTitle>
+                <CardDescription>
+                  View and manage all seller accounts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingUsers ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
+                ) : !sellers || sellers.length === 0 ? (
+                  <div className="text-center p-8 text-gray-500">
+                    <p>No sellers found.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sellers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>{user.firstName} {user.lastName}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              user.isBlocked ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                            }`}>
+                              {user.isBlocked ? "Blocked" : "Active"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant={user.isBlocked ? "outline" : "destructive"}
+                              size="sm"
+                              onClick={() => handleToggleBlock(user.id, user.isBlocked === true)}
+                              disabled={toggleBlockMutation.isPending && selectedUserId === user.id}
+                            >
+                              {toggleBlockMutation.isPending && selectedUserId === user.id ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : user.isBlocked ? (
+                                <UserCheck className="h-4 w-4 mr-1" />
+                              ) : (
+                                <UserX className="h-4 w-4 mr-1" />
+                              )}
+                              {user.isBlocked ? "Unblock" : "Block"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Agents Tab */}
+          <TabsContent value="agents">
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Management</CardTitle>
+                <CardDescription>
+                  View and manage all buyer's agent accounts
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingUsers ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : !agentUsers || agentUsers.length === 0 ? (
+                  <div className="text-center p-8 text-gray-500">
+                    <p>No agents found.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {agentUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell>{user.firstName} {user.lastName}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
+                              user.isBlocked ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                            }`}>
+                              {user.isBlocked ? "Blocked" : "Active"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant={user.isBlocked ? "outline" : "destructive"}
+                              size="sm"
+                              onClick={() => handleToggleBlock(user.id, user.isBlocked === true)}
+                              disabled={toggleBlockMutation.isPending && selectedUserId === user.id}
+                            >
+                              {toggleBlockMutation.isPending && selectedUserId === user.id ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : user.isBlocked ? (
+                                <UserCheck className="h-4 w-4 mr-1" />
+                              ) : (
+                                <UserX className="h-4 w-4 mr-1" />
+                              )}
+                              {user.isBlocked ? "Unblock" : "Block"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
@@ -324,58 +443,56 @@ export default function AdminDashboard() {
           <TabsContent value="properties">
             <Card>
               <CardHeader>
-                <CardTitle>Manage Properties</CardTitle>
+                <CardTitle>Property Management</CardTitle>
                 <CardDescription>
-                  View and manage property listings.
+                  View and manage all properties on the platform
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoadingProperties ? (
-                  <div className="flex justify-center p-4">
+                  <div className="flex justify-center p-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   </div>
                 ) : !properties || properties.length === 0 ? (
-                  <div className="text-center p-4">
-                    <p className="text-gray-500">No properties found</p>
+                  <div className="text-center p-8 text-gray-500">
+                    <p>No properties found.</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>ID</TableHead>
-                          <TableHead>Address</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Price</TableHead>
-                          <TableHead>Agent</TableHead>
-                          <TableHead>Actions</TableHead>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Address</TableHead>
+                        <TableHead>Buyer</TableHead>
+                        <TableHead>Seller</TableHead>
+                        <TableHead>Agent</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {properties.map((property) => (
+                        <TableRow key={property.id}>
+                          <TableCell>{property.address}</TableCell>
+                          <TableCell>ID: {property.createdBy}</TableCell>
+                          <TableCell>
+                            {property.sellerEmail || (property.sellerId ? "ID: " + property.sellerId : "None")}
+                          </TableCell>
+                          <TableCell>
+                            {property.agentId ? "ID: " + property.agentId : "None"}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openReassignDialog(property)}
+                            >
+                              <RefreshCw className="h-4 w-4 mr-1" />
+                              Reassign Agent
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {properties.map((property) => (
-                          <TableRow key={property.id}>
-                            <TableCell>{property.id}</TableCell>
-                            <TableCell>{property.address}</TableCell>
-                            <TableCell className="capitalize">{property.status}</TableCell>
-                            <TableCell>${property.price?.toLocaleString()}</TableCell>
-                            <TableCell>
-                              {property.agentId ? `Agent #${property.agentId}` : "Unassigned"}
-                            </TableCell>
-                            <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openReassignDialog(property)}
-                              >
-                                <UserCog className="h-4 w-4 mr-1" />
-                                Reassign
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
@@ -383,132 +500,77 @@ export default function AdminDashboard() {
           
           {/* Settings Tab */}
           <TabsContent value="settings">
-              {/* Email Settings Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Email Settings</CardTitle>
-                  <CardDescription>
-                    Configure email notification settings for testing
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...emailSettingsForm}>
-                    <form onSubmit={emailSettingsForm.handleSubmit(onEmailSettingsSubmit)} className="space-y-6">
-                      <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Settings</CardTitle>
+                <CardDescription>
+                  Configure email notification settings for testing
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...emailSettingsForm}>
+                  <form onSubmit={emailSettingsForm.handleSubmit(onEmailSettingsSubmit)} className="space-y-6">
+                    <div className="space-y-4">
+                      <FormField
+                        control={emailSettingsForm.control}
+                        name="enableTestMode"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormControl>
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={field.onChange}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                              />
+                            </FormControl>
+                            <FormLabel className="font-medium cursor-pointer">
+                              Enable Email Test Mode
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="border-t pt-4">
                         <FormField
                           control={emailSettingsForm.control}
-                          name="enableTestMode"
+                          name="testEmail"
                           render={({ field }) => (
-                            <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormItem>
+                              <FormLabel>Test Email Address</FormLabel>
+                              <FormDescription>
+                                When test mode is enabled, all emails will be sent to this address instead of their actual recipients
+                              </FormDescription>
                               <FormControl>
-                                <input
-                                  type="checkbox"
-                                  checked={field.value}
-                                  onChange={field.onChange}
-                                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                <Input 
+                                  placeholder="test@example.com" 
+                                  {...field} 
+                                  disabled={!emailSettingsForm.watch("enableTestMode")}
                                 />
                               </FormControl>
-                              <FormLabel className="font-medium cursor-pointer">
-                                Enable Email Test Mode
-                              </FormLabel>
+                              <FormMessage />
                             </FormItem>
                           )}
                         />
-                        
-                        <div className="border-t pt-4">
-                          <FormField
-                            control={emailSettingsForm.control}
-                            name="testEmail"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Test Email Address</FormLabel>
-                                <FormDescription>
-                                  When test mode is enabled, all emails will be sent to this address instead of their actual recipients
-                                </FormDescription>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="test@example.com" 
-                                    {...field} 
-                                    disabled={!emailSettingsForm.watch("enableTestMode")}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
                       </div>
+                    </div>
                     
-                      <Button 
-                        type="submit" 
-                        disabled={saveEmailSettingsMutation.isPending || 
-                          (emailSettingsForm.watch("enableTestMode") && !emailSettingsForm.watch("testEmail"))}
-                      >
-                        {saveEmailSettingsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Mail className="h-4 w-4 mr-1" />
-                        )}
-                        Save Email Settings
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-              
-              {/* Security Settings Card */}
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Security Settings</CardTitle>
-                  <CardDescription>
-                    Configure system-wide security options
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...securitySettingsForm}>
-                    <form onSubmit={securitySettingsForm.handleSubmit(onSecuritySettingsSubmit)} className="space-y-6">
-                      <div className="space-y-4">
-                        <FormField
-                          control={securitySettingsForm.control}
-                          name="emergencyPasswordEnabled"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-col">
-                              <div className="flex items-center gap-2 space-y-0">
-                                <FormControl>
-                                  <input
-                                    type="checkbox"
-                                    checked={field.value}
-                                    onChange={field.onChange}
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                  />
-                                </FormControl>
-                                <FormLabel className="font-medium cursor-pointer">
-                                  Enable Emergency Password
-                                </FormLabel>
-                              </div>
-                              <FormDescription className="ml-6">
-                                When enabled, users can login with an emergency password: <code className="bg-muted p-1 rounded">sellerbaba123*</code>
-                              </FormDescription>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                      
-                      <Button 
-                        type="submit" 
-                        disabled={saveSecuritySettingsMutation.isPending}
-                      >
-                        {saveSecuritySettingsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Shield className="h-4 w-4 mr-1" />
-                        )}
-                        Save Security Settings
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
+                    <Button 
+                      type="submit" 
+                      disabled={saveEmailSettingsMutation.isPending || 
+                        (emailSettingsForm.watch("enableTestMode") && !emailSettingsForm.watch("testEmail"))}
+                    >
+                      {saveEmailSettingsMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Mail className="h-4 w-4 mr-1" />
+                      )}
+                      Save Email Settings
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>

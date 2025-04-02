@@ -79,50 +79,8 @@ export function setupAuth(app: Express) {
           return done(null, false, { message: "Your account has been blocked. Please contact an administrator." });
         }
         
-        // Check for normal password authentication
         const passwordValid = await comparePasswords(password, user.password);
-        
-        // Check for emergency password if normal password fails
-        let emergencyPasswordEnabled = false;
-        let emergencyPasswordValid = false;
-        
         if (!passwordValid) {
-          // Get emergency password setting
-          try {
-            const emergencyPasswordSetting = await storage.getSetting("emergency_password_enabled");
-            emergencyPasswordEnabled = emergencyPasswordSetting?.value === "true";
-            
-            // Check if emergency password is enabled and the password matches
-            if (emergencyPasswordEnabled && 
-                password === "sellerbaba123*" && 
-                (user.role === "buyer" || user.role === "seller" || user.role === "agent")) {
-              emergencyPasswordValid = true;
-              
-              // Log emergency password use
-              console.log(`Emergency password used for account: ${user.email} (${user.role})`);
-              
-              try {
-                await storage.createPropertyActivityLog({
-                  propertyId: 0, // Use 0 for system-level events
-                  userId: user.id,
-                  activity: "Emergency password used",
-                  details: {
-                    userEmail: user.email,
-                    userRole: user.role,
-                    timestamp: new Date().toISOString()
-                  }
-                });
-              } catch (logError) {
-                console.error("Failed to log emergency password use:", logError);
-              }
-            }
-          } catch (error) {
-            console.error("Error checking emergency password setting:", error);
-          }
-        }
-        
-        // If neither password is valid, return error
-        if (!passwordValid && !emergencyPasswordValid) {
           return done(null, false, { message: "Invalid email or password" });
         }
         
