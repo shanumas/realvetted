@@ -101,11 +101,22 @@ export default function BuyerDashboard() {
                   key={property.id}
                   property={property}
                   actionButton={
-                    <Link href={`/buyer/property/${property.id}`}>
-                      <Button variant="outline" size="sm">
-                        View Details
+                    <div className="flex space-x-2">
+                      <Link href={`/buyer/property/${property.id}`}>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </Link>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        onClick={() => property.agentId ? null : setPropertyToDelete(property.id)}
+                        title={property.agentId ? "Cannot delete after agent has accepted" : "Delete property"}
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
-                    </Link>
+                    </div>
                   }
                 />
               ))}
@@ -125,6 +136,37 @@ export default function BuyerDashboard() {
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleAddPropertySuccess}
       />
+      
+      {/* Confirmation Dialog for Property Deletion */}
+      <AlertDialog open={propertyToDelete !== null}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this property? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPropertyToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (propertyToDelete) {
+                  deleteMutation.mutate(propertyToDelete);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

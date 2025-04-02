@@ -92,7 +92,7 @@ export class PgStorage implements IStorage {
         const hashedPassword = `${buf.toString("hex")}.${salt}`;
         
         await this.createUser({
-          email: "admin@propertymatch.com",
+          email: "admin@admin.com",
           password: hashedPassword,
           firstName: "Admin",
           lastName: "User",
