@@ -48,8 +48,9 @@ export interface LeadWithProperty {
   lead: {
     id: number;
     propertyId: number;
+    agentId: number;
     status: string;
-    createdAt: string | Date;
+    createdAt: string | Date | null;
   };
   property: Property;
 }

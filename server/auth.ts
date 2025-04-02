@@ -6,16 +6,32 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
-import createMemoryStore from "memorystore";
-
 declare global {
   namespace Express {
-    interface User extends User {}
+    interface User {
+      id: number;
+      email: string;
+      password: string;
+      firstName: string | null;
+      lastName: string | null;
+      phone: string | null;
+      role: string;
+      profileStatus: string;
+      addressLine1: string | null;
+      addressLine2: string | null;
+      city: string | null;
+      state: string | null;
+      zip: string | null;
+      dateOfBirth: Date | null;
+      createdAt: Date;
+      idFrontUrl: string | null;
+      idBackUrl: string | null;
+      isBlocked: boolean;
+    }
   }
 }
 
 const scryptAsync = promisify(scrypt);
-const MemoryStore = createMemoryStore(session);
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -35,9 +51,7 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || "propertymatch-secret-key",
     resave: false,
     saveUninitialized: false,
-    store: new MemoryStore({
-      checkPeriod: 86400000 // prune expired entries every 24h
-    }),
+    store: storage.sessionStore,
     cookie: {
       secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days

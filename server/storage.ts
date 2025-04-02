@@ -1,13 +1,20 @@
 import { 
   User, InsertUser, Property, InsertProperty, 
-  Message, InsertMessage, AgentLead, InsertAgentLead 
+  Message, InsertMessage, AgentLead, InsertAgentLead,
+  users, properties, messages, agentLeads
 } from "@shared/schema";
 import { LeadWithProperty, PropertyWithParticipants } from "@shared/types";
 import { randomBytes } from "crypto";
 import { scrypt } from "crypto";
 import { promisify } from "util";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { eq, and, or } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 
 const scryptAsync = promisify(scrypt);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // User methods
@@ -40,67 +47,86 @@ export interface IStorage {
   getAvailableLeadsByAgent(agentId: number): Promise<LeadWithProperty[]>;
   createAgentLead(lead: InsertAgentLead): Promise<AgentLead>;
   updateAgentLead(id: number, data: Partial<AgentLead>): Promise<AgentLead>;
+  
+  // Session store
+  sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private properties: Map<number, Property>;
-  private messages: Map<number, Message>;
-  private agentLeads: Map<number, AgentLead>;
-  private userIdCounter: number;
-  private propertyIdCounter: number;
-  private messageIdCounter: number;
-  private leadIdCounter: number;
+export class PgStorage implements IStorage {
+  private db: ReturnType<typeof drizzle>;
+  private pool: pg.Pool;
+  sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.properties = new Map();
-    this.messages = new Map();
-    this.agentLeads = new Map();
-    this.userIdCounter = 1;
-    this.propertyIdCounter = 1;
-    this.messageIdCounter = 1;
-    this.leadIdCounter = 1;
-    
-    // Create initial admin user
-    this.createUser({
-      email: "admin@propertymatch.com",
-      password: "admin123",
-      firstName: "Admin",
-      lastName: "User",
-      role: "admin",
-      profileStatus: "verified"
+    // Create database connection
+    this.pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
     });
+    
+    // Create Drizzle ORM instance
+    this.db = drizzle(this.pool);
+    
+    // Create session store
+    this.sessionStore = new PostgresSessionStore({
+      pool: this.pool,
+      createTableIfMissing: true,
+    });
+    
+    // Create admin user if none exists (async, will complete in background)
+    this.initializeAdminUser();
+  }
+  
+  private async initializeAdminUser() {
+    try {
+      // Check if admin user exists
+      const adminUser = await this.db.select().from(users)
+        .where(eq(users.role, 'admin'))
+        .limit(1);
+      
+      // If no admin user, create one
+      if (adminUser.length === 0) {
+        const adminPassword = "admin123";
+        const salt = randomBytes(16).toString("hex");
+        const buf = (await scryptAsync(adminPassword, salt, 64)) as Buffer;
+        const hashedPassword = `${buf.toString("hex")}.${salt}`;
+        
+        await this.createUser({
+          email: "admin@propertymatch.com",
+          password: hashedPassword,
+          firstName: "Admin",
+          lastName: "User",
+          role: "admin",
+          profileStatus: "verified"
+        });
+      }
+    } catch (error) {
+      console.error("Error initializing admin user:", error);
+    }
   }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await this.db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email.toLowerCase() === email.toLowerCase()
-    );
+    const result = await this.db.select().from(users)
+      .where(eq(users.email, email.toLowerCase()));
+    return result[0];
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    return Array.from(this.users.values()).filter(
-      (user) => user.role === role
-    );
+    return await this.db.select().from(users).where(eq(users.role, role));
   }
 
   async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+    return await this.db.select().from(users);
   }
 
   async createUser(userData: InsertUser): Promise<User> {
-    const id = this.userIdCounter++;
-    const now = new Date();
-    
-    const user: User = {
-      id,
-      email: userData.email,
+    const result = await this.db.insert(users).values({
+      email: userData.email.toLowerCase(),
       password: userData.password,
       firstName: userData.firstName || null,
       lastName: userData.lastName || null,
@@ -113,32 +139,32 @@ export class MemStorage implements IStorage {
       state: userData.state || null,
       zip: userData.zip || null,
       dateOfBirth: userData.dateOfBirth || null,
-      createdAt: now,
+      createdAt: new Date(),
       idFrontUrl: userData.idFrontUrl || null,
       idBackUrl: userData.idBackUrl || null,
       isBlocked: false
-    };
+    }).returning();
     
-    this.users.set(id, user);
-    return user;
+    return result[0];
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
-    const user = await this.getUser(id);
+    const result = await this.db.update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
     
-    if (!user) {
+    if (result.length === 0) {
       throw new Error(`User with ID ${id} not found`);
     }
     
-    const updatedUser = { ...user, ...data };
-    this.users.set(id, updatedUser);
-    
-    return updatedUser;
+    return result[0];
   }
 
   // Property methods
   async getProperty(id: number): Promise<Property | undefined> {
-    return this.properties.get(id);
+    const result = await this.db.select().from(properties).where(eq(properties.id, id));
+    return result[0];
   }
 
   async getPropertyWithParticipants(id: number): Promise<PropertyWithParticipants | undefined> {
@@ -165,33 +191,23 @@ export class MemStorage implements IStorage {
   }
 
   async getAllProperties(): Promise<Property[]> {
-    return Array.from(this.properties.values());
+    return await this.db.select().from(properties);
   }
 
   async getPropertiesByBuyer(buyerId: number): Promise<Property[]> {
-    return Array.from(this.properties.values()).filter(
-      (property) => property.createdBy === buyerId
-    );
+    return await this.db.select().from(properties).where(eq(properties.createdBy, buyerId));
   }
 
   async getPropertiesBySeller(sellerId: number): Promise<Property[]> {
-    return Array.from(this.properties.values()).filter(
-      (property) => property.sellerId === sellerId
-    );
+    return await this.db.select().from(properties).where(eq(properties.sellerId, sellerId));
   }
 
   async getPropertiesByAgent(agentId: number): Promise<Property[]> {
-    return Array.from(this.properties.values()).filter(
-      (property) => property.agentId === agentId
-    );
+    return await this.db.select().from(properties).where(eq(properties.agentId, agentId));
   }
 
   async createProperty(propertyData: InsertProperty): Promise<Property> {
-    const id = this.propertyIdCounter++;
-    const now = new Date();
-    
-    const property: Property = {
-      id,
+    const result = await this.db.insert(properties).values({
       address: propertyData.address,
       city: propertyData.city || null,
       state: propertyData.state || null,
@@ -203,91 +219,105 @@ export class MemStorage implements IStorage {
       propertyType: propertyData.propertyType || null,
       yearBuilt: propertyData.yearBuilt || null,
       description: propertyData.description || null,
-      createdAt: now,
+      createdAt: new Date(),
       createdBy: propertyData.createdBy,
       sellerEmail: propertyData.sellerEmail || null,
       sellerId: propertyData.sellerId || null,
       agentId: propertyData.agentId || null,
       status: propertyData.status || "active"
-    };
+    }).returning();
     
-    this.properties.set(id, property);
-    return property;
+    return result[0];
   }
 
   async updateProperty(id: number, data: Partial<Property>): Promise<Property> {
-    const property = await this.getProperty(id);
+    const result = await this.db.update(properties)
+      .set(data)
+      .where(eq(properties.id, id))
+      .returning();
     
-    if (!property) {
+    if (result.length === 0) {
       throw new Error(`Property with ID ${id} not found`);
     }
     
-    const updatedProperty = { ...property, ...data };
-    this.properties.set(id, updatedProperty);
-    
-    return updatedProperty;
+    return result[0];
   }
 
   // Message methods
   async getMessage(id: number): Promise<Message | undefined> {
-    return this.messages.get(id);
+    const result = await this.db.select().from(messages).where(eq(messages.id, id));
+    return result[0];
   }
 
   async getMessagesByProperty(propertyId: number): Promise<Message[]> {
-    return Array.from(this.messages.values()).filter(
-      (message) => message.propertyId === propertyId
-    ).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return await this.db.select()
+      .from(messages)
+      .where(eq(messages.propertyId, propertyId))
+      .orderBy(messages.timestamp);
   }
 
   async getMessagesBetweenUsers(propertyId: number, user1Id: number, user2Id: number): Promise<Message[]> {
-    return Array.from(this.messages.values()).filter(
-      (message) => 
-        message.propertyId === propertyId && 
-        ((message.senderId === user1Id && message.receiverId === user2Id) ||
-         (message.senderId === user2Id && message.receiverId === user1Id))
-    ).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return await this.db.select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.propertyId, propertyId),
+          or(
+            and(
+              eq(messages.senderId, user1Id),
+              eq(messages.receiverId, user2Id)
+            ),
+            and(
+              eq(messages.senderId, user2Id),
+              eq(messages.receiverId, user1Id)
+            )
+          )
+        )
+      )
+      .orderBy(messages.timestamp);
   }
 
   async createMessage(messageData: InsertMessage): Promise<Message> {
-    const id = this.messageIdCounter++;
-    const now = new Date();
-    
-    const message: Message = {
-      id,
+    const result = await this.db.insert(messages).values({
       propertyId: messageData.propertyId,
       senderId: messageData.senderId,
       receiverId: messageData.receiverId,
       content: messageData.content,
-      timestamp: now,
+      timestamp: new Date(),
       isRead: false
-    };
+    }).returning();
     
-    this.messages.set(id, message);
-    return message;
+    return result[0];
   }
 
   async markMessageAsRead(id: number): Promise<Message> {
-    const message = await this.getMessage(id);
+    const result = await this.db.update(messages)
+      .set({ isRead: true })
+      .where(eq(messages.id, id))
+      .returning();
     
-    if (!message) {
+    if (result.length === 0) {
       throw new Error(`Message with ID ${id} not found`);
     }
     
-    const updatedMessage = { ...message, isRead: true };
-    this.messages.set(id, updatedMessage);
-    
-    return updatedMessage;
+    return result[0];
   }
 
   // Agent lead methods
   async getAgentLead(id: number): Promise<AgentLead | undefined> {
-    return this.agentLeads.get(id);
+    const result = await this.db.select().from(agentLeads).where(eq(agentLeads.id, id));
+    return result[0];
   }
 
   async getAvailableLeadsByAgent(agentId: number): Promise<LeadWithProperty[]> {
-    const leads = Array.from(this.agentLeads.values()).filter(
-      (lead) => lead.agentId === agentId && lead.status === "available"
-    );
+    const leads = await this.db.select()
+      .from(agentLeads)
+      .where(
+        and(
+          eq(agentLeads.agentId, agentId),
+          eq(agentLeads.status, "available")
+        )
+      );
     
     const result: LeadWithProperty[] = [];
     
@@ -295,7 +325,13 @@ export class MemStorage implements IStorage {
       const property = await this.getProperty(lead.propertyId);
       if (property) {
         result.push({
-          lead,
+          lead: {
+            id: lead.id,
+            propertyId: lead.propertyId,
+            agentId: lead.agentId,
+            status: lead.status,
+            createdAt: lead.createdAt || new Date()
+          },
           property
         });
       }
@@ -305,33 +341,29 @@ export class MemStorage implements IStorage {
   }
 
   async createAgentLead(leadData: InsertAgentLead): Promise<AgentLead> {
-    const id = this.leadIdCounter++;
-    const now = new Date();
-    
-    const lead: AgentLead = {
-      id,
+    const result = await this.db.insert(agentLeads).values({
       propertyId: leadData.propertyId,
       agentId: leadData.agentId,
       status: leadData.status || "available",
-      createdAt: now
-    };
+      createdAt: new Date()
+    }).returning();
     
-    this.agentLeads.set(id, lead);
-    return lead;
+    return result[0];
   }
 
   async updateAgentLead(id: number, data: Partial<AgentLead>): Promise<AgentLead> {
-    const lead = await this.getAgentLead(id);
+    const result = await this.db.update(agentLeads)
+      .set(data)
+      .where(eq(agentLeads.id, id))
+      .returning();
     
-    if (!lead) {
+    if (result.length === 0) {
       throw new Error(`Agent lead with ID ${id} not found`);
     }
     
-    const updatedLead = { ...lead, ...data };
-    this.agentLeads.set(id, updatedLead);
-    
-    return updatedLead;
+    return result[0];
   }
 }
 
-export const storage = new MemStorage();
+// Use the database storage implementation
+export const storage = new PgStorage();
