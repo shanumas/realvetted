@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,26 @@ import { PropertyCard } from "@/components/property-card";
 import { AddPropertyModal } from "@/components/add-property-modal";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
-import { getQueryFn } from "@/lib/queryClient";
-import { Loader2, PlusIcon } from "lucide-react";
+import { getQueryFn, queryClient } from "@/lib/queryClient";
+import { deleteProperty } from "@/lib/ai";
+import { Loader2, PlusIcon, Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function BuyerDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
 
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
@@ -23,6 +37,28 @@ export default function BuyerDashboard() {
     setIsModalOpen(false);
     refetch();
   };
+  
+  const deleteMutation = useMutation({
+    mutationFn: (propertyId: number) => {
+      return deleteProperty(propertyId);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Property deleted",
+        description: "Property has been successfully deleted",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
+      setPropertyToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setPropertyToDelete(null);
+    },
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
