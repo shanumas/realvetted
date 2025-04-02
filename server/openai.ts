@@ -276,34 +276,51 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       return generateMockPropertyData(url);
     }
     
-    // Extract the domain and path from the URL for better search results
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname;
+    // First search - Property details search
+    const propertySearchQuery = `${url} real estate listing details bedrooms bathrooms price square feet address`;
+    console.log(`Searching for property information using query: ${propertySearchQuery}`);
     
-    // Create a search query that will find information about this property listing
-    const searchQuery = `${url} real estate listing details bedrooms bathrooms price square feet address`;
-    
-    console.log(`Searching for property information using query: ${searchQuery}`);
-    
-    // Use SerpAPI to search for the property details
-    const searchResults = await getJson({
+    const propertySearchResults = await getJson({
       engine: "google",
-      q: searchQuery,
+      q: propertySearchQuery,
       api_key: process.env.SERPAPI_KEY,
-      num: 8, // Increasing results to get more context
+      num: 6, // Get property details
     });
     
-    // Extract search results
-    const organicResults = searchResults.organic_results || [];
+    // Extract property search results
+    const propertyOrganicResults = propertySearchResults.organic_results || [];
     
     // No search results found
-    if (organicResults.length === 0) {
+    if (propertyOrganicResults.length === 0) {
       console.log("No search results found for property URL");
       return generateMockPropertyData(url);
     }
     
-    // Get the search result snippets which often contain the property details
-    const snippets = organicResults.map(result => {
+    // Get property result snippets
+    const propertySnippets = propertyOrganicResults.map(result => {
+      return {
+        title: result.title || "",
+        snippet: result.snippet || "",
+        link: result.link || ""
+      };
+    });
+    
+    // Second search - Specifically for listing agent information
+    const agentSearchQuery = `${url} "listed by" OR "listing agent" OR "listing provided by" real estate agent contact`;
+    console.log(`Searching for listing agent information using query: ${agentSearchQuery}`);
+    
+    const agentSearchResults = await getJson({
+      engine: "google",
+      q: agentSearchQuery,
+      api_key: process.env.SERPAPI_KEY,
+      num: 5, // Focus on agent details
+    });
+    
+    // Extract agent search results
+    const agentOrganicResults = agentSearchResults.organic_results || [];
+    
+    // Get agent result snippets
+    const agentSnippets = agentOrganicResults.map(result => {
       return {
         title: result.title || "",
         snippet: result.snippet || "",
@@ -315,22 +332,30 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     const prompt = `
       I have search results for a real estate listing at URL: "${url}"
       
-      Here are the search result snippets:
-      ${snippets.map((item, index) => `
-        Result ${index + 1}:
+      First, here are results from a search specifically for "listing agent" information:
+      ${agentSnippets.map((item, index) => `
+        Agent Result ${index + 1}:
         Title: ${item.title}
         Snippet: ${item.snippet}
         Link: ${item.link}
       `).join('\n')}
       
-      Based on these search results, extract the property details with a focus on finding accurate seller/agent information. 
+      And here are general property search results:
+      ${propertySnippets.map((item, index) => `
+        Property Result ${index + 1}:
+        Title: ${item.title}
+        Snippet: ${item.snippet}
+        Link: ${item.link}
+      `).join('\n')}
       
-      IMPORTANT: The seller details should be taken from the "Listed by" or "listing agent" information on real estate listings. 
-      This is the agent who has listed the property for sale, not the property owner.
+      Based on these search results, extract the property details with a primary focus on finding the listing agent information.
+      
+      CRITICAL: You MUST look specifically for information about the "Listed by" or "listing agent" details.
+      This is the real estate agent who has listed the property for sale, not the property owner.
       Look for phrases like "Listed by", "Listing Agent", "Listing provided by", "Contact agent", etc.
       
       Pay special attention to finding the listing agent's name, phone number, email, and real estate company.
-      For any missing information, make a reasonable estimate based on available data.
+      The listing agent information is the most important part of this extraction.
       
       Format your response as a JSON object with these fields: 
       {
@@ -346,7 +371,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         "yearBuilt": year built as a number,
         "description": "brief description",
         "features": ["feature1", "feature2", ...],
-        "sellerName": "Listing agent's name",
+        "sellerName": "Listing agent's full name",
         "sellerPhone": "Listing agent's phone",
         "sellerEmail": "Listing agent's email",
         "sellerCompany": "Listing agent's real estate company",
@@ -362,7 +387,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       messages: [
         {
           role: "system",
-          content: "You are a real estate data extraction expert. Extract property listing details from search results with special focus on agent/seller contact information."
+          content: "You are a real estate data extraction expert specializing in finding 'Listed by' information. Your primary task is to identify the listing agent who has listed the property for sale. Always look specifically for 'Listed by', 'Listing Agent', or 'Listing provided by' sections in real estate listings. This is the real estate professional who is representing the seller, not the property owner."
         },
         { role: "user", content: prompt }
       ],
