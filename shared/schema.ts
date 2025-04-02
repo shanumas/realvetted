@@ -75,6 +75,16 @@ export const agentLeads = pgTable("agent_leads", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Property activity logs
+export const propertyActivityLogs = pgTable("property_activity_logs", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull(),
+  userId: integer("user_id"), // Can be null for system events
+  activity: text("activity").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+  details: json("details"),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -123,6 +133,11 @@ export const agentLeadSchema = createInsertSchema(agentLeads).omit({
   createdAt: true,
 });
 
+export const propertyActivityLogSchema = createInsertSchema(propertyActivityLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -132,3 +147,5 @@ export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof messageSchema>;
 export type AgentLead = typeof agentLeads.$inferSelect;
 export type InsertAgentLead = z.infer<typeof agentLeadSchema>;
+export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
+export type InsertPropertyActivityLog = z.infer<typeof propertyActivityLogSchema>;

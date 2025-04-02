@@ -67,3 +67,18 @@ export interface LeadWithProperty {
   };
   property: Property;
 }
+
+export interface PropertyActivityLogWithUser {
+  id: number;
+  propertyId: number;
+  userId: number | null;
+  activity: string;
+  timestamp: string | Date;
+  details: any;
+  user?: {
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+    role: string;
+  };
+}

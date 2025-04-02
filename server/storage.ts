@@ -1,9 +1,10 @@
 import { 
   User, InsertUser, Property, InsertProperty, 
   Message, InsertMessage, AgentLead, InsertAgentLead,
-  users, properties, messages, agentLeads
+  PropertyActivityLog, InsertPropertyActivityLog,
+  users, properties, messages, agentLeads, propertyActivityLogs
 } from "@shared/schema";
-import { LeadWithProperty, PropertyWithParticipants } from "@shared/types";
+import { LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser } from "@shared/types";
 import { randomBytes } from "crypto";
 import { scrypt } from "crypto";
 import { promisify } from "util";
@@ -48,6 +49,10 @@ export interface IStorage {
   getAvailableLeadsByAgent(agentId: number): Promise<LeadWithProperty[]>;
   createAgentLead(lead: InsertAgentLead): Promise<AgentLead>;
   updateAgentLead(id: number, data: Partial<AgentLead>): Promise<AgentLead>;
+  
+  // Property activity log methods
+  getPropertyActivityLogs(propertyId: number): Promise<PropertyActivityLogWithUser[]>;
+  createPropertyActivityLog(log: InsertPropertyActivityLog): Promise<PropertyActivityLog>;
   
   // Session store
   sessionStore: session.Store;
@@ -381,6 +386,51 @@ export class PgStorage implements IStorage {
     if (result.length === 0) {
       throw new Error(`Agent lead with ID ${id} not found`);
     }
+    
+    return result[0];
+  }
+
+  // Property activity log methods
+  async getPropertyActivityLogs(propertyId: number): Promise<PropertyActivityLogWithUser[]> {
+    const logs = await this.db.select()
+      .from(propertyActivityLogs)
+      .where(eq(propertyActivityLogs.propertyId, propertyId))
+      .orderBy(propertyActivityLogs.timestamp, "desc");
+    
+    const result: PropertyActivityLogWithUser[] = [];
+    
+    for (const log of logs) {
+      let user = undefined;
+      
+      if (log.userId) {
+        const userData = await this.getUser(log.userId);
+        if (userData) {
+          user = {
+            firstName: userData.firstName,
+            lastName: userData.lastName,
+            email: userData.email,
+            role: userData.role
+          };
+        }
+      }
+      
+      result.push({
+        ...log,
+        user
+      });
+    }
+    
+    return result;
+  }
+  
+  async createPropertyActivityLog(logData: InsertPropertyActivityLog): Promise<PropertyActivityLog> {
+    const result = await this.db.insert(propertyActivityLogs).values({
+      propertyId: logData.propertyId,
+      userId: logData.userId || null,
+      activity: logData.activity,
+      timestamp: new Date(),
+      details: logData.details || {}
+    }).returning();
     
     return result[0];
   }

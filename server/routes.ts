@@ -100,6 +100,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const property = await storage.createProperty(propertyData);
       
+      // Log property creation
+      await storage.createPropertyActivityLog({
+        propertyId: property.id,
+        userId: req.user!.id,
+        activity: "Property created",
+        details: {
+          address: property.address,
+          price: property.price,
+          createdBy: {
+            id: req.user!.id,
+            role: req.user!.role
+          }
+        }
+      });
+      
       // If seller email is available, create seller account or associate with existing
       if (property.sellerEmail) {
         let seller = await storage.getUserByEmail(property.sellerEmail);
@@ -359,6 +374,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emailSent: true
       });
       
+      // Log this activity
+      await storage.createPropertyActivityLog({
+        propertyId,
+        userId: userId || null,
+        activity: "Email sent to seller",
+        details: {
+          sellerEmail: property.sellerEmail,
+          sentBy: {
+            id: userId,
+            role: userRole
+          }
+        }
+      });
+      
       // Send WebSocket notification to all users with access to this property
       const notifyUserIds = [property.createdBy];
       if (property.agentId) notifyUserIds.push(property.agentId);
@@ -499,6 +528,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Assign agent to property
       await storage.updateProperty(lead.propertyId, {
         agentId: req.user.id
+      });
+      
+      // Log this activity
+      await storage.createPropertyActivityLog({
+        propertyId: lead.propertyId,
+        userId: req.user!.id,
+        activity: "Agent claimed lead",
+        details: {
+          leadId: lead.id,
+          agentId: req.user!.id,
+          agentEmail: req.user!.email
+        }
       });
       
       res.json({
@@ -807,6 +848,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         agentId: agentId
       });
       
+      // Log this admin action
+      await storage.createPropertyActivityLog({
+        propertyId,
+        userId: req.user!.id,
+        activity: "Admin reassigned agent",
+        details: {
+          previousAgentId: property.agentId,
+          newAgentId: agentId,
+          adminId: req.user!.id
+        }
+      });
+      
       res.json({
         success: true,
         data: updatedProperty
@@ -816,6 +869,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to reassign agent"
+      });
+    }
+  });
+
+  // Property activity log endpoints
+  app.get("/api/properties/:id/logs", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check user permissions
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      if (
+        userRole !== "admin" && 
+        property.createdBy !== userId &&
+        property.sellerId !== userId &&
+        property.agentId !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to perform this action"
+        });
+      }
+      
+      const logs = await storage.getPropertyActivityLogs(propertyId);
+      
+      res.json({
+        success: true,
+        data: logs
+      });
+    } catch (error) {
+      console.error("Error getting property logs:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get property logs"
       });
     }
   });

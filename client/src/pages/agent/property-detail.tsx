@@ -1,9 +1,7 @@
 import React, { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { Property } from "@shared/schema";
+import { useQuery } from "@tanstack/react-query";
+import { getQueryFn } from "@/lib/queryClient";
 import { PropertyWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
@@ -13,42 +11,15 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Send, Activity
+  Activity
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 
-export default function BuyerPropertyDetail() {
-  const [, params] = useRoute("/buyer/property/:id");
+export default function AgentPropertyDetail() {
+  const [, params] = useRoute("/agent/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
-  const [activeTab, setActiveTab] = useState<string>("seller");
+  const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
-  const { toast } = useToast();
-
-  const sendEmailMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/properties/${propertyId}/send-email`, {});
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Email sent",
-        description: "Your email has been sent to the listing agent.",
-        variant: "default",
-      });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Could not send email",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
-
-  const handleSendEmail = () => {
-    sendEmailMutation.mutate();
-  };
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -277,138 +248,24 @@ export default function BuyerPropertyDetail() {
                       </div>
                     )}
                   </dl>
-                  
-                  {/* Listing Agent Information */}
-                  {(property.sellerName || property.sellerEmail || property.sellerPhone || 
-                    property.sellerCompany || property.sellerLicenseNo) && (
-                    <>
-                      <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Listing Agent Information</h3>
-                      </div>
-                      <dl>
-                        {property.sellerName && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Building className="mr-2 h-4 w-4" /> Agent name
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerName}
-                            </dd>
-                          </div>
-                        )}
-                        {property.sellerEmail && (
-                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Mail className="mr-2 h-4 w-4" /> Email
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <div className="flex items-center">
-                                <a 
-                                  href={`mailto:${property.sellerEmail}`}
-                                  className="text-blue-600 hover:underline"
-                                >
-                                  {property.sellerEmail}
-                                </a>
-                                
-                                {property.emailSent ? (
-                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                    <Mail className="mr-1 h-3 w-3" />
-                                    Email sent
-                                  </span>
-                                ) : (
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    className="ml-2"
-                                    onClick={handleSendEmail}
-                                    disabled={sendEmailMutation.isPending}
-                                  >
-                                    {sendEmailMutation.isPending ? (
-                                      <>
-                                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                        Sending...
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Send className="mr-1 h-3 w-3" />
-                                        Send Email
-                                      </>
-                                    )}
-                                  </Button>
-                                )}
-                              </div>
-                            </dd>
-                          </div>
-                        )}
-                        {property.sellerPhone && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Phone className="mr-2 h-4 w-4" /> Phone
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a 
-                                href={`tel:${property.sellerPhone}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {property.sellerPhone}
-                              </a>
-                            </dd>
-                          </div>
-                        )}
-                        {property.sellerCompany && (
-                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Briefcase className="mr-2 h-4 w-4" /> Company
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerCompany}
-                            </dd>
-                          </div>
-                        )}
-                        {property.sellerLicenseNo && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Award className="mr-2 h-4 w-4" /> License #
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerLicenseNo}
-                            </dd>
-                          </div>
-                        )}
-                      </dl>
-                    </>
-                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
           
-          {/* Chat Section */}
+          {/* Communication Section */}
           <div className="lg:col-span-1">
             <Card>
               <CardContent className="p-0">
-                <div className="px-4 py-5 border-b border-gray-200 sm:px-6">
-                  <h3 className="text-lg leading-6 font-medium text-gray-900">
-                    Property Communication
-                  </h3>
-                  <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                    Chat with seller and your agent
-                  </p>
-                </div>
-                
                 <Tabs 
-                  defaultValue={activeTab} 
                   value={activeTab} 
                   onValueChange={setActiveTab} 
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-3">
-                      <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
-                        Seller Chat
-                      </TabsTrigger>
-                      <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
-                        Agent Chat
+                    <TabsList className="w-full grid grid-cols-2">
+                      <TabsTrigger value="buyer" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        Buyer Chat
                       </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
@@ -419,32 +276,17 @@ export default function BuyerPropertyDetail() {
                     </TabsList>
                   </div>
                   
-                  <TabsContent value="seller">
-                    {property.sellerId ? (
+                  <TabsContent value="buyer">
+                    {property.createdBy ? (
                       <ChatWindow
                         propertyId={propertyId}
-                        receiverId={property.sellerId}
-                        receiverName={property.seller?.firstName || "Seller"}
+                        receiverId={property.createdBy}
+                        receiverName={property.buyer?.firstName || "Buyer"}
                       />
                     ) : (
                       <div className="p-4 text-center text-gray-500">
-                        <p>The seller hasn't joined the platform yet.</p>
+                        <p>The buyer hasn't joined the platform yet.</p>
                         <p className="text-sm mt-1">Once they sign up, you'll be able to chat with them here.</p>
-                      </div>
-                    )}
-                  </TabsContent>
-                  
-                  <TabsContent value="agent">
-                    {property.agentId ? (
-                      <ChatWindow
-                        propertyId={propertyId}
-                        receiverId={property.agentId}
-                        receiverName={property.agent?.firstName || "Agent"}
-                      />
-                    ) : (
-                      <div className="p-4 text-center text-gray-500">
-                        <p>No agent has been assigned yet.</p>
-                        <p className="text-sm mt-1">Once an agent claims this property, you'll be able to chat with them here.</p>
                       </div>
                     )}
                   </TabsContent>
