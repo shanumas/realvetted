@@ -45,16 +45,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<User | null, Error>({
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    initialData: null, // Explicitly set initial data to null
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       try {
-        const validated = loginUserSchema.parse(credentials);
-        const res = await apiRequest("POST", "/api/auth/login", validated);
+        console.log("Login credentials:", credentials);
+        // Don't re-validate here as it was already validated by the form
+        const res = await apiRequest("POST", "/api/auth/login", credentials);
         return await res.json();
       } catch (error) {
-        throw new Error(error instanceof Error ? error.message : "Validation failed");
+        console.error("Login error:", error);
+        throw new Error(error instanceof Error ? error.message : "Login failed");
       }
     },
     onSuccess: (user: User) => {
@@ -92,11 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
       try {
-        const validated = registerUserSchema.parse(data);
-        const res = await apiRequest("POST", "/api/auth/register", validated);
+        console.log("Register data:", data);
+        // Don't re-validate here as it was already validated by the form
+        const res = await apiRequest("POST", "/api/auth/register", data);
         return await res.json();
       } catch (error) {
-        throw new Error(error instanceof Error ? error.message : "Validation failed");
+        console.error("Registration error:", error);
+        throw new Error(error instanceof Error ? error.message : "Registration failed");
       }
     },
     onSuccess: (user: User) => {
@@ -151,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user,
+        user: user ?? null,
         isLoading,
         error,
         loginMutation,
