@@ -1403,10 +1403,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a viewing request
   app.post("/api/viewing-requests", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
-      const requestData = viewingRequestSchema.parse({
+      // Convert string dates to Date objects before validation
+      const requestBody = {
         ...req.body,
-        buyerId: req.user!.id
-      });
+        buyerId: req.user!.id,
+        requestedDate: req.body.requestedDate ? new Date(req.body.requestedDate) : undefined,
+        requestedEndDate: req.body.requestedEndDate ? new Date(req.body.requestedEndDate) : undefined
+      };
+      
+      const requestData = viewingRequestSchema.parse(requestBody);
       
       const property = await storage.getProperty(requestData.propertyId);
       if (!property) {
@@ -1522,15 +1527,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             buyer = await storage.getUser(request.buyerId);
           }
 
-          let agent = undefined;
-          if (request.agentId) {
-            agent = await storage.getUser(request.agentId);
+          // Get buyer agent if assigned
+          let buyerAgent = undefined;
+          if (request.buyerAgentId) {
+            buyerAgent = await storage.getUser(request.buyerAgentId);
+          }
+          
+          // Get seller agent if assigned
+          let sellerAgent = undefined;
+          if (request.sellerAgentId) {
+            sellerAgent = await storage.getUser(request.sellerAgentId);
           }
 
           return {
             ...request,
             buyer,
-            agent
+            buyerAgent,
+            sellerAgent
           } as ViewingRequestWithParticipants;
         })
       );
