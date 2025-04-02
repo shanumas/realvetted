@@ -10,13 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
-  Briefcase, Award, Link, FileText, ListTodo, ImageIcon 
+  Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight
 } from "lucide-react";
 
 export default function PropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("seller");
+  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -74,24 +75,71 @@ export default function PropertyDetail() {
                 {/* Property Images */}
                 <div className="px-4 py-5 sm:px-6">
                   {property.imageUrls && property.imageUrls.length > 0 ? (
-                    <div className="overflow-x-auto">
-                      <div className="flex space-x-4">
-                        {property.imageUrls.map((url, index) => (
-                          <div key={index} className="min-w-[300px] h-64 rounded-lg overflow-hidden">
-                            <img 
-                              src={url} 
-                              alt={`Property image ${index + 1}`} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // If image fails to load, show placeholder
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
-                                target.onerror = null; // Prevent infinite error loop
-                              }}
-                            />
-                          </div>
-                        ))}
+                    <div className="relative">
+                      {/* Image Carousel */}
+                      <div className="relative overflow-x-hidden">
+                        <div 
+                          className="flex transition-transform duration-300 ease-in-out" 
+                          style={{ 
+                            transform: `translateX(-${currentImageIndex * 100}%)`,
+                            width: `${property.imageUrls.length * 100}%` 
+                          }}
+                        >
+                          {property.imageUrls.map((url, index) => (
+                            <div key={index} className="w-full flex-shrink-0">
+                              <div className="h-64 mx-auto rounded-lg overflow-hidden">
+                                <img 
+                                  src={url} 
+                                  alt={`Property image ${index + 1}`} 
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    // If image fails to load, show placeholder
+                                    const target = e.target as HTMLImageElement;
+                                    target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+                                    target.onerror = null; // Prevent infinite error loop
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
+                      
+                      {/* Navigation Arrows */}
+                      {property.imageUrls.length > 1 && (
+                        <>
+                          <button 
+                            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-r-md hover:bg-black/70 transition-colors"
+                            onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : property.imageUrls!.length - 1))}
+                            aria-label="Previous image"
+                          >
+                            <ChevronLeft className="h-6 w-6" />
+                          </button>
+                          <button 
+                            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-l-md hover:bg-black/70 transition-colors"
+                            onClick={() => setCurrentImageIndex(prev => (prev < property.imageUrls!.length - 1 ? prev + 1 : 0))}
+                            aria-label="Next image"
+                          >
+                            <ChevronRight className="h-6 w-6" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Image Indicators */}
+                      {property.imageUrls.length > 1 && (
+                        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
+                          {property.imageUrls.map((_, index) => (
+                            <button
+                              key={index}
+                              className={`h-2 w-2 rounded-full transition-colors ${
+                                currentImageIndex === index ? 'bg-white' : 'bg-white/50'
+                              }`}
+                              onClick={() => setCurrentImageIndex(index)}
+                              aria-label={`Go to image ${index + 1}`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="bg-gray-200 h-64 rounded-lg overflow-hidden">

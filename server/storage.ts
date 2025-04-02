@@ -86,7 +86,7 @@ export class PgStorage implements IStorage {
       
       // If no admin user, create one
       if (adminUser.length === 0) {
-        const adminPassword = "admin123";
+        const adminPassword = "Kuttybuski123*";
         const salt = randomBytes(16).toString("hex");
         const buf = (await scryptAsync(adminPassword, salt, 64)) as Buffer;
         const hashedPassword = `${buf.toString("hex")}.${salt}`;
