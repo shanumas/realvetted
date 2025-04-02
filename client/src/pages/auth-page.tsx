@@ -7,19 +7,40 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Please enter a valid email address"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   rememberMe: z.boolean().optional(),
 });
 
 const registerSchema = z.object({
-  email: z.string().trim().min(1, "Email is required").email("Please enter a valid email address"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email is required")
+    .email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -38,9 +59,13 @@ export default function AuthPage() {
   useEffect(() => {
     if (user) {
       if (user.role === "buyer") {
-        navigate(user.profileStatus === "verified" ? "/buyer/dashboard" : "/buyer/kyc");
+        navigate(
+          user.profileStatus === "verified" ? "/buyer/dashboard" : "/buyer/kyc",
+        );
       } else if (user.role === "agent") {
-        navigate(user.profileStatus === "verified" ? "/agent/dashboard" : "/agent/kyc");
+        navigate(
+          user.profileStatus === "verified" ? "/agent/dashboard" : "/agent/kyc",
+        );
       } else if (user.role === "seller") {
         navigate("/seller/dashboard");
       } else if (user.role === "admin") {
@@ -70,13 +95,19 @@ export default function AuthPage() {
 
   // Listen to the form state changes
   useEffect(() => {
-    if (loginForm.formState.errors && Object.keys(loginForm.formState.errors).length > 0) {
+    if (
+      loginForm.formState.errors &&
+      Object.keys(loginForm.formState.errors).length > 0
+    ) {
       console.log("Login form errors:", loginForm.formState.errors);
     }
   }, [loginForm.formState.errors]);
 
   useEffect(() => {
-    if (registerForm.formState.errors && Object.keys(registerForm.formState.errors).length > 0) {
+    if (
+      registerForm.formState.errors &&
+      Object.keys(registerForm.formState.errors).length > 0
+    ) {
       console.log("Register form errors:", registerForm.formState.errors);
     }
   }, [registerForm.formState.errors]);
@@ -89,7 +120,7 @@ export default function AuthPage() {
       role: roleTab as any,
     });
   };
-  
+
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
     registerMutation.mutate({
@@ -121,7 +152,12 @@ export default function AuthPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="buyer" value={roleTab} onValueChange={setRoleTab} className="w-full">
+        <Tabs
+          defaultValue="buyer"
+          value={roleTab}
+          onValueChange={setRoleTab}
+          className="w-full"
+        >
           <TabsList className="grid grid-cols-4 mb-8">
             <TabsTrigger value="buyer">Buyer</TabsTrigger>
             <TabsTrigger value="agent">Agent</TabsTrigger>
@@ -133,21 +169,25 @@ export default function AuthPage() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <div>
-                  <CardTitle>{authMode === "login" ? "Sign In" : "Create Account"}</CardTitle>
+                  <CardTitle>
+                    {authMode === "login" ? "Sign In" : "Create Account"}
+                  </CardTitle>
                   <CardDescription>
                     {roleTab === "buyer"
                       ? "Find your dream property with AI-powered matching"
                       : roleTab === "agent"
-                      ? "Get matched with qualified buyers"
-                      : roleTab === "seller"
-                      ? "Connect with interested buyers"
-                      : "Manage platform users and properties"}
+                        ? "Get matched with qualified buyers"
+                        : roleTab === "seller"
+                          ? "Connect with interested buyers"
+                          : "Manage platform users and properties"}
                   </CardDescription>
                 </div>
                 <div>
-                  <Button 
-                    variant="link" 
-                    onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      setAuthMode(authMode === "login" ? "register" : "login")
+                    }
                   >
                     {authMode === "login" ? "Register" : "Sign In"}
                   </Button>
@@ -157,7 +197,10 @@ export default function AuthPage() {
             <CardContent>
               {authMode === "login" ? (
                 <Form {...loginForm}>
-                  <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={loginForm.control}
                       name="email"
@@ -165,11 +208,11 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="name@example.com" 
+                            <Input
+                              placeholder="name@example.com"
                               type="email"
                               autoComplete="email"
-                              {...field} 
+                              {...field}
                               onChange={(e) => {
                                 field.onChange(e.target.value.trim());
                               }}
@@ -186,7 +229,11 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="••••••" {...field} />
+                            <Input
+                              type="password"
+                              placeholder="••••••"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -210,7 +257,12 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
-                      <Button type="button" variant="link" size="sm" className="px-0">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="px-0"
+                      >
                         Forgot password?
                       </Button>
                     </div>
@@ -224,45 +276,48 @@ export default function AuthPage() {
                       ) : null}
                       Sign In
                     </Button>
-                    
+
                     {roleTab === "seller" && (
                       <p className="text-center text-sm text-gray-500 mt-4">
-                        Sellers are invited by email when a buyer adds a property.
+                        Sellers are invited by email when a buyer adds a
+                        property.
                       </p>
                     )}
                   </form>
                 </Form>
               ) : (
                 <Form {...registerForm}>
-                  <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={registerForm.control}
-                        name="firstName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>First Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="John" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={registerForm.control}
-                        name="lastName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Last Name</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Doe" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                  <form
+                    onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={registerForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="John" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Doe" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                     <FormField
                       control={registerForm.control}
                       name="email"
@@ -270,11 +325,11 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="name@example.com" 
+                            <Input
+                              placeholder="name@example.com"
                               type="email"
                               autoComplete="email"
-                              {...field} 
+                              {...field}
                               onChange={(e) => {
                                 field.onChange(e.target.value.trim());
                               }}
@@ -291,7 +346,11 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="••••••" {...field} />
+                            <Input
+                              type="password"
+                              placeholder="••••••"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -307,10 +366,11 @@ export default function AuthPage() {
                       ) : null}
                       Create Account
                     </Button>
-                    
+
                     {roleTab === "seller" && (
                       <p className="text-center text-sm text-gray-500 mt-4">
-                        Sellers are invited by email when a buyer adds a property.
+                        Sellers are invited by email when a buyer adds a
+                        property.
                       </p>
                     )}
                   </form>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { uploadIDDocuments } from "@/lib/openai";
+import { uploadIDDocuments, extractDataFromID, KYCExtractedData } from "@/lib/openai";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2, Upload, FileCheck } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
 
 type KYCFormValues = z.infer<typeof kycUpdateSchema>;
@@ -21,8 +21,10 @@ export default function BuyerKYC() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingID, setIsProcessingID] = useState(false);
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack, setIdBack] = useState<File | null>(null);
+  const [dataExtracted, setDataExtracted] = useState(false);
 
   const form = useForm<KYCFormValues>({
     resolver: zodResolver(kycUpdateSchema),
@@ -38,15 +40,72 @@ export default function BuyerKYC() {
     },
   });
 
+  // Extract and fill data from ID when both front and back are uploaded
+  useEffect(() => {
+    const extractDataAndFillForm = async () => {
+      if (idFront && idBack) {
+        try {
+          setIsProcessingID(true);
+          
+          // Show extraction toast
+          toast({
+            title: "Processing ID",
+            description: "We're extracting information from your ID...",
+          });
+          
+          // Extract data from ID
+          const extractedData = await extractDataFromID(idFront, idBack);
+          
+          // Update form values with extracted data
+          if (extractedData) {
+            const updates: Partial<KYCFormValues> = {};
+            
+            if (extractedData.firstName) updates.firstName = extractedData.firstName;
+            if (extractedData.lastName) updates.lastName = extractedData.lastName;
+            if (extractedData.dateOfBirth) updates.dateOfBirth = extractedData.dateOfBirth;
+            if (extractedData.addressLine1) updates.addressLine1 = extractedData.addressLine1;
+            if (extractedData.addressLine2) updates.addressLine2 = extractedData.addressLine2;
+            if (extractedData.city) updates.city = extractedData.city;
+            if (extractedData.state) updates.state = extractedData.state;
+            if (extractedData.zip) updates.zip = extractedData.zip;
+            
+            form.reset({ ...form.getValues(), ...updates });
+            setDataExtracted(true);
+            
+            toast({
+              title: "ID Processed",
+              description: "Information from your ID has been automatically filled in. Please verify and correct if needed.",
+            });
+          }
+        } catch (error) {
+          console.error("Error extracting ID data:", error);
+          toast({
+            title: "Processing error",
+            description: "Could not automatically extract data from your ID. Please fill in the information manually.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsProcessingID(false);
+        }
+      }
+    };
+    
+    if (idFront && idBack && !dataExtracted) {
+      extractDataAndFillForm();
+    }
+  }, [idFront, idBack, dataExtracted, form, toast]);
+
   const handleIdFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setIdFront(e.target.files[0]);
+      setDataExtracted(false); // Reset extraction flag when new ID is uploaded
     }
   };
 
   const handleIdBackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setIdBack(e.target.files[0]);
+      setDataExtracted(false); // Reset extraction flag when new ID is uploaded
     }
   };
 
@@ -119,17 +178,43 @@ export default function BuyerKYC() {
                 </div>
                 
                 <div className="space-y-4">
+                  {/* Processing indicator */}
+                  {isProcessingID && (
+                    <div className="p-3 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center space-x-2 mb-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                      <span>Processing your ID documents...</span>
+                    </div>
+                  )}
+                  
+                  {/* Successfully extracted data indicator */}
+                  {dataExtracted && (
+                    <div className="p-3 bg-green-50 text-green-700 rounded-lg flex items-center justify-center space-x-2 mb-4">
+                      <FileCheck className="h-5 w-5 text-green-500" />
+                      <span>ID data successfully extracted! Please verify the information below.</span>
+                    </div>
+                  )}
+                  
                   {/* ID Front Upload */}
                   <div 
                     className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
-                      idFront ? "border-green-300 bg-green-50" : "border-gray-300"
+                      idFront 
+                        ? dataExtracted 
+                          ? "border-green-300 bg-green-50" 
+                          : "border-blue-300 bg-blue-50" 
+                        : "border-gray-300"
                     }`}
-                    onClick={() => document.getElementById("id-front")?.click()}
+                    onClick={() => !isProcessingID && document.getElementById("id-front")?.click()}
                   >
                     <div className="space-y-2">
-                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      {idFront && isProcessingID ? (
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
+                      ) : idFront && dataExtracted ? (
+                        <FileCheck className="mx-auto h-8 w-8 text-green-500" />
+                      ) : (
+                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      )}
                       <div className="text-sm text-gray-600">
-                        <label htmlFor="id-front" className="cursor-pointer font-medium text-primary-600 hover:text-primary-500">
+                        <label htmlFor="id-front" className={`cursor-pointer font-medium ${isProcessingID ? 'text-blue-600' : 'text-primary-600 hover:text-primary-500'}`}>
                           {idFront ? idFront.name : "Upload front of ID"}
                         </label>
                         <p className="text-xs mt-1">JPG, PNG or PDF up to 5MB</p>
@@ -140,6 +225,7 @@ export default function BuyerKYC() {
                         className="hidden" 
                         accept="image/*, application/pdf" 
                         onChange={handleIdFrontUpload}
+                        disabled={isProcessingID}
                       />
                     </div>
                   </div>
@@ -147,14 +233,24 @@ export default function BuyerKYC() {
                   {/* ID Back Upload */}
                   <div 
                     className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
-                      idBack ? "border-green-300 bg-green-50" : "border-gray-300"
+                      idBack 
+                        ? dataExtracted 
+                          ? "border-green-300 bg-green-50" 
+                          : "border-blue-300 bg-blue-50" 
+                        : "border-gray-300"
                     }`}
-                    onClick={() => document.getElementById("id-back")?.click()}
+                    onClick={() => !isProcessingID && document.getElementById("id-back")?.click()}
                   >
                     <div className="space-y-2">
-                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      {idBack && isProcessingID ? (
+                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
+                      ) : idBack && dataExtracted ? (
+                        <FileCheck className="mx-auto h-8 w-8 text-green-500" />
+                      ) : (
+                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                      )}
                       <div className="text-sm text-gray-600">
-                        <label htmlFor="id-back" className="cursor-pointer font-medium text-primary-600 hover:text-primary-500">
+                        <label htmlFor="id-back" className={`cursor-pointer font-medium ${isProcessingID ? 'text-blue-600' : 'text-primary-600 hover:text-primary-500'}`}>
                           {idBack ? idBack.name : "Upload back of ID"}
                         </label>
                         <p className="text-xs mt-1">JPG, PNG or PDF up to 5MB</p>
@@ -165,6 +261,7 @@ export default function BuyerKYC() {
                         className="hidden" 
                         accept="image/*, application/pdf"
                         onChange={handleIdBackUpload}
+                        disabled={isProcessingID}
                       />
                     </div>
                   </div>

@@ -6,7 +6,8 @@ import { setupWebSocketServer } from "./websocket";
 import { 
   extractPropertyData, 
   verifyKYCDocuments, 
-  findAgentsForProperty 
+  findAgentsForProperty,
+  extractIDData
 } from "./openai";
 import { 
   propertySchema, 
@@ -417,6 +418,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : "Failed to extract property data"
+      });
+    }
+  });
+  
+  // Extract data from ID documents using OpenAI Vision
+  app.post("/api/ai/extract-id-data", isAuthenticated, async (req, res) => {
+    try {
+      const { idFrontBase64, idBackBase64 } = req.body;
+      
+      if (!idFrontBase64 || !idBackBase64) {
+        return res.status(400).json({
+          success: false,
+          error: "Both front and back ID images are required in base64 format"
+        });
+      }
+      
+      const extractedData = await extractIDData(idFrontBase64, idBackBase64);
+      
+      res.json({
+        success: true,
+        data: extractedData
+      });
+    } catch (error) {
+      console.error("ID data extraction error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to extract ID data"
       });
     }
   });

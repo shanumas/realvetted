@@ -51,6 +51,100 @@ export async function extractPropertyData(address: string): Promise<PropertyAIDa
   }
 }
 
+// OpenAI client initialization is at the top of this file
+
+// Interface for extracted KYC data
+export interface ExtractedIDData {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  idNumber?: string;
+  expirationDate?: string;
+}
+
+// Extract data from ID documents using OpenAI Vision
+export async function extractIDData(idFrontBase64: string, idBackBase64: string): Promise<ExtractedIDData> {
+  try {
+    // If there's no API key, return empty data as we can't extract
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+      console.log("Cannot extract ID data (no API key)");
+      return {};
+    }
+
+    // Make Vision API request to OpenAI
+    const frontResponse = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: "You are an ID document parser that extracts information from ID cards/driver's licenses. Return a JSON object with the following fields if present: firstName, lastName, dateOfBirth (in YYYY-MM-DD format), addressLine1, addressLine2, city, state, zip, idNumber, expirationDate."
+        },
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "Extract all personal information from this ID document. Format date of birth as YYYY-MM-DD. Format the address into addressLine1, addressLine2, city, state, and zip. Return the data as JSON." 
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${idFrontBase64}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const frontData = JSON.parse(frontResponse.choices[0].message.content);
+    
+    // Process back of ID card to get any additional info
+    const backResponse = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: "Extract any additional information from the back of this ID card, such as address details or restrictions. Return JSON with any of these fields that are present: addressLine1, addressLine2, city, state, zip."
+        },
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "This is the back of an ID card. Extract any additional information that isn't typically on the front, like address details or restrictions. Return data as JSON." 
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${idBackBase64}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const backData = JSON.parse(backResponse.choices[0].message.content);
+    
+    // Merge data from front and back, prioritizing front data
+    return {
+      ...backData,
+      ...frontData
+    };
+  } catch (error) {
+    console.error("Error extracting data from ID:", error);
+    return {};
+  }
+}
+
 // Verify KYC documents
 export async function verifyKYCDocuments(
   userId: number, 
