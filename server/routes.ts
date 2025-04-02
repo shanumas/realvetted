@@ -39,6 +39,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // -------- API Routes --------
+  
+  // Initialize system settings if they don't exist
+  async function initializeSystemSettings() {
+    try {
+      // Check if emergency password setting exists
+      const emergencyPassword = await storage.getSetting("emergency_password_enabled");
+      if (!emergencyPassword) {
+        await storage.createSetting({
+          key: "emergency_password_enabled",
+          value: "false",
+          description: "Enable emergency password (sellerbaba123*) for all user types",
+          updatedBy: null
+        });
+      }
+      
+      // Check if email test mode setting exists
+      const emailTestMode = await storage.getSetting("email_test_mode");
+      if (!emailTestMode) {
+        await storage.createSetting({
+          key: "email_test_mode",
+          value: "false",
+          description: "Send all emails to test email address",
+          updatedBy: null
+        });
+      }
+      
+      // Check if test email address setting exists
+      const testEmailAddress = await storage.getSetting("email_test_address");
+      if (!testEmailAddress) {
+        await storage.createSetting({
+          key: "email_test_address",
+          value: "",
+          description: "Email address to use for testing",
+          updatedBy: null
+        });
+      }
+    } catch (error) {
+      console.error("Error initializing system settings:", error);
+    }
+  }
+  
+  // Initialize settings on startup
+  initializeSystemSettings();
 
   // User routes
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
@@ -933,6 +976,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to get property logs"
+      });
+    }
+  });
+
+  // Admin settings routes
+  app.get("/api/admin/settings", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const settings = await storage.getAllSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Get settings error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch settings"
+      });
+    }
+  });
+  
+  // Update email settings
+  app.post("/api/admin/settings/email", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const { enableTestMode, testEmail } = req.body;
+      
+      // Validate inputs
+      if (typeof enableTestMode !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: "enableTestMode must be a boolean"
+        });
+      }
+      
+      if (enableTestMode && (!testEmail || typeof testEmail !== 'string')) {
+        return res.status(400).json({
+          success: false,
+          error: "testEmail is required when enableTestMode is true"
+        });
+      }
+      
+      // Update settings
+      await storage.updateSetting(
+        "email_test_mode", 
+        enableTestMode.toString(), 
+        req.user!.id
+      );
+      
+      await storage.updateSetting(
+        "email_test_address", 
+        testEmail || "", 
+        req.user!.id
+      );
+      
+      res.json({
+        success: true,
+        message: "Email settings updated successfully"
+      });
+    } catch (error) {
+      console.error("Update email settings error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update email settings"
+      });
+    }
+  });
+  
+  // Update security settings (including emergency password)
+  app.post("/api/admin/settings/security", isAuthenticated, hasRole(["admin"]), async (req, res) => {
+    try {
+      const { emergencyPasswordEnabled } = req.body;
+      
+      // Validate inputs
+      if (typeof emergencyPasswordEnabled !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          error: "emergencyPasswordEnabled must be a boolean"
+        });
+      }
+      
+      // Update emergency password setting
+      await storage.updateSetting(
+        "emergency_password_enabled", 
+        emergencyPasswordEnabled.toString(), 
+        req.user!.id
+      );
+      
+      // Log this change for audit purposes
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: 0, // Use 0 for system-level events
+          userId: req.user!.id,
+          activity: emergencyPasswordEnabled ? "Emergency password enabled" : "Emergency password disabled",
+          details: {
+            adminId: req.user!.id,
+            adminEmail: req.user!.email,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to log security setting change:", logError);
+        // Continue without failing the whole request
+      }
+      
+      res.json({
+        success: true,
+        message: "Security settings updated successfully"
+      });
+    } catch (error) {
+      console.error("Update security settings error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update security settings"
       });
     }
   });

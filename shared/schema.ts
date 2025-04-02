@@ -138,6 +138,21 @@ export const propertyActivityLogSchema = createInsertSchema(propertyActivityLogs
   timestamp: true,
 });
 
+// System settings for application configuration
+export const systemSettings = pgTable("system_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: integer("updated_by"),
+});
+
+export const systemSettingSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -149,3 +164,5 @@ export type AgentLead = typeof agentLeads.$inferSelect;
 export type InsertAgentLead = z.infer<typeof agentLeadSchema>;
 export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
 export type InsertPropertyActivityLog = z.infer<typeof propertyActivityLogSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type InsertSystemSetting = z.infer<typeof systemSettingSchema>;
