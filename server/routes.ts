@@ -69,6 +69,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateUser(req.user.id, {
               profileStatus: "verified"
             });
+            
+            // If this is an agent, create leads for existing properties
+            if (req.user.role === "agent") {
+              try {
+                // Create leads for this agent for appropriate properties
+                const properties = await storage.getAllProperties();
+                const agent = await storage.getUser(req.user.id);
+                
+                if (agent && properties.length > 0) {
+                  console.log(`Creating leads for newly verified agent ${agent.id} (${agent.email})`);
+                  
+                  // Find properties in the same state as the agent
+                  const matchingProperties = properties.filter(property => 
+                    // Match by state if available
+                    (agent.state && property.state && 
+                     agent.state.toLowerCase() === property.state.toLowerCase())
+                  );
+                  
+                  // Use properties from same state, or fall back to first 3 if none match
+                  const propertiesToMatch = matchingProperties.length > 0 
+                    ? matchingProperties.slice(0, 3) 
+                    : properties.slice(0, 3);
+                  
+                  // Create leads
+                  for (const property of propertiesToMatch) {
+                    await storage.createAgentLead({
+                      propertyId: property.id,
+                      agentId: agent.id,
+                      status: "available"
+                    });
+                    console.log(`Created lead for agent ${agent.id} on property ${property.id}`);
+                    
+                    // Send WebSocket notification
+                    if (websocketServer) {
+                      websocketServer.broadcastToUsers([agent.id], {
+                        type: 'notification',
+                        data: {
+                          message: 'New lead available! A property matches your location.',
+                          propertyId: property.id
+                        }
+                      });
+                    }
+                  }
+                }
+              } catch (leadError) {
+                console.error("Error creating leads for new agent:", leadError);
+                // Don't fail verification if lead creation fails
+              }
+            }
           }
         } catch (error) {
           console.error("KYC verification error:", error);
@@ -522,7 +571,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Agent leads routes
   app.get("/api/leads/available", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
+      console.log(`Getting available leads for agent ID: ${req.user.id}`);
       const leads = await storage.getAvailableLeadsByAgent(req.user.id);
+      console.log(`Found ${leads.length} available leads`);
       res.json(leads);
     } catch (error) {
       console.error("Get available leads error:", error);
