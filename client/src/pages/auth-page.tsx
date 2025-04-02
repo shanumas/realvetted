@@ -13,13 +13,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
+  email: z.string().trim().min(1, "Email is required").email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   rememberMe: z.boolean().optional(),
 });
 
 const registerSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Please enter a valid email address"),
+  email: z.string().trim().min(1, "Email is required").email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -68,6 +68,19 @@ export default function AuthPage() {
     },
   });
 
+  // Listen to the form state changes
+  useEffect(() => {
+    if (loginForm.formState.errors && Object.keys(loginForm.formState.errors).length > 0) {
+      console.log("Login form errors:", loginForm.formState.errors);
+    }
+  }, [loginForm.formState.errors]);
+
+  useEffect(() => {
+    if (registerForm.formState.errors && Object.keys(registerForm.formState.errors).length > 0) {
+      console.log("Register form errors:", registerForm.formState.errors);
+    }
+  }, [registerForm.formState.errors]);
+
   const onLoginSubmit = (values: LoginFormValues) => {
     console.log("Login form values:", values);
     loginMutation.mutate({
@@ -77,9 +90,6 @@ export default function AuthPage() {
     });
   };
   
-  // Log form errors for debugging
-  console.log("Login form errors:", loginForm.formState.errors);
-
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
     registerMutation.mutate({
@@ -90,9 +100,6 @@ export default function AuthPage() {
       role: roleTab as any,
     });
   };
-  
-  // Log form errors for debugging
-  console.log("Register form errors:", registerForm.formState.errors);
 
   if (isLoading) {
     return (
@@ -158,7 +165,15 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="name@example.com" {...field} />
+                            <Input 
+                              placeholder="name@example.com" 
+                              type="email"
+                              autoComplete="email"
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e.target.value.trim());
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -255,7 +270,15 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="name@example.com" {...field} />
+                            <Input 
+                              placeholder="name@example.com" 
+                              type="email"
+                              autoComplete="email"
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e.target.value.trim());
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
