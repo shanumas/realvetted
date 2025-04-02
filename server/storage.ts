@@ -34,6 +34,7 @@ export interface IStorage {
   getPropertiesByAgent(agentId: number): Promise<Property[]>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: number, data: Partial<Property>): Promise<Property>;
+  deleteProperty(id: number): Promise<void>;
   
   // Message methods
   getMessage(id: number): Promise<Message | undefined>;
@@ -241,6 +242,26 @@ export class PgStorage implements IStorage {
     }
     
     return result[0];
+  }
+  
+  async deleteProperty(id: number): Promise<void> {
+    // First check if property exists
+    const property = await this.getProperty(id);
+    if (!property) {
+      throw new Error(`Property with ID ${id} not found`);
+    }
+    
+    // Delete any agent leads associated with this property
+    await this.db.delete(agentLeads)
+      .where(eq(agentLeads.propertyId, id));
+    
+    // Delete any messages associated with this property
+    await this.db.delete(messages)
+      .where(eq(messages.propertyId, id));
+    
+    // Finally delete the property
+    await this.db.delete(properties)
+      .where(eq(properties.id, id));
   }
 
   // Message methods

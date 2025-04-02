@@ -29,6 +29,23 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   }
 }
 
+export async function deleteProperty(propertyId: number): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await apiRequest("DELETE", `/api/properties/${propertyId}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to delete property");
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error deleting property:", error);
+    throw new Error(error instanceof Error ? error.message : "Failed to delete property. Please try again.");
+  }
+}
+
 export async function matchAgentsForProperty(propertyId: number): Promise<any> {
   try {
     const response = await apiRequest("POST", "/api/ai/match-agents", { propertyId });

@@ -290,7 +290,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       engine: "google",
       q: searchQuery,
       api_key: process.env.SERPAPI_KEY,
-      num: 5, // Limit to 5 results to save API credits
+      num: 8, // Increasing results to get more context
     });
     
     // Extract search results
@@ -323,7 +323,9 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         Link: ${item.link}
       `).join('\n')}
       
-      Based on these search results, extract the property details. For any missing information, make a reasonable estimate based on available data.
+      Based on these search results, extract the property details with a focus on finding accurate seller/agent information. 
+      Pay special attention to finding the listing agent or seller name, phone number, email, and company.
+      For any missing information, make a reasonable estimate based on available data.
       
       Format your response as a JSON object with these fields: 
       {
@@ -339,9 +341,9 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         "yearBuilt": year built as a number,
         "description": "brief description",
         "features": ["feature1", "feature2", ...],
-        "sellerName": "Agent name",
-        "sellerPhone": "Agent phone",
-        "sellerEmail": "Agent email if available",
+        "sellerName": "Agent/seller name",
+        "sellerPhone": "Agent/seller phone",
+        "sellerEmail": "Agent/seller email",
         "sellerCompany": "Real estate company",
         "sellerLicenseNo": "License number if available",
         "propertyUrl": "${url}"
@@ -355,17 +357,102 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       messages: [
         {
           role: "system",
-          content: "You are a real estate data extraction expert. Extract property listing details from search results."
+          content: "You are a real estate data extraction expert. Extract property listing details from search results with special focus on agent/seller contact information."
         },
         { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }
     });
     
-    const result = JSON.parse(response.choices[0].message.content || "{}");
+    const propertyData = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // If seller name is available but email is not, try to find email with a second search
+    if (propertyData.sellerName && !propertyData.sellerEmail) {
+      console.log(`Found seller name "${propertyData.sellerName}" but no email. Searching for email...`);
+      
+      // Create search query specifically for finding the agent's email
+      const agentQuery = `${propertyData.sellerName} ${propertyData.sellerCompany || ''} real estate agent email contact`;
+      
+      // Perform a second search to find the agent's email
+      const agentSearchResults = await getJson({
+        engine: "google",
+        q: agentQuery,
+        api_key: process.env.SERPAPI_KEY,
+        num: 5,
+      });
+      
+      const agentResults = agentSearchResults.organic_results || [];
+      
+      if (agentResults.length > 0) {
+        const agentSnippets = agentResults.map(result => {
+          return {
+            title: result.title || "",
+            snippet: result.snippet || "",
+            link: result.link || ""
+          };
+        });
+        
+        // Use OpenAI to extract the agent's email from the search results
+        const emailPrompt = `
+          I need to find the email address for a real estate agent.
+          
+          Agent Name: ${propertyData.sellerName}
+          Company: ${propertyData.sellerCompany || 'Unknown'}
+          
+          Here are search results that might contain their email:
+          ${agentSnippets.map((item, index) => `
+            Result ${index + 1}:
+            Title: ${item.title}
+            Snippet: ${item.snippet}
+            Link: ${item.link}
+          `).join('\n')}
+          
+          Extract the agent's email address if present in these results. Look for patterns like "name@domain.com" or "contact: email@example.com".
+          Return ONLY the email address, or "not found" if you cannot find an email.
+        `;
+        
+        const emailResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert at finding contact information. Extract only the email address from the search results."
+            },
+            { role: "user", content: emailPrompt }
+          ]
+        });
+        
+        const extractedEmail = emailResponse.choices[0].message.content?.trim();
+        
+        // If a valid email was found, add it to the property data
+        if (extractedEmail && extractedEmail !== "not found" && extractedEmail.includes("@")) {
+          console.log(`Found email for agent: ${extractedEmail}`);
+          propertyData.sellerEmail = extractedEmail;
+        } else {
+          console.log("No valid email found for agent");
+          // Generate a placeholder email based on agent name if none was found
+          const nameParts = propertyData.sellerName.split(' ');
+          if (nameParts.length > 0) {
+            const firstName = nameParts[0].toLowerCase();
+            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
+            
+            if (propertyData.sellerCompany) {
+              const companyDomain = propertyData.sellerCompany.toLowerCase()
+                .replace(/[^a-z0-9]/g, '')
+                .substring(0, 10);
+              propertyData.sellerEmail = `${firstName}.${lastName}@${companyDomain}.com`;
+            } else {
+              propertyData.sellerEmail = `${firstName}.${lastName}@realestate.com`;
+            }
+          }
+        }
+      }
+    }
+    
+    // Ensure the original URL is preserved
     return {
-      ...result,
-      propertyUrl: url // Ensure the original URL is preserved
+      ...propertyData,
+      propertyUrl: url
     };
   } catch (error) {
     console.error("Error extracting property data from URL with web search:", error);

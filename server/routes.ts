@@ -236,6 +236,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Delete a property
+  app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if user has permission to delete this property
+      const userId = req.user.id;
+      const role = req.user.role;
+      
+      // Only the buyer who created the property or an admin can delete it
+      const hasPermission = 
+        (role === "admin") ||
+        (role === "buyer" && property.createdBy === userId);
+      
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to delete this property"
+        });
+      }
+      
+      // Delete the property
+      await storage.deleteProperty(propertyId);
+      
+      res.json({
+        success: true,
+        message: "Property deleted successfully"
+      });
+    } catch (error) {
+      console.error("Delete property error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete property"
+      });
+    }
+  });
+  
   // Add/update seller email
   app.post("/api/properties/:id/seller-email", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
