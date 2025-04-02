@@ -8,7 +8,10 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Home, Bed, Bath, Square, Tag, Calendar } from "lucide-react";
+import { 
+  Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
+  Briefcase, Award, Link, FileText, ListTodo, ImageIcon 
+} from "lucide-react";
 
 export default function PropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
@@ -68,17 +71,42 @@ export default function PropertyDetail() {
                   </div>
                 </div>
                 
-                {/* Property Images (placeholder) */}
+                {/* Property Images */}
                 <div className="px-4 py-5 sm:px-6">
-                  <div className="bg-gray-200 h-64 rounded-lg overflow-hidden">
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <Home className="h-16 w-16" />
+                  {property.imageUrls && property.imageUrls.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <div className="flex space-x-4">
+                        {property.imageUrls.map((url, index) => (
+                          <div key={index} className="min-w-[300px] h-64 rounded-lg overflow-hidden">
+                            <img 
+                              src={url} 
+                              alt={`Property image ${index + 1}`} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // If image fails to load, show placeholder
+                                const target = e.target as HTMLImageElement;
+                                target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+                                target.onerror = null; // Prevent infinite error loop
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="bg-gray-200 h-64 rounded-lg overflow-hidden">
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <Home className="h-16 w-16" />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Property Details */}
                 <div className="border-t border-gray-200">
+                  <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Property Details</h3>
+                  </div>
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500 flex items-center">
@@ -128,7 +156,120 @@ export default function PropertyDetail() {
                         {property.yearBuilt || "Not specified"}
                       </dd>
                     </div>
+                    {property.description && (
+                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500 flex items-center">
+                          <FileText className="mr-2 h-4 w-4" /> Description
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                          {property.description}
+                        </dd>
+                      </div>
+                    )}
+                    {property.features && property.features.length > 0 && (
+                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500 flex items-center">
+                          <ListTodo className="mr-2 h-4 w-4" /> Features
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                          <ul className="list-disc pl-5 space-y-1">
+                            {property.features.map((feature, index) => (
+                              <li key={index}>{feature}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                    )}
+                    {property.propertyUrl && (
+                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt className="text-sm font-medium text-gray-500 flex items-center">
+                          <Link className="mr-2 h-4 w-4" /> Original listing
+                        </dt>
+                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                          <a 
+                            href={property.propertyUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            View original listing
+                          </a>
+                        </dd>
+                      </div>
+                    )}
                   </dl>
+                  
+                  {/* Listing Agent Information */}
+                  {(property.sellerName || property.sellerEmail || property.sellerPhone || 
+                    property.sellerCompany || property.sellerLicenseNo) && (
+                    <>
+                      <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
+                        <h3 className="text-lg leading-6 font-medium text-gray-900">Listing Agent Information</h3>
+                      </div>
+                      <dl>
+                        {property.sellerName && (
+                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Building className="mr-2 h-4 w-4" /> Agent name
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              {property.sellerName}
+                            </dd>
+                          </div>
+                        )}
+                        {property.sellerEmail && (
+                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Mail className="mr-2 h-4 w-4" /> Email
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <a 
+                                href={`mailto:${property.sellerEmail}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {property.sellerEmail}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+                        {property.sellerPhone && (
+                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Phone className="mr-2 h-4 w-4" /> Phone
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <a 
+                                href={`tel:${property.sellerPhone}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {property.sellerPhone}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+                        {property.sellerCompany && (
+                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Briefcase className="mr-2 h-4 w-4" /> Company
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              {property.sellerCompany}
+                            </dd>
+                          </div>
+                        )}
+                        {property.sellerLicenseNo && (
+                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Award className="mr-2 h-4 w-4" /> License #
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              {property.sellerLicenseNo}
+                            </dd>
+                          </div>
+                        )}
+                      </dl>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>
