@@ -349,19 +349,29 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     // If no SerpApi key available, return placeholder data
     if (!process.env.SERPAPI_KEY) {
       console.log("Using mock data for property URL extraction (no SERPAPI_KEY)");
-      return generateMockPropertyData(url);
+      throw new Error("SerpAPI key is missing. Please ask the administrator to provide a valid SERPAPI_KEY.");
     }
     
     // First search - Property details search
     const propertySearchQuery = `${url} real estate listing details bedrooms bathrooms price square feet address`;
     console.log(`Searching for property information using query: ${propertySearchQuery}`);
     
-    const propertySearchResults = await getJson({
-      engine: "google",
-      q: propertySearchQuery,
-      api_key: process.env.SERPAPI_KEY,
-      num: 6, // Get property details
-    });
+    let propertySearchResults;
+    try {
+      propertySearchResults = await getJson({
+        engine: "google",
+        q: propertySearchQuery,
+        api_key: process.env.SERPAPI_KEY,
+        num: 6, // Get property details
+      });
+    } catch (error) {
+      console.error("SerpAPI search error:", error);
+      if (error instanceof Error) {
+        throw new Error(`SerpAPI search failed: ${error.message}`);
+      } else {
+        throw new Error("SerpAPI search failed for unknown reasons. Please check the API key permissions.");
+      }
+    }
     
     // Extract property search results
     const propertyOrganicResults = propertySearchResults.organic_results || [];
@@ -385,12 +395,22 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     const agentSearchQuery = `${url} "listed by" OR "listing agent" OR "listing provided by" real estate agent contact`;
     console.log(`Searching for listing agent information using query: ${agentSearchQuery}`);
     
-    const agentSearchResults = await getJson({
-      engine: "google",
-      q: agentSearchQuery,
-      api_key: process.env.SERPAPI_KEY,
-      num: 5, // Focus on agent details
-    });
+    let agentSearchResults;
+    try {
+      agentSearchResults = await getJson({
+        engine: "google",
+        q: agentSearchQuery,
+        api_key: process.env.SERPAPI_KEY,
+        num: 5, // Focus on agent details
+      });
+    } catch (error) {
+      console.error("SerpAPI agent search error:", error);
+      if (error instanceof Error) {
+        throw new Error(`SerpAPI agent search failed: ${error.message}`);
+      } else {
+        throw new Error("SerpAPI agent search failed for unknown reasons. Please check the API key permissions.");
+      }
+    }
     
     // Extract agent search results
     const agentOrganicResults = agentSearchResults.organic_results || [];
@@ -480,12 +500,19 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       const agentQuery = `${propertyData.sellerName} ${propertyData.sellerCompany || ''} real estate agent email contact`;
       
       // Perform a second search to find the agent's email
-      const agentSearchResults = await getJson({
-        engine: "google",
-        q: agentQuery,
-        api_key: process.env.SERPAPI_KEY,
-        num: 5,
-      });
+      let agentSearchResults;
+      try {
+        agentSearchResults = await getJson({
+          engine: "google",
+          q: agentQuery,
+          api_key: process.env.SERPAPI_KEY,
+          num: 5,
+        });
+      } catch (error) {
+        console.error("SerpAPI email search error:", error);
+        // Don't fail the whole process if this search fails, just continue without the email
+        agentSearchResults = { organic_results: [] };
+      }
       
       const agentResults = agentSearchResults.organic_results || [];
       

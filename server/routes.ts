@@ -756,16 +756,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Verify SERPAPI_KEY is available before proceeding
+      if (!process.env.SERPAPI_KEY) {
+        console.error("SERPAPI_KEY is missing for property URL extraction");
+        return res.status(503).json({
+          success: false,
+          error: "Search API service is unavailable. Please contact support for assistance."
+        });
+      }
+      
       // Use web search to find information about the property URL
       // This avoids direct scraping and potential blocking from real estate websites
       const propertyData = await extractPropertyFromUrl(url);
       
-      res.json(propertyData);
+      res.json({
+        success: true,
+        data: propertyData
+      });
     } catch (error) {
       console.error("Property URL extraction error:", error);
+      
+      // Provide more specific error messages based on the error type
+      if (error instanceof Error) {
+        const errorMessage = error.message;
+        
+        if (errorMessage.includes("SerpAPI")) {
+          // SerpAPI specific errors
+          if (errorMessage.includes("403")) {
+            return res.status(403).json({
+              success: false,
+              error: "Search API key permissions issue. The API key may not have the proper permissions or has reached its quota limit."
+            });
+          } else if (errorMessage.includes("401")) {
+            return res.status(401).json({
+              success: false,
+              error: "Invalid Search API key. Please contact support to update the API key."
+            });
+          } else if (errorMessage.includes("429")) {
+            return res.status(429).json({
+              success: false,
+              error: "Search API rate limit exceeded. Please try again later."
+            });
+          }
+        }
+        
+        // Return the specific error message from the API
+        return res.status(500).json({ 
+          success: false, 
+          error: errorMessage
+        });
+      }
+      
+      // Generic error
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : "Failed to extract property data from URL"
+        error: "Failed to extract property data from URL. Please try again later."
       });
     }
   });
