@@ -1,0 +1,63 @@
+**Real Estate Buyer App Requirements**
+
+### User Roles:
+1. **Buyer**
+   - Sign up automatically.
+   - Upload front and back of ID for KYC verification immediately after signup.
+   - Missing details must be re-entered and confirmed before proceeding.
+   - Can add properties by entering just the property address.
+   - Gains access to a real-time chat with the seller and assigned buyer agent (specific to the property page).
+   
+2. **Buyer’s Agent**
+   - Sign up automatically.
+   - Enter ID details during signup for AI verification before profile approval.
+   - Gets notified of leads based on expertise and location.
+   - Can claim a lead (first-come, first-serve basis, no changes once accepted).
+   - Gains access to real-time chat with assigned buyers and sellers (specific to the property page).
+   - If the seller's email is not found by the AI step, the buyer’s agent is responsible for manually finding and entering the email address before the seller's account is created and the email is sent.
+
+3. **Seller**
+   - Account is created automatically when a buyer adds a property and the seller’s email is available.
+   - Receives an automatic email with a sign-in link once the account is created.
+   - Gains access to real-time chat with the buyer and assigned buyer agent (specific to the property page).
+
+4. **Admin**
+   - Can block any account (Buyer, Seller, Buyer’s Agent).
+   - Can reassign a Buyer’s Agent to a Buyer if needed.
+
+### AI-Powered Features:
+- **Property Data Extraction**
+  - AI extracts property details, including the seller’s email, from the entered property address (assuming property is for sale and the data is publicly available).
+  - If the seller’s email is not found, the Buyer’s Agent must manually find and enter it.
+  - AI fills in key property details: 
+    - Number of beds
+    - Number of baths
+    - Price
+    - Size
+    - Type
+    - Location
+
+- **Buyer’s Agent Discovery System**
+  - AI determines a list of verified buyer agents based on location and expertise.
+  - Buyer agents are notified of new leads.
+  - The first agent to accept the lead gets it, and the assignment is final.
+
+### Communication & Access Control:
+- **Real-time Chat System**
+  - Buyer ↔ Seller (only available on the property page).
+  - Buyer ↔ Assigned Buyer Agent (only available on the property page).
+  - Different property pages correspond to different sellers and buyer agents.
+  
+### Workflow Summary:
+1. Buyer signs up, uploads ID for KYC, and confirms missing details.
+2. Buyer enters a property address to add a property.
+3. AI extracts property details, including the seller’s email.
+4. If the seller’s email is not found, the Buyer’s Agent manually finds and enters it.
+5. Seller account is created, and an email with a sign-in link is sent.
+6. AI assigns the lead to a list of capable buyer agents based on location and expertise.
+7. The first buyer agent to accept the lead gets it.
+8. Buyer, seller, and assigned buyer agent can chat in real time, but only within the corresponding property page.
+9. Admin can block accounts and reassign buyer agents to buyers if needed.
+
+This document clearly defines the requirements and logic for implementation in a code generator.
+
