@@ -265,28 +265,65 @@ export async function findAgentsForProperty(property: Property): Promise<User[]>
   }
 }
 
-// Extract property data from URL using OpenAI instead of scraping
+// Extract property data from URL using web search instead of direct scraping
+import { getJson } from 'serpapi';
+
 export async function extractPropertyFromUrl(url: string): Promise<PropertyAIData> {
   try {
-    // If no API key available, return placeholder data
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
-      console.log("Using mock data for property URL extraction (no API key)");
+    // If no SerpApi key available, return placeholder data
+    if (!process.env.SERPAPI_KEY) {
+      console.log("Using mock data for property URL extraction (no SERPAPI_KEY)");
       return generateMockPropertyData(url);
     }
     
-    // Instead of directly scraping the URL, we'll ask GPT-4o to extract relevant information from the URL itself
-    // This avoids potential issues with website blocking and is more reliable
+    // Extract the domain and path from the URL for better search results
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
     
+    // Create a search query that will find information about this property listing
+    const searchQuery = `${url} real estate listing details bedrooms bathrooms price square feet address`;
+    
+    console.log(`Searching for property information using query: ${searchQuery}`);
+    
+    // Use SerpAPI to search for the property details
+    const searchResults = await getJson({
+      engine: "google",
+      q: searchQuery,
+      api_key: process.env.SERPAPI_KEY,
+      num: 5, // Limit to 5 results to save API credits
+    });
+    
+    // Extract search results
+    const organicResults = searchResults.organic_results || [];
+    
+    // No search results found
+    if (organicResults.length === 0) {
+      console.log("No search results found for property URL");
+      return generateMockPropertyData(url);
+    }
+    
+    // Get the search result snippets which often contain the property details
+    const snippets = organicResults.map(result => {
+      return {
+        title: result.title || "",
+        snippet: result.snippet || "",
+        link: result.link || ""
+      };
+    });
+    
+    // Use OpenAI to extract structured data from the search results
     const prompt = `
-      I have a real estate listing URL: "${url}"
+      I have search results for a real estate listing at URL: "${url}"
       
-      Based on patterns in this URL and your knowledge of real estate websites, please:
+      Here are the search result snippets:
+      ${snippets.map((item, index) => `
+        Result ${index + 1}:
+        Title: ${item.title}
+        Snippet: ${item.snippet}
+        Link: ${item.link}
+      `).join('\n')}
       
-      1. Determine the property website (Zillow, Redfin, Realtor.com, etc.)
-      2. Extract any address components from the URL if possible
-      3. Generate detailed information about what type of property this might be
-      
-      Then, provide a comprehensive set of property details that would be reasonable for this type of listing.
+      Based on these search results, extract the property details. For any missing information, make a reasonable estimate based on available data.
       
       Format your response as a JSON object with these fields: 
       {
@@ -304,9 +341,9 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         "features": ["feature1", "feature2", ...],
         "sellerName": "Agent name",
         "sellerPhone": "Agent phone",
-        "sellerEmail": "Agent email",
+        "sellerEmail": "Agent email if available",
         "sellerCompany": "Real estate company",
-        "sellerLicenseNo": "License number",
+        "sellerLicenseNo": "License number if available",
         "propertyUrl": "${url}"
       }
       
@@ -318,7 +355,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       messages: [
         {
           role: "system",
-          content: "You are a real estate data analysis expert with extensive knowledge of real estate websites, property values, features, and regional characteristics across the United States."
+          content: "You are a real estate data extraction expert. Extract property listing details from search results."
         },
         { role: "user", content: prompt }
       ],
@@ -326,9 +363,12 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     });
     
     const result = JSON.parse(response.choices[0].message.content || "{}");
-    return result;
+    return {
+      ...result,
+      propertyUrl: url // Ensure the original URL is preserved
+    };
   } catch (error) {
-    console.error("Error extracting property data from URL with OpenAI:", error);
+    console.error("Error extracting property data from URL with web search:", error);
     throw new Error("Failed to extract property data from URL. Please try again later.");
   }
 }

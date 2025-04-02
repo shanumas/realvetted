@@ -7,7 +7,8 @@ import {
   extractPropertyData, 
   verifyKYCDocuments, 
   findAgentsForProperty,
-  extractIDData
+  extractIDData,
+  extractPropertyFromUrl
 } from "./openai";
 import { 
   propertySchema, 
@@ -422,7 +423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Extract property details from a URL using OpenAI (non-scraping approach)
+  // Extract property details from a URL using web search (non-scraping approach)
   app.post("/api/ai/extract-property-from-url", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
       const { url } = req.body;
@@ -434,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Use OpenAI to analyze the URL and generate property details
+      // Use web search to find information about the property URL
       // This avoids direct scraping and potential blocking from real estate websites
       const propertyData = await extractPropertyFromUrl(url);
       
