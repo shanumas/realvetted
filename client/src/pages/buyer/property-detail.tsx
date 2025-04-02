@@ -45,6 +45,7 @@ export default function BuyerPropertyDetail() {
   const [isViewingModalOpen, setIsViewingModalOpen] = useState<boolean>(false);
   const [viewingDate, setViewingDate] = useState<string>("");
   const [viewingTime, setViewingTime] = useState<string>("");
+  const [viewingEndTime, setViewingEndTime] = useState<string>("");
   const [viewingNotes, setViewingNotes] = useState<string>("");
   const { toast } = useToast();
   
@@ -129,8 +130,13 @@ export default function BuyerPropertyDetail() {
   
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
-    mutationFn: async (data: { date: string, time: string, notes: string }) => {
-      const res = await apiRequest("POST", `/api/properties/${propertyId}/request-viewing`, data);
+    mutationFn: async (data: { date: string, time: string, endTime: string, notes: string }) => {
+      const res = await apiRequest("POST", `/api/viewing-requests`, {
+        propertyId: propertyId,
+        requestedDate: `${data.date}T${data.time}:00`,
+        requestedEndDate: data.endTime ? `${data.date}T${data.endTime}:00` : undefined,
+        notes: data.notes
+      });
       return await res.json();
     },
     onSuccess: () => {
@@ -142,6 +148,7 @@ export default function BuyerPropertyDetail() {
       setIsViewingModalOpen(false);
       setViewingDate("");
       setViewingTime("");
+      setViewingEndTime("");
       setViewingNotes("");
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
@@ -174,9 +181,19 @@ export default function BuyerPropertyDetail() {
       return;
     }
     
+    if (viewingEndTime && viewingEndTime <= viewingTime) {
+      toast({
+        title: "Invalid end time",
+        description: "End time must be after start time.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     requestViewingMutation.mutate({
       date: viewingDate,
       time: viewingTime,
+      endTime: viewingEndTime,
       notes: viewingNotes
     });
   };
@@ -655,7 +672,7 @@ export default function BuyerPropertyDetail() {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <label htmlFor="viewingTime" className="text-right text-sm font-medium col-span-1">
-                Time
+                Start Time
               </label>
               <div className="col-span-3">
                 <input 
@@ -664,6 +681,20 @@ export default function BuyerPropertyDetail() {
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={viewingTime}
                   onChange={(e) => setViewingTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="viewingEndTime" className="text-right text-sm font-medium col-span-1">
+                End Time
+              </label>
+              <div className="col-span-3">
+                <input 
+                  type="time" 
+                  id="viewingEndTime" 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={viewingEndTime}
+                  onChange={(e) => setViewingEndTime(e.target.value)}
                 />
               </div>
             </div>
