@@ -44,29 +44,20 @@ export function setupWebSocketServer(server: Server) {
             }
             break;
             
+          case 'auth':
+            // Authenticate client
+            if (client && data.data?.userId) {
+              client.userId = data.data.userId;
+              console.log(`Client authenticated: User ID ${data.data.userId}`);
+              socket.send(JSON.stringify({ type: 'notification', data: { message: 'Authentication successful' } }));
+            }
+            break;
+            
           default:
             console.log(`Unknown message type: ${data.type}`);
         }
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
-      }
-    });
-    
-    // Authenticate client
-    socket.on('message', async (message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        
-        // If this is an authentication message
-        if (data.type === 'auth') {
-          const client = clients.get(socket);
-          if (client && data.data?.userId) {
-            client.userId = data.data.userId;
-            console.log(`Client authenticated: User ID ${data.data.userId}`);
-          }
-        }
-      } catch (error) {
-        // Ignore parsing errors for non-authentication messages
       }
     });
     
@@ -126,7 +117,7 @@ export function setupWebSocketServer(server: Server) {
         senderName: message.senderName || "User",
         receiverId: newMessage.receiverId,
         content: newMessage.content,
-        timestamp: newMessage.timestamp
+        timestamp: newMessage.timestamp || new Date().toISOString()
       };
       
       // Broadcast to sender and receiver

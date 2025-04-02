@@ -40,7 +40,7 @@ export interface ChatMessage {
 }
 
 export interface WebSocketMessage {
-  type: 'message' | 'notification' | 'property_update' | 'claim_lead' | 'ping';
+  type: 'message' | 'notification' | 'property_update' | 'claim_lead' | 'ping' | 'pong' | 'auth';
   data: any;
 }
 

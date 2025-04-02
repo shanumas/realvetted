@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -8,6 +8,7 @@ import { User, loginUserSchema, registerUserSchema } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import websocketClient from "@/lib/websocket";
 
 type LoginData = {
   email: string;
@@ -48,6 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
     initialData: null, // Explicitly set initial data to null
   });
+  
+  // Connect to WebSocket when user is authenticated
+  useEffect(() => {
+    if (user?.id) {
+      console.log("Connecting WebSocket with user ID:", user.id);
+      websocketClient.setUserId(user.id);
+    }
+  }, [user?.id]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
