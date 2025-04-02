@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Property } from "@shared/schema";
+import { Property, User } from "@shared/schema";
 import { PropertyWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
@@ -13,16 +13,89 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Send, Activity
+  Send, Activity, UserPlus, Users, MessageCircle
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
+import { AgentCard } from "@/components/agent-card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function BuyerPropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("seller");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const { toast } = useToast();
+  
+  // Fetch available agents
+  const { data: agents } = useQuery<Array<{
+    id: number;
+    firstName: string | null;
+    lastName: string | null;
+    state: string | null;
+    city: string | null;
+    email: string;
+    phone: string | null;
+    profilePhotoUrl: string | null;
+    profileStatus: string;
+  }>>({
+    queryKey: ["/api/agents"],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
+  
+  // Mutation to choose an agent
+  const chooseAgentMutation = useMutation({
+    mutationFn: async (agentId: number) => {
+      const res = await apiRequest("PUT", `/api/properties/${propertyId}/choose-agent`, { agentId });
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Agent assigned",
+        description: "The agent has been assigned to your property and notified.",
+        variant: "default",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      setIsAgentDialogOpen(false);
+      setSelectedAgentId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to assign agent",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const handleChooseAgent = () => {
+    if (selectedAgentId) {
+      chooseAgentMutation.mutate(selectedAgentId);
+    } else {
+      toast({
+        title: "No agent selected",
+        description: "Please select an agent first.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {
@@ -442,9 +515,19 @@ export default function BuyerPropertyDetail() {
                         receiverName={property.agent?.firstName || "Agent"}
                       />
                     ) : (
-                      <div className="p-4 text-center text-gray-500">
-                        <p>No agent has been assigned yet.</p>
-                        <p className="text-sm mt-1">Once an agent claims this property, you'll be able to chat with them here.</p>
+                      <div className="p-4 text-center">
+                        <p className="text-gray-500 mb-3">No agent has been assigned yet.</p>
+                        <Button 
+                          onClick={() => setIsAgentDialogOpen(true)} 
+                          className="mb-2"
+                          variant="outline"
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Choose an Agent
+                        </Button>
+                        <p className="text-xs text-gray-400 mt-2">
+                          Select an agent to help you with this property purchase
+                        </p>
                       </div>
                     )}
                   </TabsContent>
@@ -469,6 +552,57 @@ export default function BuyerPropertyDetail() {
           </div>
         </div>
       </main>
+
+      {/* Agent Selection Dialog */}
+      <Dialog open={isAgentDialogOpen} onOpenChange={setIsAgentDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              <UserPlus className="mr-2 h-5 w-5 text-primary" />
+              Choose an Agent for this Property
+            </DialogTitle>
+            <DialogDescription>
+              Select a real estate agent to help you with the purchase of this property.
+              Agents with experience in {property.state || "your area"} are recommended.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {!agents || agents.length === 0 ? (
+            <div className="py-6 text-center text-gray-500">
+              <Users className="mx-auto h-10 w-10 mb-3 text-gray-400" />
+              <p>No available agents found.</p>
+              <p className="text-sm mt-1">Please check back later.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3 max-h-[50vh] overflow-y-auto pr-1">
+              {agents.map((agent) => (
+                <AgentCard
+                  key={agent.id}
+                  agent={agent as User}
+                  onSelectAgent={setSelectedAgentId}
+                  selected={selectedAgentId === agent.id}
+                  disabled={chooseAgentMutation.isPending}
+                />
+              ))}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAgentDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleChooseAgent}
+              disabled={!selectedAgentId || chooseAgentMutation.isPending}
+            >
+              {chooseAgentMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Assign Selected Agent
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

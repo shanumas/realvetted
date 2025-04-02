@@ -21,6 +21,7 @@ type RegisterData = {
   role: "buyer" | "seller" | "agent" | "admin";
   firstName?: string;
   lastName?: string;
+  profilePhotoUrl?: string;
 };
 
 type AuthContextType = {

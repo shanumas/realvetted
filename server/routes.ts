@@ -490,6 +490,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all available agents for buyers to choose from
+  app.get("/api/agents", isAuthenticated, async (req, res) => {
+    try {
+      // Get verified, unblocked agents
+      const allAgents = await storage.getUsersByRole("agent");
+      const verifiedAgents = allAgents.filter(agent => 
+        agent.profileStatus === "verified" && !agent.isBlocked
+      );
+      
+      // Return minimal info for security
+      const agents = verifiedAgents.map(agent => ({
+        id: agent.id,
+        firstName: agent.firstName,
+        lastName: agent.lastName,
+        state: agent.state,
+        city: agent.city,
+        profileStatus: agent.profileStatus
+      }));
+      
+      res.json(agents);
+    } catch (error) {
+      console.error("Get all agents error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch agents"
+      });
+    }
+  });
+  
   // Agent leads routes
   app.get("/api/leads/available", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
@@ -601,6 +630,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to upload ID documents"
+      });
+    }
+  });
+  
+  // File upload for profile photo
+  app.post("/api/uploads/profile-photo", upload.single('profilePhoto'), async (req, res) => {
+    try {
+      // In a real app, this file would be uploaded to a secure storage service
+      // For this example, we'll just pretend we've stored it and return a URL
+      
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          error: "Profile photo is required"
+        });
+      }
+      
+      // Generate fake URL - in a real app this would be an actual URL to the stored file
+      // We include a timestamp to make it unique and prevent caching issues
+      const profilePhotoUrl = `https://storage.example.com/user-profiles/profile-${Date.now()}.jpg`;
+      
+      res.json({
+        success: true,
+        profilePhotoUrl
+      });
+    } catch (error) {
+      console.error("Profile photo upload error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to upload profile photo"
       });
     }
   });
@@ -826,6 +887,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint for buyers to choose their own agent
+  app.put("/api/properties/:id/choose-agent", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const { agentId } = req.body;
+      
+      if (!agentId || typeof agentId !== "number") {
+        return res.status(400).json({
+          success: false,
+          error: "Valid agent ID is required"
+        });
+      }
+      
+      // Verify property exists and belongs to this buyer
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Make sure the property belongs to this buyer
+      if (property.createdBy !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to choose an agent for this property"
+        });
+      }
+      
+      // Verify agent exists and is a verified agent
+      const agent = await storage.getUser(agentId);
+      
+      if (!agent || agent.role !== "agent" || agent.profileStatus !== "verified" || agent.isBlocked) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid or unavailable agent"
+        });
+      }
+      
+      // Update property with new agent
+      const updatedProperty = await storage.updateProperty(propertyId, {
+        agentId: agentId
+      });
+      
+      // Log this action
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId,
+          userId: req.user!.id,
+          activity: "Buyer chose agent",
+          details: {
+            previousAgentId: property.agentId,
+            newAgentId: agentId,
+            buyerId: req.user!.id
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for buyer choosing agent, but agent was assigned:", logError);
+        // Continue without failing the whole request
+      }
+      
+      // Send WebSocket notification to the agent
+      websocketServer.broadcastToUsers([agentId], {
+        type: 'notification',
+        data: {
+          message: 'A buyer has assigned you to their property!',
+          propertyId: propertyId
+        }
+      });
+      
+      res.json({
+        success: true,
+        data: updatedProperty
+      });
+    } catch (error) {
+      console.error("Choose agent error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to assign agent to property"
+      });
+    }
+  });
+
   app.put("/api/admin/properties/:id/reassign", isAuthenticated, hasRole(["admin"]), async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);

@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   idFrontUrl: text("id_front_url"),
   idBackUrl: text("id_back_url"),
+  profilePhotoUrl: text("profile_photo_url"), // URL to the user's profile photo
   isBlocked: boolean("is_blocked").default(false),
 });
 
@@ -103,6 +104,17 @@ export const registerUserSchema = z.object({
   role: z.enum(["buyer", "seller", "agent", "admin"]),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  profilePhotoUrl: z.string().optional(),
+})
+.superRefine((data, ctx) => {
+  // Require profile photo for agents
+  if (data.role === "agent" && !data.profilePhotoUrl) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Profile photo is required for agents",
+      path: ["profilePhotoUrl"]
+    });
+  }
 });
 
 export const kycUpdateSchema = z.object({

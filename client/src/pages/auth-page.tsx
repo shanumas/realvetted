@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 import {
   Form,
   FormControl,
@@ -14,6 +16,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -22,8 +25,9 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Image } from "lucide-react";
 
 const loginSchema = z.object({
   email: z
@@ -44,6 +48,7 @@ const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  profilePhotoUrl: z.string().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -54,6 +59,10 @@ export default function AuthPage() {
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const { user, isLoading, loginMutation, registerMutation } = useAuth();
   const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -121,13 +130,83 @@ export default function AuthPage() {
     });
   };
 
+  // Handle profile photo upload
+  const handleProfilePhotoUpload = async (file: File): Promise<string> => {
+    try {
+      setUploadingPhoto(true);
+      
+      const formData = new FormData();
+      formData.append('profilePhoto', file);
+      
+      const response = await fetch('/api/uploads/profile-photo', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to upload profile photo');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to upload profile photo');
+      }
+      
+      return data.profilePhotoUrl;
+    } catch (error) {
+      console.error('Profile photo upload error:', error);
+      toast({
+        title: 'Upload Failed',
+        description: error instanceof Error ? error.message : 'Failed to upload profile photo',
+        variant: 'destructive'
+      });
+      throw error;
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  // Handle file selection
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      // Preview the image
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviewImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      
+      // Upload the image
+      const photoUrl = await handleProfilePhotoUpload(file);
+      registerForm.setValue('profilePhotoUrl', photoUrl);
+    } catch (error) {
+      console.error('Error handling file:', error);
+    }
+  };
+
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
+    
+    // Validate that agents have a profile photo
+    if (roleTab === "agent" && !values.profilePhotoUrl) {
+      toast({
+        title: "Profile Photo Required",
+        description: "Agents must upload a profile photo to register",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     registerMutation.mutate({
       email: values.email,
       password: values.password,
       firstName: values.firstName,
       lastName: values.lastName,
+      profilePhotoUrl: values.profilePhotoUrl,
       role: roleTab as any,
     });
   };
@@ -356,6 +435,75 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
+                    
+                    {roleTab === "agent" && (
+                      <FormField
+                        control={registerForm.control}
+                        name="profilePhotoUrl"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              Profile Photo <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormDescription>
+                              Agents must upload a professional profile photo
+                            </FormDescription>
+                            <div className="flex flex-col items-center space-y-4">
+                              {previewImage ? (
+                                <div className="relative w-32 h-32 rounded-full overflow-hidden border-2 border-primary">
+                                  <img
+                                    src={previewImage}
+                                    alt="Profile preview"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    className="absolute bottom-0 right-0"
+                                    onClick={() => {
+                                      setPreviewImage("");
+                                      field.onChange("");
+                                    }}
+                                  >
+                                    ✕
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
+                                  <ImageIcon className="h-12 w-12 text-gray-400" />
+                                </div>
+                              )}
+                              
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                              />
+                              
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploadingPhoto}
+                                className="flex items-center"
+                              >
+                                {uploadingPhoto ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Upload className="mr-2 h-4 w-4" />
+                                )}
+                                {field.value ? "Change Photo" : "Upload Photo"}
+                              </Button>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    
                     <Button
                       type="submit"
                       className="w-full"
