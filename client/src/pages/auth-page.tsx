@@ -69,14 +69,19 @@ export default function AuthPage() {
   });
 
   const onLoginSubmit = (values: LoginFormValues) => {
+    console.log("Login form values:", values);
     loginMutation.mutate({
       email: values.email,
       password: values.password,
       role: roleTab as any,
     });
   };
+  
+  // Log form errors for debugging
+  console.log("Login form errors:", loginForm.formState.errors);
 
   const onRegisterSubmit = (values: RegisterFormValues) => {
+    console.log("Register form values:", values);
     registerMutation.mutate({
       email: values.email,
       password: values.password,
@@ -85,6 +90,9 @@ export default function AuthPage() {
       role: roleTab as any,
     });
   };
+  
+  // Log form errors for debugging
+  console.log("Register form errors:", registerForm.formState.errors);
 
   if (isLoading) {
     return (
