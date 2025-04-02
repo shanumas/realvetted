@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -101,6 +101,25 @@ export const agreements = pgTable("agreements", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Property viewing requests
+export const viewingRequests = pgTable("viewing_requests", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull(),
+  buyerId: integer("buyer_id").notNull(),
+  buyerAgentId: integer("buyer_agent_id"),
+  sellerAgentId: integer("seller_agent_id"),
+  requestedDate: timestamp("requested_date").notNull(),
+  requestedEndDate: timestamp("requested_end_date").notNull(),
+  confirmedDate: timestamp("confirmed_date"),
+  confirmedEndDate: timestamp("confirmed_end_date"),
+  status: text("status").notNull().default("pending"), // pending, accepted, rejected, rescheduled, completed, cancelled
+  notes: text("notes"),
+  confirmedById: integer("confirmed_by_id"), // ID of the agent who confirmed the viewing
+  responseMessage: text("response_message"), // Message from the confirming agent with any changes
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -170,6 +189,12 @@ export const agreementSchema = createInsertSchema(agreements).omit({
   createdAt: true,
 });
 
+export const viewingRequestSchema = createInsertSchema(viewingRequests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -183,3 +208,5 @@ export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
 export type InsertPropertyActivityLog = z.infer<typeof propertyActivityLogSchema>;
 export type Agreement = typeof agreements.$inferSelect;
 export type InsertAgreement = z.infer<typeof agreementSchema>;
+export type ViewingRequest = typeof viewingRequests.$inferSelect;
+export type InsertViewingRequest = z.infer<typeof viewingRequestSchema>;

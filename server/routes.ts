@@ -16,9 +16,11 @@ import {
   kycUpdateSchema,
   messageSchema,
   agreementSchema,
-  User
+  viewingRequestSchema,
+  User,
+  ViewingRequest
 } from "@shared/schema";
-import { PropertyAIData } from "@shared/types";
+import { PropertyAIData, ViewingRequestWithParticipants, WebSocketMessage } from "@shared/types";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import { z } from "zod";
@@ -175,17 +177,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         let seller = await storage.getUserByEmail(property.sellerEmail);
         
         if (!seller) {
-          // Create seller account with random password
-          const randomPassword = randomBytes(8).toString("hex");
+          // Create seller account with default password
+          const defaultSellerPassword = "Kuttybuski123*";
           seller = await storage.createUser({
             email: property.sellerEmail,
-            password: randomPassword, // This would be reset by the seller
+            password: defaultSellerPassword, // Standard password for sellers
             role: "seller",
             profileStatus: "verified" // Sellers don't need KYC
           });
           
           // In a real app, we'd send an email with login instructions
-          console.log(`Seller account created: ${property.sellerEmail} with temporary password: ${randomPassword}`);
+          console.log(`Seller account created: ${property.sellerEmail} with standard password: ${defaultSellerPassword}`);
         }
         
         // Associate property with seller
@@ -508,17 +510,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let seller = await storage.getUserByEmail(email);
       
       if (!seller) {
-        // Create seller account with random password
-        const randomPassword = randomBytes(8).toString("hex");
+        // Create seller account with default password
+        const defaultSellerPassword = "Kuttybuski123*";
         seller = await storage.createUser({
           email: email,
-          password: randomPassword,
+          password: defaultSellerPassword,
           role: "seller",
           profileStatus: "verified" // Sellers don't need KYC
         });
         
         // In a real app, we'd send an email with login instructions
-        console.log(`Seller account created: ${email} with temporary password: ${randomPassword}`);
+        console.log(`Seller account created: ${email} with standard password: ${defaultSellerPassword}`);
       }
       
       // Update property with seller email and ID
@@ -1392,6 +1394,349 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to update agreement"
+      });
+    }
+  });
+
+  // Viewing Request Routes
+  
+  // Create a viewing request
+  app.post("/api/viewing-requests", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const requestData = viewingRequestSchema.parse({
+        ...req.body,
+        buyerId: req.user!.id
+      });
+      
+      const property = await storage.getProperty(requestData.propertyId);
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if user has access to this property (only buyer who created the property can request a viewing)
+      if (property.createdBy !== req.user!.id) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to request a viewing for this property"
+        });
+      }
+      
+      // Create the viewing request
+      const viewingRequest = await storage.createViewingRequest(requestData);
+      
+      // Log the activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: property.id,
+          userId: req.user!.id,
+          activity: "Viewing requested",
+          details: {
+            requestId: viewingRequest.id,
+            requestedDate: viewingRequest.requestedDate,
+            requestedEndDate: viewingRequest.requestedEndDate
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for viewing request:", logError);
+        // Continue without failing the whole request
+      }
+      
+      // Send WebSocket notifications
+      const notifyUserIds = [req.user!.id]; // Notify the buyer
+      
+      // Notify the buyer's agent if assigned
+      if (viewingRequest.buyerAgentId) {
+        notifyUserIds.push(viewingRequest.buyerAgentId);
+      }
+      
+      // Notify the seller's agent if assigned
+      if (viewingRequest.sellerAgentId) {
+        notifyUserIds.push(viewingRequest.sellerAgentId);
+      }
+      
+      // Notify the seller if assigned
+      if (property.sellerId) {
+        notifyUserIds.push(property.sellerId);
+      }
+      
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: 'notification',
+        data: {
+          message: 'A new viewing has been requested',
+          propertyId: property.id,
+          viewingRequestId: viewingRequest.id
+        }
+      });
+      
+      res.status(201).json({
+        success: true,
+        data: viewingRequest
+      });
+    } catch (error) {
+      console.error("Create viewing request error:", error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Invalid data"
+      });
+    }
+  });
+  
+  // Get all viewing requests for a property
+  app.get("/api/properties/:id/viewing-requests", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if user has access to this property
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      
+      const hasAccess = 
+        (role === "admin") ||
+        (role === "buyer" && property.createdBy === userId) ||
+        (role === "seller" && property.sellerId === userId) ||
+        (role === "agent" && property.agentId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have access to viewing requests for this property"
+        });
+      }
+      
+      const viewingRequests = await storage.getViewingRequestsByProperty(propertyId);
+      res.json(viewingRequests);
+    } catch (error) {
+      console.error("Get viewing requests error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch viewing requests"
+      });
+    }
+  });
+  
+  // Get viewing requests for the current buyer
+  app.get("/api/viewing-requests/buyer", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const viewingRequests = await storage.getViewingRequestsByBuyer(req.user!.id);
+      res.json(viewingRequests);
+    } catch (error) {
+      console.error("Get buyer viewing requests error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch viewing requests"
+      });
+    }
+  });
+  
+  // Get viewing requests for the current agent
+  app.get("/api/viewing-requests/agent", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+    try {
+      const viewingRequests = await storage.getViewingRequestsByAgent(req.user!.id);
+      res.json(viewingRequests);
+    } catch (error) {
+      console.error("Get agent viewing requests error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch viewing requests"
+      });
+    }
+  });
+  
+  // Get a specific viewing request with participants
+  app.get("/api/viewing-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      const viewingRequest = await storage.getViewingRequestWithParticipants(requestId);
+      
+      if (!viewingRequest) {
+        return res.status(404).json({
+          success: false,
+          error: "Viewing request not found"
+        });
+      }
+      
+      // Check if user has access to this viewing request
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      
+      // Get the property to check permissions
+      const property = await storage.getProperty(viewingRequest.propertyId);
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      const hasAccess = 
+        (role === "admin") ||
+        (role === "buyer" && viewingRequest.buyerId === userId) ||
+        (role === "seller" && property.sellerId === userId) ||
+        (role === "agent" && 
+          (viewingRequest.buyerAgentId === userId || 
+           viewingRequest.sellerAgentId === userId || 
+           property.agentId === userId));
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have access to this viewing request"
+        });
+      }
+      
+      res.json(viewingRequest);
+    } catch (error) {
+      console.error("Get viewing request error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch viewing request"
+      });
+    }
+  });
+  
+  // Update a viewing request (accept, reject, reschedule)
+  app.put("/api/viewing-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      const viewingRequest = await storage.getViewingRequest(requestId);
+      
+      if (!viewingRequest) {
+        return res.status(404).json({
+          success: false,
+          error: "Viewing request not found"
+        });
+      }
+      
+      // Check if user has permission to update this viewing request
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      
+      // Get the property to check permissions
+      const property = await storage.getProperty(viewingRequest.propertyId);
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      const isAgent = role === "agent" && 
+        (viewingRequest.buyerAgentId === userId || 
+         viewingRequest.sellerAgentId === userId || 
+         property.agentId === userId);
+         
+      const isSeller = role === "seller" && property.sellerId === userId;
+      const isBuyer = role === "buyer" && viewingRequest.buyerId === userId;
+      const isAdmin = role === "admin";
+      
+      // Only agents, sellers, the requesting buyer, or admins can update viewing requests
+      if (!(isAgent || isSeller || isBuyer || isAdmin)) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to update this viewing request"
+        });
+      }
+      
+      // Parse the update data
+      const { status, confirmedDate, confirmedEndDate, responseMessage } = req.body;
+      
+      // Validate the status
+      if (status && !["pending", "accepted", "rejected", "rescheduled", "completed", "cancelled"].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid status value"
+        });
+      }
+      
+      // Create update data object
+      const updateData: Partial<ViewingRequest> = {};
+      if (status) updateData.status = status;
+      if (confirmedDate) updateData.confirmedDate = new Date(confirmedDate);
+      if (confirmedEndDate) updateData.confirmedEndDate = new Date(confirmedEndDate);
+      if (responseMessage) updateData.responseMessage = responseMessage;
+      
+      // If accepting or rescheduling, record who confirmed
+      if (["accepted", "rescheduled"].includes(status)) {
+        updateData.confirmedById = userId;
+      }
+      
+      // Update the viewing request
+      const updatedRequest = await storage.updateViewingRequest(requestId, updateData);
+      
+      // Log the activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: property.id,
+          userId: userId,
+          activity: `Viewing request ${status}`,
+          details: {
+            requestId: updatedRequest.id,
+            status: updatedRequest.status,
+            updatedBy: {
+              id: userId,
+              role: role
+            }
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for viewing request update:", logError);
+        // Continue without failing the whole request
+      }
+      
+      // Send WebSocket notifications
+      const notifyUserIds = [viewingRequest.buyerId]; // Always notify the buyer
+      
+      // Notify the buyer's agent if assigned
+      if (viewingRequest.buyerAgentId) {
+        notifyUserIds.push(viewingRequest.buyerAgentId);
+      }
+      
+      // Notify the seller's agent if assigned
+      if (viewingRequest.sellerAgentId) {
+        notifyUserIds.push(viewingRequest.sellerAgentId);
+      }
+      
+      // Notify the seller if assigned
+      if (property.sellerId) {
+        notifyUserIds.push(property.sellerId);
+      }
+      
+      // Notify the property's agent if assigned
+      if (property.agentId) {
+        notifyUserIds.push(property.agentId);
+      }
+      
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: 'property_update',
+        data: {
+          propertyId: property.id,
+          viewingRequestId: updatedRequest.id,
+          action: 'viewing_request_updated',
+          status: updatedRequest.status,
+          message: `Viewing request has been ${updatedRequest.status}`
+        }
+      });
+      
+      res.json({
+        success: true,
+        data: updatedRequest
+      });
+    } catch (error) {
+      console.error("Update viewing request error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update viewing request"
       });
     }
   });

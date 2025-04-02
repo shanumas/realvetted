@@ -3,15 +3,19 @@ import {
   Message, InsertMessage, AgentLead, InsertAgentLead,
   PropertyActivityLog, InsertPropertyActivityLog,
   Agreement, InsertAgreement,
-  users, properties, messages, agentLeads, propertyActivityLogs, agreements
+  ViewingRequest, InsertViewingRequest,
+  users, properties, messages, agentLeads, propertyActivityLogs, agreements, viewingRequests
 } from "@shared/schema";
-import { LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser } from "@shared/types";
+import { 
+  LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser, 
+  ViewingRequestWithParticipants 
+} from "@shared/types";
 import { randomBytes } from "crypto";
 import { scrypt } from "crypto";
 import { promisify } from "util";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 
@@ -60,6 +64,15 @@ export interface IStorage {
   getAgreementsByProperty(propertyId: number): Promise<Agreement[]>;
   createAgreement(agreement: InsertAgreement): Promise<Agreement>;
   updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement>;
+  
+  // Viewing request methods
+  getViewingRequest(id: number): Promise<ViewingRequest | undefined>;
+  getViewingRequestWithParticipants(id: number): Promise<ViewingRequestWithParticipants | undefined>;
+  getViewingRequestsByProperty(propertyId: number): Promise<ViewingRequest[]>;
+  getViewingRequestsByBuyer(buyerId: number): Promise<ViewingRequest[]>;
+  getViewingRequestsByAgent(agentId: number): Promise<ViewingRequest[]>;
+  createViewingRequest(request: InsertViewingRequest): Promise<ViewingRequest>;
+  updateViewingRequest(id: number, data: Partial<ViewingRequest>): Promise<ViewingRequest>;
   
   // Session store
   sessionStore: session.Store;
@@ -607,6 +620,87 @@ export class PgStorage implements IStorage {
     
     if (result.length === 0) {
       throw new Error(`Agreement with ID ${id} not found`);
+    }
+    
+    return result[0];
+  }
+  
+  // Viewing request methods
+  async getViewingRequest(id: number): Promise<ViewingRequest | undefined> {
+    const result = await this.db.select().from(viewingRequests).where(eq(viewingRequests.id, id));
+    return result[0];
+  }
+  
+  async getViewingRequestWithParticipants(id: number): Promise<ViewingRequestWithParticipants | undefined> {
+    const request = await this.getViewingRequest(id);
+    
+    if (!request) {
+      return undefined;
+    }
+    
+    const property = await this.getProperty(request.propertyId);
+    const buyer = await this.getUser(request.buyerId);
+    // Use buyerAgentId instead of agentId
+    const agent = request.buyerAgentId ? await this.getUser(request.buyerAgentId) : undefined;
+    
+    return {
+      ...request,
+      property,
+      buyer,
+      agent
+    };
+  }
+  
+  async getViewingRequestsByProperty(propertyId: number): Promise<ViewingRequest[]> {
+    return await this.db.select()
+      .from(viewingRequests)
+      .where(eq(viewingRequests.propertyId, propertyId))
+      .orderBy(desc(viewingRequests.requestedDate));
+  }
+  
+  async getViewingRequestsByBuyer(buyerId: number): Promise<ViewingRequest[]> {
+    return await this.db.select()
+      .from(viewingRequests)
+      .where(eq(viewingRequests.buyerId, buyerId))
+      .orderBy(desc(viewingRequests.requestedDate));
+  }
+  
+  async getViewingRequestsByAgent(agentId: number): Promise<ViewingRequest[]> {
+    return await this.db.select()
+      .from(viewingRequests)
+      .where(
+        or(
+          eq(viewingRequests.buyerAgentId, agentId),
+          eq(viewingRequests.sellerAgentId, agentId)
+        )
+      )
+      .orderBy(desc(viewingRequests.requestedDate));
+  }
+  
+  async createViewingRequest(request: InsertViewingRequest): Promise<ViewingRequest> {
+    const result = await this.db.insert(viewingRequests).values({
+      propertyId: request.propertyId,
+      buyerId: request.buyerId,
+      buyerAgentId: request.buyerAgentId || null,
+      sellerAgentId: request.sellerAgentId || null,
+      requestedDate: request.requestedDate,
+      requestedEndDate: request.requestedEndDate,
+      status: request.status || "pending",
+      notes: request.notes || null,
+      createdAt: new Date()
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateViewingRequest(id: number, data: Partial<ViewingRequest>): Promise<ViewingRequest> {
+    const result = await this.db.update(viewingRequests)
+      .set(data)
+      .where(eq(viewingRequests.id, id))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error(`Viewing request with ID ${id} not found`);
     }
     
     return result[0];

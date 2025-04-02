@@ -1,4 +1,4 @@
-import { User, Property, Message } from "./schema";
+import { User, Property, Message, ViewingRequest } from "./schema";
 
 // AI extracted property data
 export interface PropertyAIData {
@@ -81,4 +81,10 @@ export interface PropertyActivityLogWithUser {
     email: string;
     role: string;
   };
+}
+
+export interface ViewingRequestWithParticipants extends ViewingRequest {
+  property?: Property;
+  buyer?: User;
+  agent?: User;
 }
