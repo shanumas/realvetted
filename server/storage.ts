@@ -169,8 +169,21 @@ export class PgStorage implements IStorage {
 
   // Property methods
   async getProperty(id: number): Promise<Property | undefined> {
-    const result = await this.db.select().from(properties).where(eq(properties.id, id));
-    return result[0];
+    try {
+      // Ensure the emailSent column exists
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+      
+      const result = await this.db.select().from(properties).where(eq(properties.id, id));
+      return result[0];
+    } catch (error) {
+      console.error("Error in getProperty:", error);
+      // Fallback to raw query if there's a schema issue
+      const result = await this.pool.query(`SELECT * FROM properties WHERE id = $1`, [id]);
+      return result.rows[0];
+    }
   }
 
   async getPropertyWithParticipants(id: number): Promise<PropertyWithParticipants | undefined> {
@@ -197,22 +210,84 @@ export class PgStorage implements IStorage {
   }
 
   async getAllProperties(): Promise<Property[]> {
-    return await this.db.select().from(properties);
+    try {
+      // First, ensure the emailSent column exists
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+      
+      return await this.db.select().from(properties);
+    } catch (error) {
+      console.error("Error in getAllProperties:", error);
+      // If there's an error with the column, return properties without using the schema
+      const result = await this.pool.query(`SELECT * FROM properties`);
+      return result.rows;
+    }
   }
 
   async getPropertiesByBuyer(buyerId: number): Promise<Property[]> {
-    return await this.db.select().from(properties).where(eq(properties.createdBy, buyerId));
+    try {
+      // Ensure the emailSent column exists
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+      
+      return await this.db.select().from(properties).where(eq(properties.createdBy, buyerId));
+    } catch (error) {
+      console.error("Error in getPropertiesByBuyer:", error);
+      // Fallback to raw query if there's a schema issue
+      const result = await this.pool.query(`SELECT * FROM properties WHERE created_by = $1`, [buyerId]);
+      return result.rows;
+    }
   }
 
   async getPropertiesBySeller(sellerId: number): Promise<Property[]> {
-    return await this.db.select().from(properties).where(eq(properties.sellerId, sellerId));
+    try {
+      // Ensure the emailSent column exists
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+      
+      return await this.db.select().from(properties).where(eq(properties.sellerId, sellerId));
+    } catch (error) {
+      console.error("Error in getPropertiesBySeller:", error);
+      // Fallback to raw query if there's a schema issue
+      const result = await this.pool.query(`SELECT * FROM properties WHERE seller_id = $1`, [sellerId]);
+      return result.rows;
+    }
   }
 
   async getPropertiesByAgent(agentId: number): Promise<Property[]> {
-    return await this.db.select().from(properties).where(eq(properties.agentId, agentId));
+    try {
+      // Ensure the emailSent column exists
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+      
+      return await this.db.select().from(properties).where(eq(properties.agentId, agentId));
+    } catch (error) {
+      console.error("Error in getPropertiesByAgent:", error);
+      // Fallback to raw query if there's a schema issue
+      const result = await this.pool.query(`SELECT * FROM properties WHERE agent_id = $1`, [agentId]);
+      return result.rows;
+    }
   }
 
   async createProperty(propertyData: InsertProperty): Promise<Property> {
+    // Let's first run a raw query to add the email_sent column if it doesn't exist
+    try {
+      await this.pool.query(`
+        ALTER TABLE properties 
+        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+      `);
+    } catch (error) {
+      console.error("Error adding email_sent column:", error);
+    }
+    
     const result = await this.db.insert(properties).values({
       address: propertyData.address,
       city: propertyData.city || null,
@@ -230,23 +305,75 @@ export class PgStorage implements IStorage {
       sellerEmail: propertyData.sellerEmail || null,
       sellerId: propertyData.sellerId || null,
       agentId: propertyData.agentId || null,
-      status: propertyData.status || "active"
+      status: propertyData.status || "active",
+      emailSent: propertyData.emailSent || false
     }).returning();
     
     return result[0];
   }
 
   async updateProperty(id: number, data: Partial<Property>): Promise<Property> {
-    const result = await this.db.update(properties)
-      .set(data)
-      .where(eq(properties.id, id))
-      .returning();
-    
-    if (result.length === 0) {
-      throw new Error(`Property with ID ${id} not found`);
+    try {
+      // Ensure the emailSent column exists before updating
+      if ('emailSent' in data) {
+        // Make sure the column exists
+        await this.pool.query(`
+          ALTER TABLE properties 
+          ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+        `);
+      }
+      
+      // Update using Drizzle ORM
+      const result = await this.db.update(properties)
+        .set(data)
+        .where(eq(properties.id, id))
+        .returning();
+      
+      if (result.length === 0) {
+        throw new Error(`Property with ID ${id} not found`);
+      }
+      
+      return result[0];
+    } catch (error) {
+      console.error("Error updating property:", error);
+      
+      // Fallback manual update if the ORM approach fails
+      const current = await this.getProperty(id);
+      if (!current) {
+        throw new Error(`Property with ID ${id} not found`);
+      }
+      
+      // Handle each field individually to avoid SQL errors
+      for (const [key, value] of Object.entries(data)) {
+        if (key === 'emailSent') {
+          try {
+            // Try to update the email_sent column
+            await this.pool.query(`
+              UPDATE properties SET email_sent = $1 WHERE id = $2
+            `, [value, id]);
+          } catch (err) {
+            console.error("Error updating emailSent:", err);
+            // If that fails, try to add the column first
+            await this.pool.query(`
+              ALTER TABLE properties 
+              ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
+            `);
+            await this.pool.query(`
+              UPDATE properties SET email_sent = $1 WHERE id = $2
+            `, [value, id]);
+          }
+        } else {
+          // Convert camelCase to snake_case for column names
+          const columnName = key.replace(/([A-Z])/g, '_$1').toLowerCase();
+          await this.pool.query(`
+            UPDATE properties SET ${columnName} = $1 WHERE id = $2
+          `, [value, id]);
+        }
+      }
+      
+      // Return the updated property
+      return await this.getProperty(id) as Property;
     }
-    
-    return result[0];
   }
   
   async deleteProperty(id: number): Promise<void> {

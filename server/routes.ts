@@ -101,19 +101,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = await storage.createProperty(propertyData);
       
       // Log property creation
-      await storage.createPropertyActivityLog({
-        propertyId: property.id,
-        userId: req.user!.id,
-        activity: "Property created",
-        details: {
-          address: property.address,
-          price: property.price,
-          createdBy: {
-            id: req.user!.id,
-            role: req.user!.role
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: property.id,
+          userId: req.user!.id,
+          activity: "Property created",
+          details: {
+            address: property.address,
+            price: property.price,
+            createdBy: {
+              id: req.user!.id,
+              role: req.user!.role
+            }
           }
-        }
-      });
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for property creation, but property was created:", logError);
+        // Continue without failing the whole request
+      }
       
       // If seller email is available, create seller account or associate with existing
       if (property.sellerEmail) {
@@ -375,18 +380,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Log this activity
-      await storage.createPropertyActivityLog({
-        propertyId,
-        userId: userId || null,
-        activity: "Email sent to seller",
-        details: {
-          sellerEmail: property.sellerEmail,
-          sentBy: {
-            id: userId,
-            role: userRole
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId,
+          userId: userId || null,
+          activity: "Email sent to seller",
+          details: {
+            sellerEmail: property.sellerEmail,
+            sentBy: {
+              id: userId,
+              role: userRole
+            }
           }
-        }
-      });
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log, but email was marked as sent:", logError);
+        // Continue without failing the whole request
+      }
       
       // Send WebSocket notification to all users with access to this property
       const notifyUserIds = [property.createdBy];
@@ -531,16 +541,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Log this activity
-      await storage.createPropertyActivityLog({
-        propertyId: lead.propertyId,
-        userId: req.user!.id,
-        activity: "Agent claimed lead",
-        details: {
-          leadId: lead.id,
-          agentId: req.user!.id,
-          agentEmail: req.user!.email
-        }
-      });
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: lead.propertyId,
+          userId: req.user!.id,
+          activity: "Agent claimed lead",
+          details: {
+            leadId: lead.id,
+            agentId: req.user!.id,
+            agentEmail: req.user!.email
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for agent claiming lead, but lead was claimed:", logError);
+        // Continue without failing the whole request
+      }
       
       res.json({
         success: true,
@@ -849,16 +864,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Log this admin action
-      await storage.createPropertyActivityLog({
-        propertyId,
-        userId: req.user!.id,
-        activity: "Admin reassigned agent",
-        details: {
-          previousAgentId: property.agentId,
-          newAgentId: agentId,
-          adminId: req.user!.id
-        }
-      });
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId,
+          userId: req.user!.id,
+          activity: "Admin reassigned agent",
+          details: {
+            previousAgentId: property.agentId,
+            newAgentId: agentId,
+            adminId: req.user!.id
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for admin reassigning agent, but agent was reassigned:", logError);
+        // Continue without failing the whole request
+      }
       
       res.json({
         success: true,
