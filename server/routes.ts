@@ -265,6 +265,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if an agent has already accepted this property's lead
+      // If property.agentId exists, it means an agent has accepted the lead
+      if (role === "buyer" && property.agentId) {
+        return res.status(403).json({
+          success: false,
+          error: "Cannot delete property after an agent has accepted the lead"
+        });
+      }
+      
       // Delete the property
       await storage.deleteProperty(propertyId);
       
