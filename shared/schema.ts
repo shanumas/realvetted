@@ -52,6 +52,7 @@ export const properties = pgTable("properties", {
   propertyUrl: text("property_url"),
   features: text("features").array(),
   imageUrls: text("image_urls").array(),
+  emailSent: boolean("email_sent").default(false),
 });
 
 // Messages for chat functionality

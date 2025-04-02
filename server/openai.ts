@@ -211,57 +211,133 @@ export async function findAgentsForProperty(property: Property): Promise<User[]>
       return [];
     }
 
-    // If no API key, just return all verified agents
+    // Pre-filter agents by state when possible for better location-based matching
+    const propertyState = property.state;
+    
+    // Create two groups of agents - those in the same state and those in other states
+    const sameStateAgents = propertyState 
+      ? verifiedAgents.filter(agent => agent.state?.toLowerCase() === propertyState.toLowerCase())
+      : [];
+    
+    // If we have enough agents in the same state, prioritize them
+    if (sameStateAgents.length >= 3) {
+      console.log(`Found ${sameStateAgents.length} agents in ${propertyState} for property matching`);
+      
+      // If we have many agents in the same state, use AI to rank them by expertise
+      if (sameStateAgents.length > 3 && process.env.OPENAI_API_KEY && 
+          process.env.OPENAI_API_KEY !== "dummy_key_for_development") {
+        return await rankAgentsByExpertise(property, sameStateAgents);
+      }
+      
+      // If we have exactly 3 or fewer agents in the same state, return them all
+      return sameStateAgents;
+    }
+    
+    // If no API key, return the same-state agents first, then add other agents
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
       console.log("Using simplified agent matching (no API key)");
-      return verifiedAgents;
+      
+      // If we have some agents in the same state but fewer than 3, add agents from other states
+      if (sameStateAgents.length > 0) {
+        const otherStateAgents = verifiedAgents.filter(agent => 
+          !sameStateAgents.some(sa => sa.id === agent.id)
+        );
+        
+        // Return same-state agents first, then add others up to 3 total
+        const topAgents = [
+          ...sameStateAgents,
+          ...otherStateAgents.slice(0, 3 - sameStateAgents.length)
+        ];
+        
+        return topAgents;
+      }
+      
+      // If no same-state agents, just return up to 3 verified agents
+      return verifiedAgents.slice(0, 3);
     }
 
-    const prompt = `
-      I need to match real estate agents to a property. Here's the property information:
-      - Address: ${property.address}
-      - City: ${property.city || "Unknown"}
-      - State: ${property.state || "Unknown"}
-      - Property Type: ${property.propertyType || "Unknown"}
-      - Price: ${property.price ? `$${property.price}` : "Unknown"}
-
-      Here are the available agents and their expertise:
-      ${verifiedAgents.map((agent, i) => `
-        Agent ${i+1}:
-        - Name: ${agent.firstName} ${agent.lastName}
-        - Location: ${agent.city || "Unknown"}, ${agent.state || "Unknown"}
-        - Expertise: ${agent.expertise || "General real estate"}
-      `).join("\n")}
-
-      Please provide the IDs of the top 3 most suitable agents based on location and expertise.
-      Return a JSON array with only the agent IDs like this: [1, 2, 3]
-    `;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        { role: "system", content: "You are a real estate agent matching expert." },
-        { role: "user", content: prompt }
-      ],
-      response_format: { type: "json_object" }
-    });
-
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    const matchedAgentIds = result.agents || [];
-    
-    // Return matched agents or all agents if no matches
-    if (matchedAgentIds.length > 0) {
-      return verifiedAgents.filter(agent => matchedAgentIds.includes(agent.id));
-    } else {
-      return verifiedAgents;
-    }
+    // Use AI for comprehensive matching
+    return await rankAgentsByExpertise(property, verifiedAgents, sameStateAgents);
   } catch (error) {
     console.error("Error matching agents:", error);
-    // Return all verified agents as fallback
+    // Return all verified agents as fallback, prioritizing same-state agents
     const allAgents = await storage.getUsersByRole("agent");
-    return allAgents.filter(agent => 
+    const verifiedAgents = allAgents.filter(agent => 
       agent.profileStatus === "verified" && !agent.isBlocked
     );
+    
+    if (property.state) {
+      // Sort to prioritize agents in the same state
+      return verifiedAgents.sort((a, b) => {
+        const aInSameState = (a.state?.toLowerCase() === property.state?.toLowerCase()) ? 0 : 1;
+        const bInSameState = (b.state?.toLowerCase() === property.state?.toLowerCase()) ? 0 : 1;
+        return aInSameState - bInSameState;
+      }).slice(0, 3);
+    }
+    
+    return verifiedAgents.slice(0, 3);
+  }
+}
+
+// Helper function to rank agents using AI based on expertise and property details
+async function rankAgentsByExpertise(
+  property: Property, 
+  agents: User[], 
+  prioritizedAgents: User[] = []
+): Promise<User[]> {
+  const prompt = `
+    I need to match real estate agents to a property. Here's the property information:
+    - Address: ${property.address}
+    - City: ${property.city || "Unknown"}
+    - State: ${property.state || "Unknown"}
+    - Property Type: ${property.propertyType || "Unknown"}
+    - Price: ${property.price ? `$${property.price}` : "Unknown"}
+
+    Here are the available agents and their expertise:
+    ${agents.map((agent, i) => `
+      Agent ${i+1} (ID: ${agent.id}):
+      - Name: ${agent.firstName} ${agent.lastName}
+      - Location: ${agent.city || "Unknown"}, ${agent.state || "Unknown"}
+      - Expertise: ${agent.expertise || "General real estate"}
+    `).join("\n")}
+
+    ${prioritizedAgents.length > 0 ? `
+    NOTE: Agents with IDs ${prioritizedAgents.map(a => a.id).join(', ')} are located in the same state as the property (${property.state}) and should be given higher priority.
+    ` : ''}
+
+    Please provide the IDs of the top 3 most suitable agents based on location and expertise.
+    Return a JSON object with an 'agents' array containing the agent IDs, like this: {"agents": [1, 2, 3]}
+  `;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    messages: [
+      { role: "system", content: "You are a real estate agent matching expert." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" }
+  });
+
+  const result = JSON.parse(response.choices[0].message.content || "{}");
+  const matchedAgentIds = result.agents || [];
+  
+  // Return matched agents (up to 3) or prioritized agents + others if no matches
+  if (matchedAgentIds.length > 0) {
+    const matchedAgents = agents.filter(agent => matchedAgentIds.includes(agent.id));
+    return matchedAgents.slice(0, 3);
+  } else if (prioritizedAgents.length > 0) {
+    // If AI didn't return matches but we have prioritized agents, use those first
+    const otherAgents = agents.filter(agent => 
+      !prioritizedAgents.some(pa => pa.id === agent.id)
+    );
+    
+    return [
+      ...prioritizedAgents,
+      ...otherAgents
+    ].slice(0, 3);
+  } else {
+    // Fallback to returning top 3 agents
+    return agents.slice(0, 3);
   }
 }
 

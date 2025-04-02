@@ -1,16 +1,19 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { getQueryFn } from "@/lib/queryClient";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Property } from "@shared/schema";
 import { PropertyWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
-  Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight
+  Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
+  Send
 } from "lucide-react";
 
 export default function PropertyDetail() {
@@ -271,12 +274,41 @@ export default function PropertyDetail() {
                               <Mail className="mr-2 h-4 w-4" /> Email
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a 
-                                href={`mailto:${property.sellerEmail}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {property.sellerEmail}
-                              </a>
+                              <div className="flex items-center">
+                                <a 
+                                  href={`mailto:${property.sellerEmail}`}
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  {property.sellerEmail}
+                                </a>
+                                
+                                {property.emailSent ? (
+                                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                    <Mail className="mr-1 h-3 w-3" />
+                                    Email sent
+                                  </span>
+                                ) : (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="ml-2"
+                                    onClick={handleSendEmail}
+                                    disabled={sendEmailMutation.isPending}
+                                  >
+                                    {sendEmailMutation.isPending ? (
+                                      <>
+                                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                        Sending...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="mr-1 h-3 w-3" />
+                                        Send Email
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             </dd>
                           </div>
                         )}

@@ -30,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { isAuthenticated, hasRole } = setupAuth(app);
   
   // Set up WebSocket server
-  setupWebSocketServer(httpServer);
+  const websocketServer = setupWebSocketServer(httpServer);
   
   // Configure multer for file uploads
   const upload = multer({
@@ -127,14 +127,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Find and notify potential agents
       try {
         const agents = await findAgentsForProperty(property);
+        console.log(`Found ${agents.length} matching agents for property ${property.id}`);
         
-        // Create leads for each agent
-        for (const agent of agents) {
-          await storage.createAgentLead({
+        // Create leads for top 3 agents only
+        const topAgents = agents.slice(0, 3);
+        for (const agent of topAgents) {
+          const lead = await storage.createAgentLead({
             propertyId: property.id,
             agentId: agent.id,
             status: "available"
           });
+          console.log(`Created lead ${lead.id} for agent ${agent.id} on property ${property.id}`);
+          
+          // In a real app, send a notification to the agent via email
+          
+          // Send a notification via WebSocket to the agent if they're online
+          if (websocketServer) {
+            websocketServer.broadcastToUsers([agent.id], {
+              type: 'notification',
+              data: {
+                message: 'New lead available! A buyer has added a property that matches your expertise.',
+                propertyId: property.id,
+                leadId: lead.id
+              }
+            });
+          }
         }
       } catch (error) {
         console.error("Agent matching error:", error);
@@ -290,6 +307,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Send email to seller and update emailSent flag
+  app.post("/api/properties/:id/send-email", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check user permissions
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      if (!userId || !userRole) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized"
+        });
+      }
+      
+      const hasAccess = 
+        (userRole === "admin") ||
+        (userRole === "buyer" && property.createdBy === userId) ||
+        (userRole === "agent" && property.agentId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to send an email for this property"
+        });
+      }
+      
+      if (!property.sellerEmail) {
+        return res.status(400).json({
+          success: false,
+          error: "No seller email address available"
+        });
+      }
+      
+      // In a real application, this would send an actual email
+      // For now, we'll just mark it as sent
+      console.log(`[Email Service] Sending email to seller ${property.sellerEmail} about property ${propertyId}`);
+      
+      // Update property to mark email as sent
+      const updatedProperty = await storage.updateProperty(propertyId, {
+        emailSent: true
+      });
+      
+      // Send WebSocket notification to all users with access to this property
+      const notifyUserIds = [property.createdBy];
+      if (property.agentId) notifyUserIds.push(property.agentId);
+      if (property.sellerId) notifyUserIds.push(property.sellerId);
+      
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: 'property_update',
+        data: {
+          propertyId,
+          action: 'email_sent',
+          message: 'Email has been sent to the seller'
+        }
+      });
+      
+      res.json({
+        success: true,
+        data: updatedProperty
+      });
+    } catch (error) {
+      console.error("Send email error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to send email to seller"
+      });
+    }
+  });
+
   // Add/update seller email
   app.post("/api/properties/:id/seller-email", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {

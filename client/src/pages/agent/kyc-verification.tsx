@@ -14,11 +14,31 @@ import { uploadIDDocuments, extractDataFromID, KYCExtractedData } from "@/lib/op
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Upload, FileCheck } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+
+// Array of US states for agent location selection
+const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", 
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", 
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan", 
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", 
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", 
+  "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", 
+  "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming",
+  "District of Columbia"
+];
 
 // Extend the base KYC schema for agents to include expertise
 const agentKycSchema = kycUpdateSchema.extend({
   expertise: z.string().min(1, "Please describe your expertise"),
   licenseNumber: z.string().min(1, "License number is required"),
+  state: z.string().min(1, "State is required to match you with local properties"),
 });
 
 type AgentKYCFormValues = z.infer<typeof agentKycSchema>;
@@ -400,9 +420,26 @@ export default function AgentKYC() {
                         <FormItem>
                           <FormLabel>State</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a state" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {US_STATES.map((state) => (
+                                  <SelectItem key={state} value={state}>
+                                    {state}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </FormControl>
                           <FormMessage />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Your primary state of operation will be used to match you with relevant properties
+                          </p>
                         </FormItem>
                       )}
                     />
