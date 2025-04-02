@@ -422,6 +422,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Extract property details from a URL (e.g., Zillow listing)
+  app.post("/api/ai/extract-property-from-url", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "Property URL is required"
+        });
+      }
+      
+      // Import the scraper function
+      const { scrapePropertyListing } = await import('./scrapers/property-scraper');
+      
+      // Scrape the property listing
+      const propertyData = await scrapePropertyListing(url);
+      
+      res.json(propertyData);
+    } catch (error) {
+      console.error("Property URL scraping error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to extract property data from URL"
+      });
+    }
+  });
+  
   // Extract data from ID documents using OpenAI Vision
   app.post("/api/ai/extract-id-data", isAuthenticated, async (req, res) => {
     try {

@@ -2,7 +2,7 @@ import { User, Property, Message } from "./schema";
 
 // AI extracted property data
 export interface PropertyAIData {
-  address: string;
+  address: string;  // Make address required for form submission but optional for API responses
   city?: string;
   state?: string;
   zip?: string;
@@ -12,7 +12,20 @@ export interface PropertyAIData {
   squareFeet?: number;
   propertyType?: string;
   yearBuilt?: number;
-  sellerEmail?: string;
+  sellerName?: string;       // Name of the seller/listing agent
+  sellerPhone?: string;      // Phone number of the seller/listing agent
+  sellerEmail?: string;      // Email of the seller/listing agent
+  sellerCompany?: string;    // Real estate company of the seller/listing agent
+  sellerLicenseNo?: string;  // License number of the seller/listing agent
+  propertyUrl?: string;      // Original property listing URL
+  description?: string;      // Property description
+  features?: string[];       // Property features/amenities
+  imageUrls?: string[];      // Property image URLs
+}
+
+// Similar to PropertyAIData but allows address to be optional when extracting from HTML
+export interface PropertyScraperResult extends Omit<PropertyAIData, 'address'> {
+  address?: string;
 }
 
 // Socket message types

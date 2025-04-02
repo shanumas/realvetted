@@ -44,6 +44,14 @@ export const properties = pgTable("properties", {
   sellerId: integer("seller_id"), // Seller user ID (if they've signed up)
   agentId: integer("agent_id"), // Assigned agent ID
   status: text("status").notNull().default("active"), // "active", "pending", "sold", etc.
+  // Additional columns for seller/listing details
+  sellerName: text("seller_name"),
+  sellerPhone: text("seller_phone"),
+  sellerCompany: text("seller_company"),
+  sellerLicenseNo: text("seller_license_no"),
+  propertyUrl: text("property_url"),
+  features: text("features").array(),
+  imageUrls: text("image_urls").array(),
 });
 
 // Messages for chat functionality
