@@ -5,16 +5,17 @@ import { getQueryFn } from "@/lib/queryClient";
 import { PropertyWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
+import { PropertyActivityLog } from "@/components/property-activity-log";
+import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
+import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, FileSignature
+  Activity, FileSignature, CalendarDays
 } from "lucide-react";
-import { PropertyActivityLog } from "@/components/property-activity-log";
-import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 
 export default function AgentPropertyDetail() {
   const [, params] = useRoute("/agent/property/:id");
@@ -265,7 +266,7 @@ export default function AgentPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-3">
+                    <TabsList className="w-full grid grid-cols-4">
                       <TabsTrigger value="buyer" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Buyer Chat
                       </TabsTrigger>
@@ -273,6 +274,12 @@ export default function AgentPropertyDetail() {
                         <span className="flex items-center">
                           <Activity className="mr-1 h-4 w-4" /> 
                           Activity
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <CalendarDays className="mr-1 h-4 w-4" /> 
+                          Viewings
                         </span>
                       </TabsTrigger>
                       <TabsTrigger value="documents" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
@@ -311,6 +318,21 @@ export default function AgentPropertyDetail() {
                         </p>
                       </div>
                       <PropertyActivityLog propertyId={propertyId} />
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="viewings">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <CalendarDays className="mr-2 h-5 w-5 text-primary" />
+                          Property Viewing Requests
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Manage viewing requests from buyers
+                        </p>
+                      </div>
+                      <ViewingRequestsList propertyId={propertyId} />
                     </div>
                   </TabsContent>
                   

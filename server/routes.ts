@@ -1514,7 +1514,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const viewingRequests = await storage.getViewingRequestsByProperty(propertyId);
+      // Get the viewing requests with participant information
+      const viewingRequests = await Promise.all(
+        (await storage.getViewingRequestsByProperty(propertyId)).map(async (request) => {
+          let buyer = undefined;
+          if (request.buyerId) {
+            buyer = await storage.getUser(request.buyerId);
+          }
+
+          let agent = undefined;
+          if (request.agentId) {
+            agent = await storage.getUser(request.agentId);
+          }
+
+          return {
+            ...request,
+            buyer,
+            agent
+          } as ViewingRequestWithParticipants;
+        })
+      );
+      
       res.json(viewingRequests);
     } catch (error) {
       console.error("Get viewing requests error:", error);

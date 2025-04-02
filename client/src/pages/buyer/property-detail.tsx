@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Send, Activity, UserPlus, Users, MessageCircle
+  Send, Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
@@ -42,6 +42,10 @@ export default function BuyerPropertyDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+  const [isViewingModalOpen, setIsViewingModalOpen] = useState<boolean>(false);
+  const [viewingDate, setViewingDate] = useState<string>("");
+  const [viewingTime, setViewingTime] = useState<string>("");
+  const [viewingNotes, setViewingNotes] = useState<string>("");
   const { toast } = useToast();
   
   // Fetch available agents
@@ -121,6 +125,60 @@ export default function BuyerPropertyDetail() {
 
   const handleSendEmail = () => {
     sendEmailMutation.mutate();
+  };
+  
+  // Mutation to request a property viewing
+  const requestViewingMutation = useMutation({
+    mutationFn: async (data: { date: string, time: string, notes: string }) => {
+      const res = await apiRequest("POST", `/api/properties/${propertyId}/request-viewing`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Viewing requested",
+        description: "Your viewing request has been sent to the agent.",
+        variant: "default",
+      });
+      setIsViewingModalOpen(false);
+      setViewingDate("");
+      setViewingTime("");
+      setViewingNotes("");
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Could not request viewing",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const handleRequestViewing = () => {
+    if (!viewingDate) {
+      toast({
+        title: "Date required",
+        description: "Please select a date for the viewing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!viewingTime) {
+      toast({
+        title: "Time required",
+        description: "Please select a time for the viewing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    requestViewingMutation.mutate({
+      date: viewingDate,
+      time: viewingTime,
+      notes: viewingNotes
+    });
   };
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
@@ -549,9 +607,100 @@ export default function BuyerPropertyDetail() {
                 </Tabs>
               </CardContent>
             </Card>
+            
+            {/* Request Viewing Button */}
+            <Card className="mt-4">
+              <CardContent className="p-5">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Schedule a Viewing</h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Request a property viewing with your agent at your preferred date and time.
+                </p>
+                <Button 
+                  className="w-full flex items-center justify-center" 
+                  onClick={() => setIsViewingModalOpen(true)}
+                >
+                  <Eye className="mr-2 h-5 w-5" /> Request Viewing
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
+
+      {/* Viewing Request Modal */}
+      <Dialog open={isViewingModalOpen} onOpenChange={setIsViewingModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Request Property Viewing</DialogTitle>
+            <DialogDescription>
+              Schedule a time to view this property with your agent.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="viewingDate" className="text-right text-sm font-medium col-span-1">
+                Date
+              </label>
+              <div className="col-span-3">
+                {/* Date Selection (placeholder for now) */}
+                <input 
+                  type="date" 
+                  id="viewingDate" 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  min={new Date().toISOString().split('T')[0]}
+                  value={viewingDate}
+                  onChange={(e) => setViewingDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="viewingTime" className="text-right text-sm font-medium col-span-1">
+                Time
+              </label>
+              <div className="col-span-3">
+                <input 
+                  type="time" 
+                  id="viewingTime" 
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  value={viewingTime}
+                  onChange={(e) => setViewingTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <label htmlFor="notes" className="text-right text-sm font-medium col-span-1">
+                Notes
+              </label>
+              <div className="col-span-3">
+                <textarea
+                  id="notes"
+                  placeholder="Any special requests or questions about viewing the property"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                  rows={3}
+                  value={viewingNotes}
+                  onChange={(e) => setViewingNotes(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewingModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRequestViewing} 
+              disabled={requestViewingMutation.isPending}
+            >
+              {requestViewingMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CalendarIcon className="mr-2 h-4 w-4" />
+              )}
+              Schedule Viewing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Agent Selection Dialog */}
       <Dialog open={isAgentDialogOpen} onOpenChange={setIsAgentDialogOpen}>
