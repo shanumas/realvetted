@@ -11,15 +11,17 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity
+  Activity, FileSignature
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
+import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 
 export default function AgentPropertyDetail() {
   const [, params] = useRoute("/agent/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -263,7 +265,7 @@ export default function AgentPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-2">
+                    <TabsList className="w-full grid grid-cols-3">
                       <TabsTrigger value="buyer" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Buyer Chat
                       </TabsTrigger>
@@ -271,6 +273,12 @@ export default function AgentPropertyDetail() {
                         <span className="flex items-center">
                           <Activity className="mr-1 h-4 w-4" /> 
                           Activity
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="documents" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <FileSignature className="mr-1 h-4 w-4" /> 
+                          Documents
                         </span>
                       </TabsTrigger>
                     </TabsList>
@@ -305,7 +313,47 @@ export default function AgentPropertyDetail() {
                       <PropertyActivityLog propertyId={propertyId} />
                     </div>
                   </TabsContent>
+                  
+                  <TabsContent value="documents">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <FileSignature className="mr-2 h-5 w-5 text-primary" />
+                          Property Documents
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Manage property-related documents and agreements
+                        </p>
+                      </div>
+                      
+                      <Button 
+                        onClick={() => setIsAgreementModalOpen(true)}
+                        className="w-full mb-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                      >
+                        <FileSignature className="mr-2 h-4 w-4" />
+                        Create Buyer Representation Agreement
+                      </Button>
+                      
+                      <div className="mt-4">
+                        <div className="text-center text-gray-500">
+                          {isAgreementModalOpen ? null : (
+                            <p>Click the button above to create a new buyer representation agreement</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </TabsContent>
                 </Tabs>
+                
+                {/* Render BuyerRepresentationAgreement component */}
+                {isAgreementModalOpen && property.buyer && (
+                  <BuyerRepresentationAgreement
+                    property={property}
+                    agent={property.agent!}
+                    isOpen={isAgreementModalOpen}
+                    onClose={() => setIsAgreementModalOpen(false)}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>

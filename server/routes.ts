@@ -15,6 +15,7 @@ import {
   agentLeadSchema, 
   kycUpdateSchema,
   messageSchema,
+  agreementSchema,
   User
 } from "@shared/schema";
 import { PropertyAIData } from "@shared/types";
@@ -1130,6 +1131,267 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to get property logs"
+      });
+    }
+  });
+
+  // Agreement endpoints
+  app.get("/api/properties/:id/agreements", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check user permissions
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      if (
+        userRole !== "admin" && 
+        property.createdBy !== userId &&
+        property.sellerId !== userId &&
+        property.agentId !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to view agreements for this property"
+        });
+      }
+      
+      const agreements = await storage.getAgreementsByProperty(propertyId);
+      
+      res.json({
+        success: true,
+        data: agreements
+      });
+    } catch (error) {
+      console.error("Error getting property agreements:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get property agreements"
+      });
+    }
+  });
+  
+  app.get("/api/agreements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const agreementId = parseInt(req.params.id);
+      const agreement = await storage.getAgreement(agreementId);
+      
+      if (!agreement) {
+        return res.status(404).json({
+          success: false,
+          error: "Agreement not found"
+        });
+      }
+      
+      // Verify user has permission to view this agreement
+      const property = await storage.getProperty(agreement.propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check user permissions
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      
+      if (
+        userRole !== "admin" && 
+        property.createdBy !== userId &&
+        property.sellerId !== userId &&
+        property.agentId !== userId &&
+        agreement.buyerId !== userId &&
+        agreement.agentId !== userId
+      ) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to view this agreement"
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: agreement
+      });
+    } catch (error) {
+      console.error("Error getting agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get agreement"
+      });
+    }
+  });
+  
+  app.post("/api/properties/:id/agreements", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Only agents can create agreements
+      if (req.user.role !== "agent" && req.user.role !== "admin") {
+        return res.status(403).json({
+          success: false,
+          error: "Only agents can create agreements"
+        });
+      }
+      
+      // Ensure the agent is assigned to this property
+      if (req.user.role === "agent" && property.agentId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error: "You are not the agent assigned to this property"
+        });
+      }
+      
+      const agreementData = req.body;
+      
+      // Validate required fields
+      if (!agreementData.buyerId || !agreementData.agreementText || !agreementData.agentSignature) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing required fields: buyerId, agreementText, and agentSignature are required"
+        });
+      }
+      
+      const agreement = await storage.createAgreement({
+        propertyId,
+        agentId: req.user.role === "admin" ? agreementData.agentId : req.user.id,
+        buyerId: agreementData.buyerId,
+        agreementText: agreementData.agreementText,
+        agentSignature: agreementData.agentSignature,
+        date: new Date(),
+        status: "pending_buyer"
+      });
+      
+      // Log this activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId,
+          userId: req.user.id,
+          activity: "Agreement created",
+          details: {
+            agreementId: agreement.id,
+            status: agreement.status
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for agreement creation, but agreement was created:", logError);
+      }
+      
+      res.status(201).json({
+        success: true,
+        data: agreement
+      });
+    } catch (error) {
+      console.error("Error creating agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create agreement"
+      });
+    }
+  });
+  
+  app.patch("/api/agreements/:id", isAuthenticated, async (req, res) => {
+    try {
+      const agreementId = parseInt(req.params.id);
+      const agreement = await storage.getAgreement(agreementId);
+      
+      if (!agreement) {
+        return res.status(404).json({
+          success: false,
+          error: "Agreement not found"
+        });
+      }
+      
+      const updateData = req.body;
+      
+      // Determine what's being updated and check permissions
+      if (updateData.buyerSignature) {
+        // Only the buyer can sign as the buyer
+        if (req.user.id !== agreement.buyerId && req.user.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Only the buyer can sign as the buyer"
+          });
+        }
+        
+        // Update the status
+        updateData.status = "signed_buyer";
+      } else if (updateData.sellerSignature) {
+        // Only the seller can sign as the seller
+        const property = await storage.getProperty(agreement.propertyId);
+        
+        if (!property) {
+          return res.status(404).json({
+            success: false,
+            error: "Property not found"
+          });
+        }
+        
+        if (req.user.id !== property.sellerId && req.user.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Only the seller can sign as the seller"
+          });
+        }
+        
+        // Update the status
+        updateData.status = "completed";
+      } else if (updateData.status) {
+        // Only admins can update status directly
+        if (req.user.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Only administrators can update status directly"
+          });
+        }
+      }
+      
+      // Update the agreement
+      const updatedAgreement = await storage.updateAgreement(agreementId, updateData);
+      
+      // Log this activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: agreement.propertyId,
+          userId: req.user.id,
+          activity: `Agreement ${updatedAgreement.status}`,
+          details: {
+            agreementId,
+            previousStatus: agreement.status,
+            newStatus: updatedAgreement.status
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for agreement update, but agreement was updated:", logError);
+      }
+      
+      res.json({
+        success: true,
+        data: updatedAgreement
+      });
+    } catch (error) {
+      console.error("Error updating agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update agreement"
       });
     }
   });

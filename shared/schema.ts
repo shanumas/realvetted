@@ -86,6 +86,21 @@ export const propertyActivityLogs = pgTable("property_activity_logs", {
   details: json("details"),
 });
 
+// Buyer representation agreements
+export const agreements = pgTable("agreements", {
+  id: serial("id").primaryKey(),
+  propertyId: integer("property_id").notNull(),
+  agentId: integer("agent_id").notNull(),
+  buyerId: integer("buyer_id").notNull(),
+  agreementText: text("agreement_text").notNull(),
+  agentSignature: text("agent_signature").notNull(),
+  buyerSignature: text("buyer_signature"),
+  sellerSignature: text("seller_signature"),
+  date: timestamp("date").notNull(),
+  status: text("status").notNull().default("pending_buyer"), // pending_buyer, signed_buyer, signed_seller, completed, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -150,6 +165,11 @@ export const propertyActivityLogSchema = createInsertSchema(propertyActivityLogs
   timestamp: true,
 });
 
+export const agreementSchema = createInsertSchema(agreements).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -161,3 +181,5 @@ export type AgentLead = typeof agentLeads.$inferSelect;
 export type InsertAgentLead = z.infer<typeof agentLeadSchema>;
 export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
 export type InsertPropertyActivityLog = z.infer<typeof propertyActivityLogSchema>;
+export type Agreement = typeof agreements.$inferSelect;
+export type InsertAgreement = z.infer<typeof agreementSchema>;

@@ -2,7 +2,8 @@ import {
   User, InsertUser, Property, InsertProperty, 
   Message, InsertMessage, AgentLead, InsertAgentLead,
   PropertyActivityLog, InsertPropertyActivityLog,
-  users, properties, messages, agentLeads, propertyActivityLogs
+  Agreement, InsertAgreement,
+  users, properties, messages, agentLeads, propertyActivityLogs, agreements
 } from "@shared/schema";
 import { LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser } from "@shared/types";
 import { randomBytes } from "crypto";
@@ -53,6 +54,12 @@ export interface IStorage {
   // Property activity log methods
   getPropertyActivityLogs(propertyId: number): Promise<PropertyActivityLogWithUser[]>;
   createPropertyActivityLog(log: InsertPropertyActivityLog): Promise<PropertyActivityLog>;
+  
+  // Agreement methods
+  getAgreement(id: number): Promise<Agreement | undefined>;
+  getAgreementsByProperty(propertyId: number): Promise<Agreement[]>;
+  createAgreement(agreement: InsertAgreement): Promise<Agreement>;
+  updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement>;
   
   // Session store
   sessionStore: session.Store;
@@ -558,6 +565,49 @@ export class PgStorage implements IStorage {
       timestamp: new Date(),
       details: logData.details || {}
     }).returning();
+    
+    return result[0];
+  }
+  
+  // Agreement methods
+  async getAgreement(id: number): Promise<Agreement | undefined> {
+    const result = await this.db.select().from(agreements).where(eq(agreements.id, id));
+    return result[0];
+  }
+  
+  async getAgreementsByProperty(propertyId: number): Promise<Agreement[]> {
+    return await this.db.select()
+      .from(agreements)
+      .where(eq(agreements.propertyId, propertyId))
+      .orderBy(agreements.createdAt, "desc");
+  }
+  
+  async createAgreement(agreementData: InsertAgreement): Promise<Agreement> {
+    const result = await this.db.insert(agreements).values({
+      propertyId: agreementData.propertyId,
+      agentId: agreementData.agentId,
+      buyerId: agreementData.buyerId,
+      agreementText: agreementData.agreementText,
+      agentSignature: agreementData.agentSignature,
+      buyerSignature: agreementData.buyerSignature || null,
+      sellerSignature: agreementData.sellerSignature || null,
+      date: agreementData.date,
+      status: agreementData.status || "pending_buyer",
+      createdAt: new Date()
+    }).returning();
+    
+    return result[0];
+  }
+  
+  async updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement> {
+    const result = await this.db.update(agreements)
+      .set(data)
+      .where(eq(agreements.id, id))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error(`Agreement with ID ${id} not found`);
+    }
     
     return result[0];
   }
