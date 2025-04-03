@@ -200,6 +200,8 @@ export const viewingRequestSchema = createInsertSchema(viewingRequests)
     // Convert string dates to Date objects
     requestedDate: z.string().transform((str) => new Date(str)),
     requestedEndDate: z.string().transform((str) => new Date(str)),
+    // Override flag (not stored in DB, used for API logic)
+    override: z.boolean().optional(),
   });
 
 // Export types

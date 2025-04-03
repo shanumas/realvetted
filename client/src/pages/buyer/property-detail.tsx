@@ -14,7 +14,7 @@ import { AgencyDisclosureForm } from "@/components/agency-disclosure-form";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Send, Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon
+  Send, Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon, AlertTriangle
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
@@ -27,6 +27,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -52,6 +62,20 @@ export default function BuyerPropertyDetail() {
   const [viewingNotes, setViewingNotes] = useState<string>("");
   const [isDisclosureFormOpen, setIsDisclosureFormOpen] = useState<boolean>(false);
   const [viewingRequestData, setViewingRequestData] = useState<{ date: string; time: string; endTime: string; notes: string } | null>(null);
+  
+  // State for override confirmation dialog
+  const [showOverrideDialog, setShowOverrideDialog] = useState<boolean>(false);
+  const [pendingRequestData, setPendingRequestData] = useState<{
+    date: string;
+    time: string;
+    endTime: string;
+    notes: string;
+  } | null>(null);
+  const [existingRequestInfo, setExistingRequestInfo] = useState<{
+    existingRequestId?: number;
+    existingRequestDate?: string;
+  } | null>(null);
+  
   const { toast } = useToast();
   
   // Fetch available agents
@@ -135,12 +159,19 @@ export default function BuyerPropertyDetail() {
   
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
-    mutationFn: async (data: { date: string, time: string, endTime: string, notes: string }) => {
+    mutationFn: async (data: { 
+      date: string, 
+      time: string, 
+      endTime: string, 
+      notes: string, 
+      override?: boolean 
+    }) => {
       const res = await apiRequest("POST", `/api/viewing-requests`, {
         propertyId: propertyId,
         requestedDate: `${data.date}T${data.time}:00`,
         requestedEndDate: data.endTime ? `${data.date}T${data.endTime}:00` : undefined,
-        notes: data.notes
+        notes: data.notes,
+        override: data.override || false
       });
       return await res.json();
     },
@@ -155,6 +186,13 @@ export default function BuyerPropertyDetail() {
       setViewingTime("");
       setViewingEndTime("");
       setViewingNotes("");
+      
+      // Reset override dialog state
+      setShowOverrideDialog(false);
+      setPendingRequestData(null);
+      setExistingRequestInfo(null);
+      
+      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
       queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
@@ -163,27 +201,72 @@ export default function BuyerPropertyDetail() {
       // Set active tab to viewings
       setActiveTab("viewings");
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       // Check if this is a duplicate viewing request error
-      if (error.message.includes("already exists")) {
-        toast({
-          title: "Viewing request already exists",
-          description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
-          variant: "warning",
-          action: (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setActiveTab("viewings")}
-              className="mt-2"
-            >
-              View My Requests
-            </Button>
-          ),
-        });
-        
-        // Automatically switch to the viewings tab
-        setActiveTab("viewings");
+      if (error.message?.includes("already exists")) {
+        try {
+          // Try to parse the error response to get details about the existing request
+          const errorData = error.response?.data;
+          
+          if (errorData && errorData.existingRequestId) {
+            // Store the existing request info
+            setExistingRequestInfo({
+              existingRequestId: errorData.existingRequestId,
+              existingRequestDate: errorData.existingRequestDate || "previously scheduled time"
+            });
+            
+            // Store pending request data for potential override
+            setPendingRequestData({
+              date: viewingDate,
+              time: viewingTime,
+              endTime: viewingEndTime,
+              notes: viewingNotes
+            });
+            
+            // Show the override dialog
+            setShowOverrideDialog(true);
+          } else {
+            // Fallback if we don't have detailed error info
+            toast({
+              title: "Viewing request already exists",
+              description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
+              variant: "default",
+              action: (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setActiveTab("viewings")}
+                  className="mt-2"
+                >
+                  View My Requests
+                </Button>
+              ),
+            });
+            
+            // Automatically switch to the viewings tab
+            setActiveTab("viewings");
+          }
+        } catch (e) {
+          // If there's an error parsing the response, fall back to the simple message
+          toast({
+            title: "Viewing request already exists",
+            description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
+            variant: "default",
+            action: (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setActiveTab("viewings")}
+                className="mt-2"
+              >
+                View My Requests
+              </Button>
+            ),
+          });
+          
+          // Automatically switch to the viewings tab
+          setActiveTab("viewings");
+        }
       } else {
         toast({
           title: "Could not request viewing",
@@ -259,7 +342,8 @@ export default function BuyerPropertyDetail() {
         date: viewingRequestData.date,
         time: viewingRequestData.time,
         endTime: viewingRequestData.endTime,
-        notes: viewingRequestData.notes
+        notes: viewingRequestData.notes,
+        override: false // Always use override: false for new requests
       });
       
       // Clear the stored data
@@ -947,6 +1031,57 @@ export default function BuyerPropertyDetail() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Alert Dialog for confirming override of existing viewing request */}
+      <AlertDialog open={showOverrideDialog} onOpenChange={setShowOverrideDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center">
+              <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
+              Replace Existing Viewing Request?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You already have a viewing request scheduled for {existingRequestInfo?.existingRequestDate && (
+                <span className="font-medium">{new Date(existingRequestInfo.existingRequestDate).toLocaleString()}</span>
+              )}.
+              <p className="mt-2">Would you like to replace it with a new request for {pendingRequestData && (
+                <span className="font-medium">
+                  {new Date(`${pendingRequestData.date}T${pendingRequestData.time}`).toLocaleString(undefined, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+              )}?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowOverrideDialog(false);
+              setPendingRequestData(null);
+              setExistingRequestInfo(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (pendingRequestData) {
+                  // Submit the request with override flag set to true
+                  requestViewingMutation.mutate({
+                    ...pendingRequestData,
+                    override: true
+                  });
+                }
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-600"
+            >
+              Replace Existing Request
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

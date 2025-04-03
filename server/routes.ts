@@ -1847,10 +1847,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (existingRequestForProperty) {
-        return res.status(400).json({
-          success: false,
-          error: "A viewing request for this property already exists. Please check your existing requests."
-        });
+        // If override flag is set, cancel the existing request before creating a new one
+        if (requestData.override) {
+          // Update the existing request to be canceled
+          await storage.updateViewingRequest(existingRequestForProperty.id, {
+            status: "canceled",
+            notes: existingRequestForProperty.notes ? 
+                   `${existingRequestForProperty.notes} [Canceled and replaced with a new request]` : 
+                   "[Canceled and replaced with a new request]"
+          });
+          
+          // Log the cancellation
+          await storage.createPropertyActivityLog({
+            propertyId: requestData.propertyId,
+            userId: req.user!.id,
+            activity: "Viewing request canceled and replaced",
+            details: { 
+              oldRequestId: existingRequestForProperty.id,
+              oldRequestDate: existingRequestForProperty.requestedDate
+            }
+          });
+        } else {
+          // If override flag is not set, return an error with information
+          return res.status(400).json({
+            success: false,
+            error: "A viewing request for this property already exists. Please check your existing requests.",
+            data: {
+              existingRequestId: existingRequestForProperty.id,
+              existingRequestDate: existingRequestForProperty.requestedDate
+            }
+          });
+        }
       }
       
       // Ensure the buyer's agent is assigned to the viewing request
