@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity
+  Activity, FileSignature, File
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 
@@ -263,12 +263,18 @@ export default function SellerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-3">
+                    <TabsList className="w-full grid grid-cols-4">
                       <TabsTrigger value="buyer" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Buyer Chat
                       </TabsTrigger>
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
+                      </TabsTrigger>
+                      <TabsTrigger value="documents" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <FileSignature className="mr-1 h-4 w-4" /> 
+                          Documents
+                        </span>
                       </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
@@ -307,6 +313,100 @@ export default function SellerPropertyDetail() {
                         <p className="text-sm mt-1">Once an agent claims this property, you'll be able to chat with them here.</p>
                       </div>
                     )}
+                  </TabsContent>
+                  
+                  <TabsContent value="documents">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <FileSignature className="mr-2 h-5 w-5 text-primary" />
+                          Property Documents
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Review and sign documents related to this property
+                        </p>
+                      </div>
+                      
+                      {/* Agreements List */}
+                      {(() => {
+                        const { data: agreements, isLoading: loadingAgreements } = useQuery({
+                          queryKey: [`/api/properties/${propertyId}/agreements`],
+                          queryFn: getQueryFn({ on401: "throw" }),
+                        });
+                        
+                        if (loadingAgreements) {
+                          return (
+                            <div className="flex items-center justify-center p-4">
+                              <Loader2 className="h-5 w-5 animate-spin text-primary/70" />
+                              <span className="ml-2 text-sm text-gray-500">Loading documents...</span>
+                            </div>
+                          );
+                        }
+                        
+                        if (!agreements || agreements.length === 0) {
+                          return (
+                            <div className="text-center p-6 border border-dashed rounded-md">
+                              <File className="mx-auto h-10 w-10 text-gray-400" />
+                              <p className="mt-2 text-gray-500">No documents available yet</p>
+                              <p className="text-sm mt-1 text-gray-400">Documents will appear here when the agent creates them</p>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <div className="divide-y">
+                            {agreements.map((agreement: any) => (
+                              <div key={agreement.id} className="py-3 flex justify-between items-center">
+                                <div>
+                                  <h5 className="font-medium">
+                                    {agreement.type === "standard" ? "Buyer Representation Agreement" : "Agency Disclosure Form"}
+                                  </h5>
+                                  <div className="text-sm text-gray-500 mt-1">
+                                    <span className="block">Created: {new Date(agreement.date).toLocaleDateString()}</span>
+                                    <div className="flex items-center mt-1">
+                                      <span 
+                                        className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
+                                          agreement.status === "draft" 
+                                            ? "bg-gray-100 text-gray-800" 
+                                            : agreement.status === "pending_buyer"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : agreement.status === "signed_by_buyer" 
+                                            ? "bg-green-100 text-green-800"
+                                            : agreement.status === "pending_seller"
+                                            ? "bg-orange-100 text-orange-800"
+                                            : "bg-gray-100 text-gray-800"
+                                        }`}
+                                      >
+                                        {agreement.status === "draft" 
+                                          ? "Draft" 
+                                          : agreement.status === "pending_buyer"
+                                          ? "Awaiting Buyer"
+                                          : agreement.status === "signed_by_buyer" 
+                                          ? "Signed by Buyer" 
+                                          : agreement.status === "pending_seller"
+                                          ? "Awaiting Your Signature"
+                                          : agreement.status}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    // Open a preview of the agreement
+                                    window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                  }}
+                                >
+                                  View
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </TabsContent>
                   
                   <TabsContent value="activity">
