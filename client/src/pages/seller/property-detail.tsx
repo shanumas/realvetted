@@ -329,10 +329,14 @@ export default function SellerPropertyDetail() {
                       
                       {/* Agreements List */}
                       {(() => {
-                        const { data: agreements, isLoading: loadingAgreements } = useQuery({
+                        const { data, isLoading: loadingAgreements } = useQuery({
                           queryKey: [`/api/properties/${propertyId}/agreements`],
                           queryFn: getQueryFn({ on401: "throw" }),
                         });
+                        
+                        // Debug output
+                        console.log("Property ID:", propertyId);
+                        console.log("Agreements data:", data);
                         
                         if (loadingAgreements) {
                           return (
@@ -342,6 +346,8 @@ export default function SellerPropertyDetail() {
                             </div>
                           );
                         }
+                        
+                        const agreements = data?.data || [];
                         
                         if (!agreements || agreements.length === 0) {
                           return (
