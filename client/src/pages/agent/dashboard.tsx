@@ -9,9 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyCard } from "@/components/property-card";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { Property } from "@shared/schema";
-import { LeadWithProperty } from "@shared/types";
+import { LeadWithProperty, ViewingRequestWithParticipants } from "@shared/types";
 import { ChatWindow } from "@/components/chat/chat-window";
-import { Loader2, MessageSquare, Mail, AlertCircle } from "lucide-react";
+import { Loader2, MessageSquare, Mail, AlertCircle, Clock, Calendar } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -19,6 +19,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { ViewingRequestsList } from "@/components/viewing-requests-list";
+import { Badge } from "@/components/ui/badge";
+import { format, parseISO } from "date-fns";
 
 // Schema for seller email form
 const sellerEmailSchema = z.object({
@@ -56,10 +59,18 @@ export default function AgentDashboard() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: activeTab === "leads",
   });
+  
+  // Fetch viewing requests
+  const { data: viewingRequests, isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
+    queryKey: ["/api/viewing-requests/agent"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: activeTab === "viewing-requests",
+  });
 
   // Stats
   const clientCount = assignedProperties?.length || 0;
   const leadCount = availableLeads?.length || 0;
+  const viewingRequestCount = viewingRequests?.length || 0;
   const closedDealsCount = 0; // This would come from another API call in a real app
 
   // Claim lead mutation
@@ -155,6 +166,9 @@ export default function AgentDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="clients">My Clients</TabsTrigger>
+            <TabsTrigger value="viewing-requests">
+              Viewing Requests {viewingRequestCount > 0 && <Badge className="ml-1">{viewingRequestCount}</Badge>}
+            </TabsTrigger>
             <TabsTrigger value="leads">Available Leads</TabsTrigger>
           </TabsList>
           
@@ -249,6 +263,17 @@ export default function AgentDashboard() {
                     ))}
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="viewing-requests">
+            <Card>
+              <CardHeader>
+                <CardTitle>Property Viewing Requests</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {user && <ViewingRequestsList userId={user.id} role="agent" />}
               </CardContent>
             </Card>
           </TabsContent>

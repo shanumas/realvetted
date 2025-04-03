@@ -1,375 +1,277 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import { ViewingRequest } from "@shared/schema";
-import { ViewingRequestWithParticipants } from "@shared/types";
+import { Link } from "wouter";
 import { format, parseISO } from "date-fns";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Calendar,
-  Clock,
-  User,
-  Home,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  Phone,
-  Mail,
-} from "lucide-react";
-import { UserProfilePhoto } from "@/components/user-profile-photo";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Loader2, MessageSquare, Calendar, Clock } from "lucide-react";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { ViewingRequestWithParticipants } from "@shared/types";
+import { useToast } from "@/hooks/use-toast";
+import { ChatWindow } from "./chat/chat-window";
 
-interface ViewingRequestsListProps {
-  propertyId: number;
-}
+type ViewingRequestsListProps = {
+  userId: number;
+  role: string;
+};
 
-export function ViewingRequestsList({ propertyId }: ViewingRequestsListProps) {
+export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [responseMessage, setResponseMessage] = useState("");
-  const [activeRequestId, setActiveRequestId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("pending");
+  const [selectedChat, setSelectedChat] = useState<{ propertyId: number; userId: number; userName: string } | null>(null);
 
+  // Determine the API endpoint based on the user's role
+  const endpoint = role === "agent" 
+    ? "/api/viewing-requests/agent" 
+    : role === "buyer" 
+      ? "/api/viewing-requests/buyer" 
+      : "/api/viewing-requests";
+
+  // Fetch viewing requests
   const { data: viewingRequests, isLoading } = useQuery<ViewingRequestWithParticipants[]>({
-    queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+    queryKey: [endpoint],
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
-  const updateViewingRequestMutation = useMutation({
-    mutationFn: async ({ id, status, responseMessage }: { id: number; status: string; responseMessage?: string }) => {
-      const res = await apiRequest("PUT", `/api/viewing-requests/${id}`, { 
-        status, 
-        responseMessage 
-      });
-      return await res.json();
+  // Filter requests based on active tab
+  const filteredRequests = viewingRequests?.filter(request => {
+    if (activeTab === "pending") return request.status === "pending";
+    if (activeTab === "approved") return request.status === "approved";
+    if (activeTab === "rejected") return request.status === "rejected";
+    if (activeTab === "completed") return request.status === "completed";
+    return true; // Show all requests on "all" tab
+  });
+
+  // Update viewing request status mutation
+  const updateRequestMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const response = await apiRequest("PATCH", `/api/viewing-requests/${id}`, { status });
+      return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Request updated",
-        description: "The viewing request has been updated.",
-        variant: "default",
+        title: "Viewing request updated",
+        description: "The viewing request status has been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
-      setResponseMessage("");
-      setActiveRequestId(null);
+      queryClient.invalidateQueries({ queryKey: [endpoint] });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
       toast({
-        title: "Error updating request",
-        description: error.message,
+        title: "Error updating viewing request",
+        description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
     },
   });
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return (
-          <div className="flex items-center text-amber-600">
-            <AlertCircle className="w-4 h-4 mr-1" /> Pending
-          </div>
-        );
-      case "approved":
-        return (
-          <div className="flex items-center text-green-600">
-            <CheckCircle className="w-4 h-4 mr-1" /> Approved
-          </div>
-        );
-      case "rejected":
-        return (
-          <div className="flex items-center text-red-600">
-            <XCircle className="w-4 h-4 mr-1" /> Rejected
-          </div>
-        );
-      case "completed":
-        return (
-          <div className="flex items-center text-blue-600">
-            <CheckCircle className="w-4 h-4 mr-1" /> Completed
-          </div>
-        );
-      default:
-        return <span>{status}</span>;
-    }
-  };
-
   const handleStatusChange = (id: number, status: string) => {
-    if (status === "rejected" && !responseMessage && id === activeRequestId) {
-      // If rejecting and there's no response message, don't submit yet
-      toast({
-        title: "Response required",
-        description: "Please provide a reason for rejecting this request.",
-        variant: "destructive",
-      });
-      return;
+    updateRequestMutation.mutate({ id, status });
+  };
+
+  // Get counts for badges
+  const pendingCount = viewingRequests?.filter(req => req.status === "pending").length || 0;
+  const approvedCount = viewingRequests?.filter(req => req.status === "approved").length || 0;
+  const rejectedCount = viewingRequests?.filter(req => req.status === "rejected").length || 0;
+  const completedCount = viewingRequests?.filter(req => req.status === "completed").length || 0;
+
+  // Determine who to chat with based on role
+  const getChatParticipant = (request: ViewingRequestWithParticipants) => {
+    if (role === "agent" && request.buyer) {
+      return {
+        userId: request.buyerId,
+        name: `${request.buyer.firstName || ""} ${request.buyer.lastName || ""}`.trim() || "Buyer"
+      };
+    } else if (role === "buyer" && request.agent) {
+      return {
+        userId: request.agent.id,
+        name: `${request.agent.firstName || ""} ${request.agent.lastName || ""}`.trim() || "Agent"
+      };
     }
-    
-    updateViewingRequestMutation.mutate({ 
-      id, 
-      status,
-      responseMessage: responseMessage || undefined 
-    });
+    return null;
   };
-  
-  const handleResponseChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setResponseMessage(e.target.value);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!viewingRequests?.length) {
-    return (
-      <div className="bg-gray-50 p-6 rounded-lg text-center">
-        <h3 className="text-lg font-medium text-gray-900">No viewing requests</h3>
-        <p className="mt-2 text-gray-500">There are no viewing requests for this property yet.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
-      {viewingRequests.map((request) => (
-        <Card key={request.id} className="overflow-hidden">
-          <CardHeader className="bg-gray-50 pb-3">
-            <div className="flex justify-between items-start">
-              <div>
-                <CardTitle className="text-lg">
-                  Viewing Request #{request.id}
-                </CardTitle>
-                <CardDescription>
-                  {format(parseISO(request.requestedDate.toString()), "MMMM d, yyyy 'at' h:mm a")}
-                </CardDescription>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-4">
+          <TabsTrigger value="pending">
+            Pending {pendingCount > 0 && <Badge variant="outline" className="ml-1">{pendingCount}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="approved">
+            Approved {approvedCount > 0 && <Badge variant="outline" className="ml-1">{approvedCount}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rejected {rejectedCount > 0 && <Badge variant="outline" className="ml-1">{rejectedCount}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Completed {completedCount > 0 && <Badge variant="outline" className="ml-1">{completedCount}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="all">All</TabsTrigger>
+        </TabsList>
+
+        {["pending", "approved", "rejected", "completed", "all"].map(tab => (
+          <TabsContent key={tab} value={tab}>
+            {isLoading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-              {getStatusBadge(request.status)}
+            ) : !filteredRequests || filteredRequests.length === 0 ? (
+              <div className="text-center p-8 text-gray-500">
+                <p>No {tab} viewing requests found.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredRequests.map(request => {
+                  const property = request.property;
+                  if (!property) return null;
+
+                  const chatParticipant = getChatParticipant(request);
+
+                  return (
+                    <Card key={request.id} className="border border-gray-200">
+                      <CardHeader className="bg-gray-50 pb-2">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-lg">
+                            Viewing Request #{request.id}
+                          </CardTitle>
+                          <Badge 
+                            variant={
+                              request.status === 'pending' ? 'outline' : 
+                              request.status === 'approved' ? 'success' :
+                              request.status === 'rejected' ? 'destructive' : 'default'
+                            }
+                          >
+                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      
+                      <CardContent className="p-4">
+                        <div className="mb-4">
+                          <h3 className="font-semibold text-gray-700 mb-1">{property.address}</h3>
+                          <p className="text-sm text-gray-500">
+                            {property.city}, {property.state} {property.zip}
+                          </p>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 text-gray-500" />
+                            <span className="text-sm">
+                              {format(parseISO(request.requestedDate.toString()), "MMMM d, yyyy")}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2 text-gray-500" />
+                            <span className="text-sm">
+                              {format(parseISO(request.requestedDate.toString()), "h:mm a")}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {request.notes && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium mb-1">Notes:</h4>
+                            <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                              {request.notes}
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="mt-4 flex justify-end space-x-2">
+                          {chatParticipant && (
+                            <Button 
+                              onClick={() => setSelectedChat({
+                                propertyId: property.id,
+                                userId: chatParticipant.userId,
+                                userName: chatParticipant.name
+                              })}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <MessageSquare className="h-4 w-4 mr-1" /> Chat
+                            </Button>
+                          )}
+                          
+                          <Link href={`/properties/${property.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Property
+                            </Button>
+                          </Link>
+                          
+                          {role === 'agent' && request.status === 'pending' && (
+                            <>
+                              <Button 
+                                variant="success"
+                                size="sm"
+                                onClick={() => handleStatusChange(request.id, 'approved')}
+                                disabled={updateRequestMutation.isPending}
+                              >
+                                {updateRequestMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : null}
+                                Approve
+                              </Button>
+                              
+                              <Button 
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleStatusChange(request.id, 'rejected')}
+                                disabled={updateRequestMutation.isPending}
+                              >
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          
+                          {role === 'agent' && request.status === 'approved' && (
+                            <Button 
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleStatusChange(request.id, 'completed')}
+                              disabled={updateRequestMutation.isPending}
+                            >
+                              {updateRequestMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : null}
+                              Mark Completed
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        ))}
+      </Tabs>
+      
+      {/* Chat Dialog */}
+      {selectedChat && (
+        <Dialog open={!!selectedChat} onOpenChange={() => setSelectedChat(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Chat with {selectedChat.userName}</DialogTitle>
+              <DialogDescription>
+                Property ID: {selectedChat.propertyId}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="h-96">
+              <ChatWindow
+                propertyId={selectedChat.propertyId}
+                receiverId={selectedChat.userId}
+                receiverName={selectedChat.userName}
+              />
             </div>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="flex flex-wrap gap-4 mb-4">
-              {/* Buyer Information */}
-              {request.buyer && (
-                <div className="flex items-center">
-                  <UserProfilePhoto user={request.buyer} size="sm" />
-                  <div className="ml-3">
-                    <h4 className="text-sm font-medium">
-                      {request.buyer.firstName} {request.buyer.lastName}
-                    </h4>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Mail className="h-3 w-3 mr-1" />
-                      {request.buyer.email}
-                    </div>
-                    {request.buyer.phone && (
-                      <div className="flex items-center text-sm text-gray-500">
-                        <Phone className="h-3 w-3 mr-1" />
-                        {request.buyer.phone}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Agent Information */}
-              {request.agent && (
-                <div className="flex items-center">
-                  <UserProfilePhoto user={request.agent} size="sm" />
-                  <div className="ml-3">
-                    <h4 className="text-sm font-medium">
-                      {request.agent.firstName} {request.agent.lastName}
-                    </h4>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Badge variant="outline" className="text-xs">Agent</Badge>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Request Notes */}
-            {request.notes && (
-              <div className="mt-2 mb-4">
-                <h4 className="text-sm font-medium mb-1">Request Notes</h4>
-                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{request.notes}</p>
-              </div>
-            )}
-            
-            {/* Response Message */}
-            {request.responseMessage && (
-              <div className="mt-2 mb-4">
-                <h4 className="text-sm font-medium mb-1">Response</h4>
-                <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded border-l-2 border-blue-400">
-                  {request.responseMessage}
-                </p>
-              </div>
-            )}
-            
-            {/* Active rejection form */}
-            {activeRequestId === request.id && (
-              <div className="mt-4 mb-2">
-                <h4 className="text-sm font-medium mb-1">Response Message</h4>
-                <Textarea 
-                  value={responseMessage}
-                  onChange={handleResponseChange}
-                  placeholder="Please provide a reason or any additional information..."
-                  className="resize-none"
-                  rows={3}
-                />
-              </div>
-            )}
-            
-            {/* Schedule Information */}
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="flex items-center">
-                <Calendar className="h-4 w-4 text-gray-400 mr-2" />
-                <span className="text-sm">
-                  {format(parseISO(request.requestedDate.toString()), "MMMM d, yyyy")}
-                </span>
-              </div>
-              <div className="flex items-center">
-                <Clock className="h-4 w-4 text-gray-400 mr-2" />
-                <span className="text-sm">
-                  {format(parseISO(request.requestedDate.toString()), "h:mm a")} - 
-                  {request.requestedEndDate ? 
-                    ` ${format(parseISO(request.requestedEndDate.toString()), "h:mm a")}` : 
-                    " (no end time specified)"
-                  }
-                </span>
-              </div>
-            </div>
-            
-            {/* Confirmation Information */}
-            {request.confirmedDate && (
-              <div className="mt-4 p-3 bg-green-50 rounded-md">
-                <h4 className="text-sm font-medium text-green-700 mb-1">Confirmed Schedule</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center">
-                    <Calendar className="h-4 w-4 text-green-600 mr-2" />
-                    <span className="text-sm text-green-700">
-                      {format(parseISO(request.confirmedDate.toString()), "MMMM d, yyyy")}
-                    </span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 text-green-600 mr-2" />
-                    <span className="text-sm text-green-700">
-                      {format(parseISO(request.confirmedDate.toString()), "h:mm a")}
-                      {request.confirmedEndDate ? 
-                        ` - ${format(parseISO(request.confirmedEndDate.toString()), "h:mm a")}` : 
-                        ""
-                      }
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-          
-          <CardFooter className="bg-gray-50 flex flex-wrap justify-end gap-2 border-t p-3">
-            {request.status === "pending" && (
-              <>
-                {/* For setting up rejection with response message */}
-                {activeRequestId !== request.id ? (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setActiveRequestId(request.id)}
-                    disabled={updateViewingRequestMutation.isPending}
-                  >
-                    Reject
-                  </Button>
-                ) : (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setActiveRequestId(null)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={() => handleStatusChange(request.id, "rejected")}
-                      disabled={updateViewingRequestMutation.isPending || !responseMessage.trim()}
-                    >
-                      {updateViewingRequestMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      ) : null}
-                      Confirm Rejection
-                    </Button>
-                  </>
-                )}
-                
-                {/* Only show approve button if not actively rejecting */}
-                {activeRequestId !== request.id && (
-                  <Button 
-                    variant="default" 
-                    size="sm"
-                    onClick={() => handleStatusChange(request.id, "approved")}
-                    disabled={updateViewingRequestMutation.isPending}
-                  >
-                    {updateViewingRequestMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : null}
-                    Approve
-                  </Button>
-                )}
-              </>
-            )}
-            
-            {request.status === "approved" && (
-              <Button 
-                variant="default" 
-                size="sm"
-                onClick={() => handleStatusChange(request.id, "completed")}
-                disabled={updateViewingRequestMutation.isPending}
-              >
-                Mark as Completed
-              </Button>
-            )}
-            
-            {(request.status === "rejected" || request.status === "completed") && (
-              <Select 
-                onValueChange={(value) => handleStatusChange(request.id, value)}
-                defaultValue={request.status}
-                disabled={updateViewingRequestMutation.isPending}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Change status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Set to Pending</SelectItem>
-                  <SelectItem value="approved">Set to Approved</SelectItem>
-                  <SelectItem value="rejected">Set to Rejected</SelectItem>
-                  <SelectItem value="completed">Set to Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </CardFooter>
-        </Card>
-      ))}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

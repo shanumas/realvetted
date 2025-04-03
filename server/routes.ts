@@ -1981,7 +1981,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/viewing-requests/buyer", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
       const viewingRequests = await storage.getViewingRequestsByBuyer(req.user!.id);
-      res.json(viewingRequests);
+      
+      // For each viewing request, get the full property and agent details
+      const enhancedRequests = await Promise.all(viewingRequests.map(async (request) => {
+        const property = await storage.getProperty(request.propertyId);
+        const agent = request.buyerAgentId ? await storage.getUser(request.buyerAgentId) : 
+                  (request.sellerAgentId ? await storage.getUser(request.sellerAgentId) : undefined);
+        
+        return {
+          ...request,
+          property,
+          agent
+        };
+      }));
+      
+      res.json(enhancedRequests);
     } catch (error) {
       console.error("Get buyer viewing requests error:", error);
       res.status(500).json({
@@ -1995,7 +2009,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/viewing-requests/agent", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
       const viewingRequests = await storage.getViewingRequestsByAgent(req.user!.id);
-      res.json(viewingRequests);
+      
+      // For each viewing request, get the full property and buyer details
+      const enhancedRequests = await Promise.all(viewingRequests.map(async (request) => {
+        const property = await storage.getProperty(request.propertyId);
+        const buyer = request.buyerId ? await storage.getUser(request.buyerId) : undefined;
+        
+        return {
+          ...request,
+          property,
+          buyer
+        };
+      }));
+      
+      res.json(enhancedRequests);
     } catch (error) {
       console.error("Get agent viewing requests error:", error);
       res.status(500).json({
