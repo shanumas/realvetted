@@ -63,17 +63,25 @@ export default function SellerDashboard() {
                     <PropertyCard
                       property={property}
                       actionButton={
-                        <Button
-                          variant="outline"
-                          onClick={() => setSelectedPropertyForChat({
-                            id: property.id,
-                            buyerId: property.createdBy,
-                            buyerName: "Buyer" // This would come from the property data in a real app
-                          })}
-                        >
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Chat with Buyer
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            variant="default"
+                            onClick={() => window.location.href = `/seller/property/${property.id}`}
+                          >
+                            View Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setSelectedPropertyForChat({
+                              id: property.id,
+                              buyerId: property.createdBy,
+                              buyerName: "Buyer" // This would come from the property data in a real app
+                            })}
+                          >
+                            <MessageSquare className="h-4 w-4 mr-1" />
+                            Chat with Buyer
+                          </Button>
+                        </div>
                       }
                     />
                   </div>

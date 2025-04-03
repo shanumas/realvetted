@@ -1,6 +1,7 @@
 import { Property } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Bed, Bath, Square, Tag, Home } from "lucide-react";
+import { Link } from "wouter";
 
 interface PropertyCardProps {
   property: Property;
@@ -12,7 +13,11 @@ export function PropertyCard({ property, actionButton }: PropertyCardProps) {
     <div className="border-b border-gray-200 px-4 py-5 sm:px-6">
       <div className="flex flex-col sm:flex-row justify-between">
         <div className="mb-4 sm:mb-0">
-          <h4 className="text-lg font-medium text-gray-900">{property.address}</h4>
+          <Link to={`/seller/property/${property.id}`}>
+            <h4 className="text-lg font-medium text-gray-900 hover:text-primary hover:underline cursor-pointer">
+              {property.address}
+            </h4>
+          </Link>
           <div className="mt-2 flex flex-wrap items-center text-sm text-gray-500 gap-2">
             {property.bedrooms && (
               <span className="flex items-center mr-4">
