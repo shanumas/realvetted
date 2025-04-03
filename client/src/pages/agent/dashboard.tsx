@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,6 +66,33 @@ export default function AgentDashboard() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: activeTab === "viewing-requests",
   });
+  
+  // Setup WebSocket for real-time updates
+  useEffect(() => {
+    // Set up WebSocket listener for property updates and viewing request changes
+    const onMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'notification' || data.type === 'property_update') {
+          // Refresh all relevant data
+          queryClient.invalidateQueries({ queryKey: ["/api/properties/by-agent"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/agent"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/leads/available"] });
+          console.log("Agent dashboard - received update, refreshing data:", data);
+        }
+      } catch (e) {
+        console.error("Error parsing WebSocket message in agent dashboard:", e);
+      }
+    };
+
+    // Connect event listener
+    window.addEventListener('message', onMessage);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('message', onMessage);
+    };
+  }, []);
 
   // Stats
   const clientCount = assignedProperties?.length || 0;

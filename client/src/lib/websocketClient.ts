@@ -68,6 +68,10 @@ class WebSocketClient {
             return;
           }
           
+          // Dispatch the message to window so all components can listen to it
+          window.dispatchEvent(new MessageEvent('message', { data: event.data }));
+          
+          // Also call the handler if provided
           if (this.handlers.onMessage) {
             this.handlers.onMessage(data);
           }
