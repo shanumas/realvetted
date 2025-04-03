@@ -262,7 +262,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </Button>
                           )}
                           
-                          <Link href={`/properties/${property.id}`}>
+                          <Link href={`/${role}/property/${property.id}`}>
                             <Button variant="outline" size="sm">
                               View Property
                             </Button>
@@ -315,8 +315,10 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                               size="sm"
                               onClick={() => {
                                 // Store the current request with its property and participants
+                                console.log("Button clicked, request:", request);
                                 setSelectedRequest(request);
                                 setShowAgreementModal(true);
+                                console.log("showAgreementModal:", true);
                               }}
                               className="bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
                             >
@@ -357,7 +359,14 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
       )}
       
       {/* Buyer Representation Agreement Modal */}
-      {showAgreementModal && selectedRequest && selectedRequest.property && selectedRequest.agent && (
+      {console.log("Modal conditions:", {
+        showAgreementModal,
+        selectedRequest,
+        hasProperty: selectedRequest?.property,
+        hasAgent: selectedRequest?.agent
+      })}
+      
+      {showAgreementModal && selectedRequest && selectedRequest.property && selectedRequest.agent ? (
         <BuyerRepresentationAgreement
           property={selectedRequest.property}
           agent={selectedRequest.agent}
@@ -369,7 +378,9 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
           autoGenerate={true} // Auto-generate agreement for viewing requests
           viewingRequestId={selectedRequest.id} // Pass the viewing request ID
         />
-      )}
+      ) : showAgreementModal ? (
+        <div>Modal cannot open: Missing property or agent data</div>
+      ) : null}
     </div>
   );
 }
