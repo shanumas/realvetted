@@ -189,11 +189,17 @@ export const agreementSchema = createInsertSchema(agreements).omit({
   createdAt: true,
 });
 
-export const viewingRequestSchema = createInsertSchema(viewingRequests).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const viewingRequestSchema = createInsertSchema(viewingRequests)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    // Convert string dates to Date objects
+    requestedDate: z.string().transform((str) => new Date(str)),
+    requestedEndDate: z.string().transform((str) => new Date(str)),
+  });
 
 // Export types
 export type User = typeof users.$inferSelect;

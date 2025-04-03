@@ -203,27 +203,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Create leads for top 3 agents only
         const topAgents = agents.slice(0, 3);
-        for (const agent of topAgents) {
-          const lead = await storage.createAgentLead({
-            propertyId: property.id,
-            agentId: agent.id,
-            status: "available"
+        
+        // Auto-assign the first agent if available
+        if (topAgents.length > 0) {
+          const assignedAgent = topAgents[0];
+          
+          // Update property with assigned agent
+          await storage.updateProperty(property.id, {
+            agentId: assignedAgent.id
           });
-          console.log(`Created lead ${lead.id} for agent ${agent.id} on property ${property.id}`);
           
-          // In a real app, send a notification to the agent via email
+          // Log agent assignment
+          await storage.createPropertyActivityLog({
+            propertyId: property.id,
+            userId: assignedAgent.id,
+            activity: "Agent automatically assigned",
+            details: {
+              agentId: assignedAgent.id,
+              agentEmail: assignedAgent.email
+            }
+          });
           
-          // Send a notification via WebSocket to the agent if they're online
+          console.log(`Automatically assigned agent ${assignedAgent.id} to property ${property.id}`);
+          
+          // Notify the buyer about the assigned agent
           if (websocketServer) {
-            websocketServer.broadcastToUsers([agent.id], {
+            websocketServer.broadcastToUsers([req.user!.id], {
               type: 'notification',
               data: {
-                message: 'New lead available! A buyer has added a property that matches your expertise.',
-                propertyId: property.id,
-                leadId: lead.id
+                message: `An agent has been automatically assigned to your property at ${property.address}.`,
+                propertyId: property.id
               }
             });
           }
+          
+          // Notify the assigned agent
+          if (websocketServer) {
+            websocketServer.broadcastToUsers([assignedAgent.id], {
+              type: 'notification',
+              data: {
+                message: 'You have been automatically assigned to a new property that matches your expertise.',
+                propertyId: property.id
+              }
+            });
+          }
+          
+          // Create leads for the other top agents as backup
+          for (const agent of topAgents) {
+            // Set status as "claimed" for the assigned agent, "available" for others
+            const status = agent.id === assignedAgent.id ? "claimed" : "available";
+            
+            const lead = await storage.createAgentLead({
+              propertyId: property.id,
+              agentId: agent.id,
+              status: status
+            });
+            console.log(`Created lead ${lead.id} for agent ${agent.id} on property ${property.id} with status ${status}`);
+            
+            // Send notification about available leads (except to the already assigned agent)
+            if (agent.id !== assignedAgent.id && websocketServer) {
+              websocketServer.broadcastToUsers([agent.id], {
+                type: 'notification',
+                data: {
+                  message: 'New lead available! A buyer has added a property that matches your expertise.',
+                  propertyId: property.id,
+                  leadId: lead.id
+                }
+              });
+            }
+          }
+        } else {
+          console.log(`No matching agents found for property ${property.id}`);
         }
       } catch (error) {
         console.error("Agent matching error:", error);
