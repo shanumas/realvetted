@@ -4,7 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Property, User } from "@shared/schema";
-import { PropertyWithParticipants } from "@shared/types";
+import { PropertyWithParticipants, ViewingRequestWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
+import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
 import {
   Dialog,
   DialogContent,
@@ -40,7 +41,7 @@ export default function BuyerPropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<string>("seller");
+  const [activeTab, setActiveTab] = useState<string>("property");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
@@ -157,11 +158,10 @@ export default function BuyerPropertyDetail() {
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
       queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
       
-      // Navigate to buyer dashboard with viewing requests tab active
-      // Using localStorage to temporarily store the active tab preference
-      localStorage.setItem('buyerDashboardActiveTab', 'viewingRequests');
-      navigate('/buyer/dashboard');
+      // Set active tab to viewings
+      setActiveTab("viewings");
     },
     onError: (error: Error) => {
       toast({
@@ -260,6 +260,13 @@ export default function BuyerPropertyDetail() {
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
     queryFn: getQueryFn({ on401: "throw" }),
+  });
+  
+  // Fetch viewing requests for this property
+  const { data: viewingRequests, isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
+    queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!propertyId, // Only run query if propertyId is valid
   });
 
   if (isLoading) {
@@ -610,12 +617,18 @@ export default function BuyerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-3">
+                    <TabsList className="w-full grid grid-cols-4">
                       <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Seller Chat
                       </TabsTrigger>
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
+                      </TabsTrigger>
+                      <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <Eye className="mr-1 h-4 w-4" /> 
+                          Viewings
+                        </span>
                       </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
@@ -668,6 +681,48 @@ export default function BuyerPropertyDetail() {
                     )}
                   </TabsContent>
                   
+                  <TabsContent value="viewings">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Eye className="mr-2 h-5 w-5 text-primary" />
+                          Viewing Requests
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Track the status of your property viewing requests
+                        </p>
+                      </div>
+                      {isLoadingViewingRequests ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : viewingRequests && viewingRequests.length > 0 ? (
+                        <PropertyViewingRequestsList 
+                          viewingRequests={viewingRequests} 
+                          showPropertyDetails={false}
+                          propertyName={property.address}
+                        />
+                      ) : (
+                        <div className="text-center py-8 border border-dashed border-gray-300 rounded-md">
+                          <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
+                          <h3 className="mt-2 text-sm font-medium text-gray-900">No viewing requests</h3>
+                          <p className="mt-1 text-sm text-gray-500">
+                            You haven't requested to view this property yet.
+                          </p>
+                          <div className="mt-6">
+                            <Button
+                              onClick={() => setIsViewingModalOpen(true)}
+                              className="inline-flex items-center"
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Request Viewing
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                
                   <TabsContent value="activity">
                     <div className="p-4">
                       <div className="mb-4">
