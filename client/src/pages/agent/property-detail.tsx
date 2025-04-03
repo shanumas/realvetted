@@ -23,6 +23,7 @@ export default function AgentPropertyDetail() {
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
+  const [selectedDraftId, setSelectedDraftId] = useState<number | undefined>();
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -348,19 +349,140 @@ export default function AgentPropertyDetail() {
                         </p>
                       </div>
                       
-                      <Button 
-                        onClick={() => setIsAgreementModalOpen(true)}
-                        className="w-full mb-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                      >
-                        <FileSignature className="mr-2 h-4 w-4" />
-                        Create Buyer Representation Agreement
-                      </Button>
-                      
-                      <div className="mt-4">
-                        <div className="text-center text-gray-500">
-                          {isAgreementModalOpen ? null : (
-                            <p>Click the button above to create a new buyer representation agreement</p>
-                          )}
+                      {/* Agreements section */}
+                      <div className="space-y-5">
+                        {/* Action buttons */}
+                        <div className="flex flex-col space-y-2">
+                          <Button 
+                            onClick={() => setIsAgreementModalOpen(true)}
+                            className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                          >
+                            <FileSignature className="mr-2 h-4 w-4" />
+                            Create Buyer Representation Agreement
+                          </Button>
+                          
+                          <Button 
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(`/api/properties/${propertyId}/generate-agreement-draft`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  credentials: 'same-origin'
+                                });
+                                
+                                if (!response.ok) {
+                                  throw new Error("Failed to generate agreement draft");
+                                }
+                                
+                                // Refresh the current page data
+                                window.location.reload();
+                              } catch (error) {
+                                console.error("Error generating draft:", error);
+                              }
+                            }}
+                            variant="outline"
+                            className="w-full"
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Generate New Draft Agreement
+                          </Button>
+                        </div>
+                        
+                        {/* Existing Agreements List */}
+                        <div className="mt-6">
+                          <h4 className="font-medium text-gray-900 mb-2">Existing Agreements</h4>
+                          
+                          {/* Fetch agreements for this property */}
+                          {(() => {
+                            const { data: agreements, isLoading: loadingAgreements } = useQuery({
+                              queryKey: [`/api/properties/${propertyId}/agreements`],
+                              queryFn: getQueryFn({ on401: "throw" }),
+                            });
+                            
+                            if (loadingAgreements) {
+                              return (
+                                <div className="flex items-center justify-center p-4">
+                                  <Loader2 className="h-5 w-5 animate-spin text-primary/70" />
+                                  <span className="ml-2 text-sm text-gray-500">Loading agreements...</span>
+                                </div>
+                              );
+                            }
+                            
+                            if (!agreements || agreements.length === 0) {
+                              return (
+                                <div className="text-center p-6 border border-dashed rounded-md">
+                                  <p className="text-gray-500">No agreements found for this property</p>
+                                  <p className="text-sm mt-1 text-gray-400">Create a new agreement or generate a draft to get started</p>
+                                </div>
+                              );
+                            }
+                            
+                            return (
+                              <div className="divide-y">
+                                {agreements.map((agreement) => (
+                                  <div key={agreement.id} className="py-3 flex justify-between items-center">
+                                    <div>
+                                      <h5 className="font-medium">
+                                        {agreement.type === "standard" ? "Buyer Representation Agreement" : "Agency Disclosure Form"}
+                                      </h5>
+                                      <div className="text-sm text-gray-500 mt-1">
+                                        <span className="block">Created: {new Date(agreement.date).toLocaleDateString()}</span>
+                                        <div className="flex items-center mt-1">
+                                          <span 
+                                            className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
+                                              agreement.status === "draft" 
+                                                ? "bg-gray-100 text-gray-800" 
+                                                : agreement.status === "pending_buyer" 
+                                                ? "bg-blue-100 text-blue-800"
+                                                : agreement.status === "signed_by_buyer" 
+                                                ? "bg-green-100 text-green-800"
+                                                : "bg-gray-100 text-gray-800"
+                                            }`}
+                                          >
+                                            {agreement.status === "draft" 
+                                              ? "Draft" 
+                                              : agreement.status === "pending_buyer"
+                                              ? "Awaiting Buyer"
+                                              : agreement.status === "signed_by_buyer" 
+                                              ? "Signed" 
+                                              : agreement.status}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex space-x-2">
+                                      {agreement.status === "draft" ? (
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline"
+                                          onClick={() => {
+                                            // Open the agreement editor with the draft
+                                            setSelectedDraftId(agreement.id);
+                                            setIsAgreementModalOpen(true);
+                                          }}
+                                        >
+                                          Edit Draft
+                                        </Button>
+                                      ) : (
+                                        <Button 
+                                          size="sm" 
+                                          variant="outline"
+                                          onClick={() => {
+                                            // Open a preview of the agreement
+                                            // This is a placeholder for viewing signed agreements
+                                            alert("Viewing signed agreements is not implemented yet");
+                                          }}
+                                        >
+                                          View
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -373,7 +495,11 @@ export default function AgentPropertyDetail() {
                     property={property}
                     agent={property.agent!}
                     isOpen={isAgreementModalOpen}
-                    onClose={() => setIsAgreementModalOpen(false)}
+                    onClose={() => {
+                      setIsAgreementModalOpen(false);
+                      setSelectedDraftId(undefined);
+                    }}
+                    draftId={selectedDraftId}
                   />
                 )}
               </CardContent>

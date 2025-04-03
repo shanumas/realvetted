@@ -1587,6 +1587,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to auto-generate a buyer representation agreement (draft)
+  app.post("/api/properties/:id/generate-agreement-draft", isAuthenticated, hasRole(["agent", "admin"]), async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getPropertyWithParticipants(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if the agent is assigned to this property
+      if (req.user!.role === "agent" && property.agentId !== req.user!.id) {
+        return res.status(403).json({
+          success: false,
+          error: "You are not the agent assigned to this property"
+        });
+      }
+      
+      // Make sure there's a buyer for this property
+      if (!property.createdBy) {
+        return res.status(400).json({
+          success: false,
+          error: "Property must have a buyer"
+        });
+      }
+      
+      // Get the buyer information
+      const buyer = property.buyer || await storage.getUser(property.createdBy);
+      
+      if (!buyer) {
+        return res.status(404).json({
+          success: false,
+          error: "Buyer not found"
+        });
+      }
+      
+      // Generate a default agreement text
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + 90); // 90 days term
+      
+      const agentName = req.user!.firstName && req.user!.lastName 
+        ? `${req.user!.firstName} ${req.user!.lastName}` 
+        : req.user!.email;
+        
+      const buyerName = buyer.firstName && buyer.lastName 
+        ? `${buyer.firstName} ${buyer.lastName}` 
+        : buyer.email;
+        
+      const buyerAddress = buyer.addressLine1 
+        ? `${buyer.addressLine1}${buyer.addressLine2 ? `, ${buyer.addressLine2}` : ''}, ${buyer.city || ''}, ${buyer.state || ''} ${buyer.zip || ''}` 
+        : '';
+      
+      // Generate agreement text
+      const agreementText = `
+BUYER REPRESENTATION AGREEMENT
+
+This Buyer Representation Agreement ("Agreement") is entered into on ${startDate.toISOString().split('T')[0]} between:
+
+BUYER: ${buyerName}
+Address: ${buyerAddress}
+
+And
+
+BROKER/AGENT: ${agentName}
+License #: 
+Brokerage: 
+
+1. APPOINTMENT OF BROKER/AGENT:
+Buyer appoints Agent as Buyer's exclusive real estate agent for the purpose of finding and acquiring real property as follows:
+Property Address: ${property.address}
+City: ${property.city || ''}
+State: ${property.state || ''}
+Zip: ${property.zip || ''}
+
+2. TERM:
+This Agreement shall commence on ${startDate.toISOString().split('T')[0]} and shall expire at 11:59 PM on ${endDate.toISOString().split('T')[0]} (90 days).
+
+3. BROKER/AGENT'S OBLIGATIONS:
+a) To use professional knowledge and skills to find the property described above.
+b) To present all offers and counteroffers in a timely manner.
+c) To disclose all known material facts about the property.
+d) To maintain the confidentiality of Buyer's personal and financial information.
+e) To represent Buyer's interests diligently and in good faith.
+
+4. BUYER'S OBLIGATIONS:
+a) To work exclusively with Agent for the purpose of purchasing property as described above.
+b) To provide accurate personal and financial information.
+c) To view properties only by appointment through Agent.
+d) To negotiate the purchase of property only through Agent.
+e) To act in good faith toward completing a purchase.
+
+5. COMPENSATION:
+a) If Buyer purchases a property during the term of this Agreement, compensation to Agent will be as follows:
+   - Agent shall be paid a commission of 3% of the purchase price.
+   - If the listing broker or seller offers a commission less than the above, Buyer will be responsible for the difference.
+
+6. TERMINATION:
+This Agreement may be terminated by mutual consent of the parties or as otherwise provided by law.
+
+7. ADDITIONAL TERMS:
+
+`;
+      
+      // Create a draft agreement in the database (not signed by agent yet)
+      const agreement = await storage.createAgreement({
+        propertyId,
+        type: "standard",
+        agentId: req.user!.id,
+        buyerId: buyer.id,
+        agreementText: agreementText,
+        date: new Date(),
+        status: "draft" // New status: draft
+      });
+      
+      // Log this activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId,
+          userId: req.user!.id,
+          activity: "Draft agreement created",
+          details: {
+            agreementId: agreement.id,
+            status: "draft"
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for draft agreement:", logError);
+      }
+      
+      res.status(201).json({
+        success: true,
+        data: agreement
+      });
+    } catch (error) {
+      console.error("Error generating draft agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate draft agreement"
+      });
+    }
+  });
+  
   // Agency Disclosure Form endpoints
   
   // Generate and handle agency disclosure forms
