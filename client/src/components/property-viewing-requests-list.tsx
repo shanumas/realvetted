@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type PropertyViewingRequestsListProps = {
@@ -126,8 +126,15 @@ export function PropertyViewingRequestsList({
         variant: "default"
       });
       
-      // Reload the page to show the updated requests
-      window.location.reload();
+      // Invalidate both relevant query caches so the UI updates
+      const propertyId = viewingRequests[0]?.propertyId;
+      if (propertyId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
+        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
+      } else {
+        // If we don't have a propertyId, invalidate all viewing request queries
+        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests'] });
+      }
     } catch (error) {
       console.error("Error deleting viewing request:", error);
       toast({
@@ -190,8 +197,9 @@ export function PropertyViewingRequestsList({
       // Close the dialog
       setDialogOpen(false);
       
-      // Reload the page to show the updated request
-      window.location.reload();
+      // Invalidate queries to update the UI
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${selectedRequest.propertyId}/viewing-requests`] });
+      queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
     } catch (error) {
       console.error("Error submitting viewing request:", error);
       toast({
