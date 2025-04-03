@@ -81,7 +81,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   // Filter requests based on active tab
   const filteredRequests = viewingRequests?.filter(request => {
     if (activeTab === "pending") return request.status === "pending";
-    if (activeTab === "approved") return request.status === "approved";
+    if (activeTab === "approved") return request.status === "accepted"; // Use 'accepted' status from backend
     if (activeTab === "rejected") return request.status === "rejected";
     if (activeTab === "completed") return request.status === "completed";
     return true; // Show all requests on "all" tab
@@ -118,7 +118,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
 
   // Get counts for badges
   const pendingCount = viewingRequests?.filter(req => req.status === "pending").length || 0;
-  const approvedCount = viewingRequests?.filter(req => req.status === "approved").length || 0;
+  const approvedCount = viewingRequests?.filter(req => req.status === "accepted").length || 0; // Use 'accepted' status from backend
   const rejectedCount = viewingRequests?.filter(req => req.status === "rejected").length || 0;
   const completedCount = viewingRequests?.filter(req => req.status === "completed").length || 0;
 
@@ -202,11 +202,11 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                           <Badge 
                             variant={
                               request.status === 'pending' ? 'outline' : 
-                              request.status === 'approved' ? 'success' :
+                              request.status === 'accepted' ? 'success' :
                               request.status === 'rejected' ? 'destructive' : 'default'
                             }
                           >
-                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            {request.status === 'accepted' ? 'Approved' : request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                           </Badge>
                         </div>
                       </CardHeader>
@@ -270,7 +270,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                               <Button 
                                 variant="success"
                                 size="sm"
-                                onClick={() => handleStatusChange(request.id, 'approved')}
+                                onClick={() => handleStatusChange(request.id, 'accepted')}
                                 disabled={updateRequestMutation.isPending}
                               >
                                 {updateRequestMutation.isPending ? (
@@ -290,7 +290,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </>
                           )}
                           
-                          {role === 'agent' && request.status === 'approved' && (
+                          {role === 'agent' && request.status === 'accepted' && (
                             <Button 
                               variant="default"
                               size="sm"
