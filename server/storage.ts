@@ -600,6 +600,7 @@ export class PgStorage implements IStorage {
       propertyId: agreementData.propertyId,
       agentId: agreementData.agentId,
       buyerId: agreementData.buyerId,
+      type: agreementData.type || "standard",
       agreementText: agreementData.agreementText,
       agentSignature: agreementData.agentSignature,
       buyerSignature: agreementData.buyerSignature || null,
