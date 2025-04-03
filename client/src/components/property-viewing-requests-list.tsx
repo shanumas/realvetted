@@ -22,6 +22,9 @@ export function PropertyViewingRequestsList({
   const [activeTab, setActiveTab] = useState("pending");
   const { user } = useAuth();
   
+  // Debugging output
+  console.log("ViewingRequests received:", viewingRequests);
+  
   // Filter requests based on active tab
   const filteredRequests = viewingRequests?.filter(request => {
     if (activeTab === "pending") return request.status === "pending";
