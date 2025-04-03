@@ -103,6 +103,43 @@ export function PropertyViewingRequestsList({
     setDialogOpen(true);
   };
   
+  // Handle delete request
+  const handleDeleteRequest = async (requestId: number) => {
+    if (!confirm("Are you sure you want to delete this viewing request?")) {
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Send the delete request to the server
+      const response = await apiRequest("DELETE", `/api/viewing-requests/${requestId}`);
+      
+      if (!response.ok) {
+        throw new Error("Failed to delete viewing request");
+      }
+      
+      // Show success message
+      toast({
+        title: "Request Deleted",
+        description: "Your viewing request has been deleted successfully.",
+        variant: "default"
+      });
+      
+      // Reload the page to show the updated requests
+      window.location.reload();
+    } catch (error) {
+      console.error("Error deleting viewing request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete viewing request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
   // Handle form submission
   const handleSubmit = async () => {
     if (!selectedRequest || !selectedDate || !selectedTime) {
@@ -362,15 +399,22 @@ export function PropertyViewingRequestsList({
                         )}
                       </CardContent>
                       
-                      {/* Add button for "Request Different Time" */}
+                      {/* Add buttons for request management */}
                       {request.status === "pending" && user?.role === "buyer" && (
-                        <CardFooter className="bg-gray-50 pt-2 pb-3 px-4 flex justify-end">
+                        <CardFooter className="bg-gray-50 pt-2 pb-3 px-4 flex justify-end gap-2">
                           <Button 
                             variant="outline"
                             onClick={() => openRequestDialog(request)}
                             className="text-sm"
                           >
                             Request Different Time
+                          </Button>
+                          <Button 
+                            variant="destructive"
+                            onClick={() => handleDeleteRequest(request.id)}
+                            className="text-sm"
+                          >
+                            Delete Request
                           </Button>
                         </CardFooter>
                       )}

@@ -198,8 +198,10 @@ export default function BuyerPropertyDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
       
-      // Set active tab to viewings
-      setActiveTab("viewings");
+      // Scroll to viewing requests section
+      setTimeout(() => {
+        document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
+      }, 500);
     },
     onError: (error: any) => {
       // Check if this is a duplicate viewing request error
@@ -235,7 +237,7 @@ export default function BuyerPropertyDetail() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => setActiveTab("viewings")}
+                  onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
                   className="mt-2"
                 >
                   View My Requests
@@ -243,8 +245,10 @@ export default function BuyerPropertyDetail() {
               ),
             });
             
-            // Automatically switch to the viewings tab
-            setActiveTab("viewings");
+            // Automatically scroll to the viewing requests section
+            setTimeout(() => {
+              document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
+            }, 500);
           }
         } catch (e) {
           // If there's an error parsing the response, fall back to the simple message
@@ -256,7 +260,7 @@ export default function BuyerPropertyDetail() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => setActiveTab("viewings")}
+                onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
                 className="mt-2"
               >
                 View My Requests
@@ -264,8 +268,10 @@ export default function BuyerPropertyDetail() {
             ),
           });
           
-          // Automatically switch to the viewings tab
-          setActiveTab("viewings");
+          // Automatically scroll to the viewing requests section
+          setTimeout(() => {
+            document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
+          }, 500);
         }
       } else {
         toast({
@@ -723,18 +729,12 @@ export default function BuyerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-4">
+                    <TabsList className="w-full grid grid-cols-3">
                       <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Seller Chat
                       </TabsTrigger>
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
-                      </TabsTrigger>
-                      <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
-                        <span className="flex items-center">
-                          <Eye className="mr-1 h-4 w-4" /> 
-                          Viewings
-                        </span>
                       </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
@@ -787,47 +787,7 @@ export default function BuyerPropertyDetail() {
                     )}
                   </TabsContent>
                   
-                  <TabsContent value="viewings">
-                    <div className="p-4">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-medium flex items-center text-gray-900">
-                          <Eye className="mr-2 h-5 w-5 text-primary" />
-                          Viewing Requests
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Track the status of your property viewing requests
-                        </p>
-                      </div>
-                      {isLoadingViewingRequests ? (
-                        <div className="flex justify-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                      ) : viewingRequests.length > 0 ? (
-                        <PropertyViewingRequestsList 
-                          viewingRequests={viewingRequests} 
-                          showPropertyDetails={false}
-                          propertyName={property.address}
-                        />
-                      ) : (
-                        <div className="text-center py-8 border border-dashed border-gray-300 rounded-md">
-                          <CalendarIcon className="mx-auto h-12 w-12 text-gray-400" />
-                          <h3 className="mt-2 text-sm font-medium text-gray-900">No viewing requests</h3>
-                          <p className="mt-1 text-sm text-gray-500">
-                            You haven't requested to view this property yet.
-                          </p>
-                          <div className="mt-6">
-                            <Button
-                              onClick={() => setIsViewingModalOpen(true)}
-                              className="inline-flex items-center"
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Request Viewing
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </TabsContent>
+
                 
                   <TabsContent value="activity">
                     <div className="p-4">
@@ -854,12 +814,68 @@ export default function BuyerPropertyDetail() {
                 <p className="text-sm text-gray-500 mb-4">
                   Request a property viewing with your agent at your preferred date and time.
                 </p>
-                <Button 
-                  className="w-full flex items-center justify-center" 
-                  onClick={() => setIsViewingModalOpen(true)}
-                >
-                  <Eye className="mr-2 h-5 w-5" /> Request Viewing
-                </Button>
+                {/* Disable the button if there's already a pending viewing request */}
+                {viewingRequests.some(request => request.status === 'pending') ? (
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      className="w-full flex items-center justify-center"
+                      variant="outline"
+                      disabled
+                    >
+                      <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" /> 
+                      Pending Request Exists
+                    </Button>
+                    <p className="text-sm text-center text-amber-600">
+                      You already have a pending viewing request for this property. 
+                      <Button 
+                        variant="link" 
+                        className="p-0 h-auto text-sm" 
+                        onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
+                      >
+                        View your requests
+                      </Button>
+                    </p>
+                  </div>
+                ) : (
+                  <Button 
+                    className="w-full flex items-center justify-center" 
+                    onClick={() => setIsViewingModalOpen(true)}
+                  >
+                    <Eye className="mr-2 h-5 w-5" /> Request Viewing
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Viewing Requests Section (Separate from communication tabs) */}
+            <Card className="mt-4" id="viewing-requests-section">
+              <CardContent className="p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Viewing Requests</h3>
+                </div>
+                {isLoadingViewingRequests ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : viewingRequests.length > 0 ? (
+                  <PropertyViewingRequestsList 
+                    viewingRequests={viewingRequests} 
+                    showPropertyDetails={false}
+                    propertyName={property.address}
+                  />
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                    <p className="mb-3">No viewing requests yet</p>
+                    <Button
+                      onClick={() => setIsViewingModalOpen(true)}
+                      className="inline-flex items-center"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Request Viewing
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

@@ -2270,6 +2270,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Delete a viewing request
+  app.delete("/api/viewing-requests/:id", isAuthenticated, async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      const viewingRequest = await storage.getViewingRequest(requestId);
+      
+      if (!viewingRequest) {
+        return res.status(404).json({
+          success: false,
+          error: "Viewing request not found"
+        });
+      }
+      
+      // Check if user has permission to delete this viewing request
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      
+      // Only the buyer who created the request or an admin can delete it
+      const isBuyer = role === "buyer" && viewingRequest.buyerId === userId;
+      const isAdmin = role === "admin";
+      
+      if (!(isBuyer || isAdmin)) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to delete this viewing request"
+        });
+      }
+      
+      // Update the request status to cancelled instead of actually deleting it
+      // This preserves the history and allows for better tracking
+      const updatedRequest = await storage.updateViewingRequest(requestId, {
+        status: "cancelled",
+        updatedAt: new Date()
+      });
+      
+      // Get the property to include in notifications
+      const property = await storage.getProperty(viewingRequest.propertyId);
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Log the activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: property.id,
+          userId: userId,
+          activity: "Viewing request cancelled",
+          details: {
+            requestId: viewingRequest.id,
+            cancelledBy: {
+              id: userId,
+              role: role
+            }
+          }
+        });
+      } catch (logError) {
+        console.error("Failed to create activity log for viewing request deletion:", logError);
+        // Continue without failing the whole request
+      }
+      
+      // Send WebSocket notifications
+      const notifyUserIds: number[] = [];
+      
+      // Notify the buyer's agent if assigned
+      if (viewingRequest.buyerAgentId) {
+        notifyUserIds.push(viewingRequest.buyerAgentId);
+      }
+      
+      // Notify the seller's agent if assigned
+      if (viewingRequest.sellerAgentId) {
+        notifyUserIds.push(viewingRequest.sellerAgentId);
+      }
+      
+      // Notify the seller if assigned
+      if (property.sellerId) {
+        notifyUserIds.push(property.sellerId);
+      }
+      
+      // Notify the property's agent if assigned
+      if (property.agentId) {
+        notifyUserIds.push(property.agentId);
+      }
+      
+      if (notifyUserIds.length > 0) {
+        websocketServer.broadcastToUsers(notifyUserIds, {
+          type: 'property_update',
+          data: {
+            propertyId: property.id,
+            viewingRequestId: viewingRequest.id,
+            action: 'viewing_request_cancelled',
+            status: "cancelled",
+            message: `Viewing request #${viewingRequest.id} has been cancelled by the buyer`
+          }
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: "Viewing request cancelled successfully"
+      });
+    } catch (error) {
+      console.error("Delete viewing request error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to delete viewing request"
+      });
+    }
+  });
 
   return httpServer;
 }
