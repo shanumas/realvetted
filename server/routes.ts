@@ -1963,9 +1963,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/properties/:id/viewing-requests", isAuthenticated, async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);
+      console.log(`Getting viewing requests for property ${propertyId}`);
+      
       const property = await storage.getProperty(propertyId);
       
       if (!property) {
+        console.log(`Property ${propertyId} not found`);
         return res.status(404).json({
           success: false,
           error: "Property not found"
@@ -1983,6 +1986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (role === "agent" && property.agentId === userId);
       
       if (!hasAccess) {
+        console.log(`User ${userId} with role ${role} does not have access to viewing requests for property ${propertyId}`);
         return res.status(403).json({
           success: false,
           error: "You don't have access to viewing requests for this property"
@@ -1990,8 +1994,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get the viewing requests with participant information
+      const baseRequests = await storage.getViewingRequestsByProperty(propertyId);
+      console.log(`Found ${baseRequests.length} viewing requests for property ${propertyId}`, baseRequests);
+      
       const viewingRequests = await Promise.all(
-        (await storage.getViewingRequestsByProperty(propertyId)).map(async (request) => {
+        baseRequests.map(async (request) => {
           let buyer = undefined;
           if (request.buyerId) {
             buyer = await storage.getUser(request.buyerId);
@@ -2010,6 +2017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      console.log(`Processed viewing requests:`, viewingRequests);
       res.json(viewingRequests);
     } catch (error) {
       console.error("Get viewing requests error:", error);

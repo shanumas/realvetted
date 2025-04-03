@@ -27,15 +27,21 @@ export function PropertyViewingRequestsList({
   
   // Ensure viewingRequests is not undefined and is an array
   const validRequests = Array.isArray(viewingRequests) ? viewingRequests : [];
+  console.log("Valid requests array:", validRequests);
   
   // Filter requests based on active tab
   const filteredRequests = validRequests.filter(request => {
+    // Additional debugging to check each request and its status
+    console.log("Request being filtered:", request, "Status:", request.status, "Active tab:", activeTab);
+    
     if (activeTab === "pending") return request.status === "pending";
     if (activeTab === "approved") return request.status === "approved";
     if (activeTab === "rejected") return request.status === "rejected";
     if (activeTab === "completed") return request.status === "completed";
     return true; // Show all requests on "all" tab
   });
+  
+  console.log("Filtered requests for tab", activeTab, ":", filteredRequests);
   
   // Get counts for badges
   const pendingCount = validRequests.filter(req => req.status === "pending").length || 0;
@@ -72,8 +78,10 @@ export function PropertyViewingRequestsList({
               <div className="space-y-4">
                 {filteredRequests.map(request => {
                   const property = request.property;
-                  if (!showPropertyDetails && !property) return null;
-
+                  
+                  // Previously this was returning null in a specific condition which could stop all requests from showing
+                  // Now we'll just render each request
+                  
                   return (
                     <Card key={request.id} className="border border-gray-200">
                       <CardHeader className="bg-gray-50 pb-2">
