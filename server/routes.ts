@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
@@ -25,8 +25,17 @@ import multer from "multer";
 import { randomBytes } from "crypto";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import path from "path";
+import fs from "fs";
+import { fillAgencyDisclosureForm, addSignatureToPdf, AgencyDisclosureFormData } from "./pdf-service";
 
 const scryptAsync = promisify(scrypt);
+
+// Create uploads/pdf directory if it doesn't exist
+const pdfDir = path.join(process.cwd(), 'uploads', 'pdf');
+if (!fs.existsSync(pdfDir)) {
+  fs.mkdirSync(pdfDir, { recursive: true });
+}
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -44,6 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Set up WebSocket server
   const websocketServer = setupWebSocketServer(httpServer);
+  
+  // Set up static file serving for uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
   
   // Configure multer for file uploads
   const upload = multer({
@@ -1461,6 +1474,230 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Agency Disclosure Form endpoints
+  
+  // Generate and handle agency disclosure forms
+  app.post("/api/properties/:id/agency-disclosure", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getPropertyWithParticipants(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Verify user has permission to access this property
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      
+      const hasAccess = 
+        (userRole === "admin") ||
+        (userRole === "buyer" && property.createdBy === userId) ||
+        (userRole === "agent" && property.agentId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to create or sign agency disclosure forms for this property"
+        });
+      }
+      
+      // Get form data from request
+      const formData = req.body;
+      
+      // Different processing depending on if this is a buyer or agent
+      if (userRole === "buyer") {
+        // Buyer is signing the form
+        if (!formData.buyerSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Buyer signature is required"
+          });
+        }
+        
+        try {
+          // Get agent information
+          let agent = null;
+          if (property.agentId) {
+            agent = await storage.getUser(property.agentId);
+          }
+          
+          // Prepare form data
+          const formDataForPdf: AgencyDisclosureFormData = {
+            buyerName1: `${req.user!.firstName || ''} ${req.user!.lastName || ''}`.trim() || req.user!.email,
+            buyerSignature1: formData.buyerSignature,
+            buyerSignatureDate1: new Date().toISOString().split('T')[0],
+            propertyAddress: property.address,
+            propertyCity: property.city || '',
+            propertyState: property.state || '',
+            propertyZip: property.zip || '',
+            // Add agent info if available
+            agentName: agent ? `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email : '',
+            agentBrokerageName: "Coldwell Banker Grass Roots Realty",
+            agentLicenseNumber: "2244751" // Example license number
+          };
+          
+          // Fill the PDF form with data
+          let pdfBuffer = await fillAgencyDisclosureForm(formDataForPdf);
+          
+          // Add buyer signature to the PDF
+          if (formData.buyerSignature) {
+            pdfBuffer = await addSignatureToPdf(pdfBuffer, formData.buyerSignature, 'buyer1');
+          }
+          
+          // Generate a unique filename
+          const timestamp = Date.now();
+          const filename = `agency_disclosure_${propertyId}_${timestamp}.pdf`;
+          const pdfPath = path.join(pdfDir, filename);
+          
+          // Save the PDF to disk
+          fs.writeFileSync(pdfPath, pdfBuffer);
+          
+          // Create a URL for accessing the PDF
+          const pdfUrl = `/uploads/pdf/${filename}`;
+          
+          // Create a log entry
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId,
+            activity: "Agency disclosure form signed by buyer",
+            details: {
+              buyerId: userId,
+              date: new Date().toISOString(),
+              pdfUrl
+            }
+          });
+          
+          // If agent is assigned, notify them
+          if (property.agentId) {
+            websocketServer.broadcastToUsers([property.agentId], {
+              type: 'notification',
+              data: {
+                message: 'The buyer has signed the Agency Disclosure form.',
+                propertyId,
+                pdfUrl
+              }
+            });
+          }
+          
+          // Return success with the PDF URL
+          return res.status(200).json({
+            success: true,
+            data: {
+              message: "Form signed successfully",
+              fileUrl: pdfUrl
+            }
+          });
+        } catch (pdfError) {
+          console.error("Error generating PDF:", pdfError);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to generate PDF form"
+          });
+        }
+      } else if (userRole === "agent") {
+        // Agent is creating/preparing the form
+        if (!formData.agentSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Agent signature is required"
+          });
+        }
+        
+        // Generate a form PDF with the agent's signature
+        try {
+          // Prepare form data
+          const formDataForPdf: AgencyDisclosureFormData = {
+            buyerName1: property.buyer?.firstName && property.buyer?.lastName 
+              ? `${property.buyer.firstName} ${property.buyer.lastName}` 
+              : property.buyer?.email || '',
+            agentName: `${req.user!.firstName || ''} ${req.user!.lastName || ''}`.trim() || req.user!.email,
+            agentBrokerageName: "Coldwell Banker Grass Roots Realty",
+            agentLicenseNumber: "2244751", // Example license number
+            agentSignature: formData.agentSignature,
+            agentSignatureDate: new Date().toISOString().split('T')[0],
+            propertyAddress: property.address,
+            propertyCity: property.city || '',
+            propertyState: property.state || '',
+            propertyZip: property.zip || ''
+          };
+          
+          // Fill the PDF form with data
+          let pdfBuffer = await fillAgencyDisclosureForm(formDataForPdf);
+          
+          // Add agent signature to the PDF
+          if (formData.agentSignature) {
+            pdfBuffer = await addSignatureToPdf(pdfBuffer, formData.agentSignature, 'agent');
+          }
+          
+          // Generate a unique filename
+          const timestamp = Date.now();
+          const filename = `agency_disclosure_${propertyId}_${timestamp}.pdf`;
+          const pdfPath = path.join(pdfDir, filename);
+          
+          // Save the PDF to disk
+          fs.writeFileSync(pdfPath, pdfBuffer);
+          
+          // Create a URL for accessing the PDF
+          const pdfUrl = `/uploads/pdf/${filename}`;
+          
+          // Log the activity
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId,
+            activity: "Agency disclosure form prepared by agent",
+            details: {
+              agentId: userId,
+              date: new Date().toISOString(),
+              pdfUrl
+            }
+          });
+          
+          // Notify the buyer if available
+          if (property.createdBy) {
+            websocketServer.broadcastToUsers([property.createdBy], {
+              type: 'notification',
+              data: {
+                message: 'Your agent has prepared the Agency Disclosure form for your signature.',
+                propertyId
+              }
+            });
+          }
+          
+          // Return success with the PDF URL
+          return res.status(200).json({
+            success: true,
+            data: {
+              message: "Form created successfully",
+              pdfUrl
+            }
+          });
+        } catch (pdfError) {
+          console.error("Error generating PDF:", pdfError);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to generate PDF form"
+          });
+        }
+      } else {
+        // Only buyers and agents can interact with this form
+        return res.status(403).json({
+          success: false,
+          error: "Only buyers and agents can access this functionality"
+        });
+      }
+    } catch (error) {
+      console.error("Agency disclosure form error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to process agency disclosure form"
+      });
+    }
+  });
 
   // Viewing Request Routes
   
@@ -1488,8 +1725,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Ensure the buyer's agent is assigned to the viewing request
+      const requestDataWithAgent = { ...requestData };
+      if (property.agentId) {
+        requestDataWithAgent.buyerAgentId = property.agentId;
+      }
+      
       // Create the viewing request
-      const viewingRequest = await storage.createViewingRequest(requestData);
+      const viewingRequest = await storage.createViewingRequest(requestDataWithAgent);
       
       // Log the activity
       try {
@@ -1500,7 +1743,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           details: {
             requestId: viewingRequest.id,
             requestedDate: viewingRequest.requestedDate,
-            requestedEndDate: viewingRequest.requestedEndDate
+            requestedEndDate: viewingRequest.requestedEndDate,
+            agentId: property.agentId
           }
         });
       } catch (logError) {
@@ -1512,12 +1756,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const notifyUserIds = [req.user!.id]; // Notify the buyer
       
       // Notify the buyer's agent if assigned
-      if (viewingRequest.buyerAgentId) {
-        notifyUserIds.push(viewingRequest.buyerAgentId);
+      if (property.agentId) {
+        notifyUserIds.push(property.agentId);
+        
+        // Create a special message for the agent to fill out the disclosure form
+        websocketServer.broadcastToUsers([property.agentId], {
+          type: 'notification',
+          data: {
+            message: 'A buyer has requested a viewing. Please prepare the Real Estate Agency Disclosure form.',
+            propertyId: property.id,
+            viewingRequestId: viewingRequest.id,
+            requiresDisclosure: true
+          }
+        });
       }
       
       // Notify the seller's agent if assigned
-      if (viewingRequest.sellerAgentId) {
+      if (viewingRequest.sellerAgentId && viewingRequest.sellerAgentId !== property.agentId) {
         notifyUserIds.push(viewingRequest.sellerAgentId);
       }
       
@@ -1526,6 +1781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notifyUserIds.push(property.sellerId);
       }
       
+      // Send general notification to all users involved
       websocketServer.broadcastToUsers(notifyUserIds, {
         type: 'notification',
         data: {
@@ -1587,8 +1843,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
 
           let agent = undefined;
-          if (request.agentId) {
-            agent = await storage.getUser(request.agentId);
+          if (request.buyerAgentId) {
+            agent = await storage.getUser(request.buyerAgentId);
           }
 
           return {
