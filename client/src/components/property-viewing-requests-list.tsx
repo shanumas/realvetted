@@ -1,12 +1,32 @@
 import { useState } from "react";
-import { format, parseISO } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format, parseISO, addDays, addHours, setHours, setMinutes } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { ViewingRequestWithParticipants } from "@shared/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { DatePicker } from "@/components/ui/date-picker";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type PropertyViewingRequestsListProps = {
   viewingRequests: ViewingRequestWithParticipants[];
@@ -21,6 +41,19 @@ export function PropertyViewingRequestsList({
 }: PropertyViewingRequestsListProps) {
   const [activeTab, setActiveTab] = useState("pending");
   const { user } = useAuth();
+  const { toast } = useToast();
+  
+  // Dialog state for requesting different time
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<ViewingRequestWithParticipants | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState("12:00");
+  const [durationHours, setDurationHours] = useState("2");
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Calculate the minimum date for scheduling (24 hours from now)
+  const minimumDate = addDays(new Date(), 1);
   
   // Debugging output
   console.log("ViewingRequests received:", viewingRequests);
@@ -48,9 +81,195 @@ export function PropertyViewingRequestsList({
   const approvedCount = validRequests.filter(req => req.status === "approved").length || 0;
   const rejectedCount = validRequests.filter(req => req.status === "rejected").length || 0;
   const completedCount = validRequests.filter(req => req.status === "completed").length || 0;
+  
+  // Open the dialog for requesting a different time
+  const openRequestDialog = (request: ViewingRequestWithParticipants) => {
+    setSelectedRequest(request);
+    
+    // Default to a date 2 days from now
+    const defaultDate = addDays(new Date(), 2);
+    setSelectedDate(defaultDate);
+    
+    // Default time to 12:00 PM
+    setSelectedTime("12:00");
+    
+    // Default duration to 2 hours
+    setDurationHours("2");
+    
+    // Clear notes
+    setNotes("");
+    
+    // Open the dialog
+    setDialogOpen(true);
+  };
+  
+  // Handle form submission
+  const handleSubmit = async () => {
+    if (!selectedRequest || !selectedDate || !selectedTime) {
+      toast({
+        title: "Missing Information",
+        description: "Please provide all required information",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      
+      // Parse the time string (format: "HH:MM")
+      const [hours, minutes] = selectedTime.split(":").map(Number);
+      
+      // Set the time on the selected date
+      let requestedDate = setHours(selectedDate, hours);
+      requestedDate = setMinutes(requestedDate, minutes);
+      
+      // Calculate the end date/time based on duration
+      const requestedEndDate = addHours(requestedDate, parseInt(durationHours));
+      
+      // Create the request payload
+      const payload = {
+        propertyId: selectedRequest.propertyId,
+        requestedDate: requestedDate.toISOString(),
+        requestedEndDate: requestedEndDate.toISOString(),
+        notes,
+        override: true // This flag indicates we're replacing an existing request
+      };
+      
+      // Send the request to the server
+      const response = await apiRequest("POST", "/api/viewing-requests", payload);
+      
+      if (!response.ok) {
+        throw new Error("Failed to create viewing request");
+      }
+      
+      // Show success message
+      toast({
+        title: "Request Submitted",
+        description: "Your viewing request has been submitted successfully and will replace the previous request.",
+        variant: "default"
+      });
+      
+      // Close the dialog
+      setDialogOpen(false);
+      
+      // Reload the page to show the updated request
+      window.location.reload();
+    } catch (error) {
+      console.error("Error submitting viewing request:", error);
+      toast({
+        title: "Error",
+        description: "Failed to submit viewing request. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
+      {/* Dialog for requesting a different time */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Request Different Viewing Time</DialogTitle>
+            <DialogDescription>
+              Choose a new date and time to view this property. 
+              This will replace your current pending request.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="date">Date (must be at least 24 hours from now)</Label>
+              <DatePicker 
+                date={selectedDate} 
+                setDate={setSelectedDate}
+                fromDate={minimumDate}
+                label="Select a date"
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="time">Time</Label>
+              <Select
+                value={selectedTime}
+                onValueChange={setSelectedTime}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a time" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="9:00">9:00 AM</SelectItem>
+                  <SelectItem value="9:30">9:30 AM</SelectItem>
+                  <SelectItem value="10:00">10:00 AM</SelectItem>
+                  <SelectItem value="10:30">10:30 AM</SelectItem>
+                  <SelectItem value="11:00">11:00 AM</SelectItem>
+                  <SelectItem value="11:30">11:30 AM</SelectItem>
+                  <SelectItem value="12:00">12:00 PM</SelectItem>
+                  <SelectItem value="12:30">12:30 PM</SelectItem>
+                  <SelectItem value="13:00">1:00 PM</SelectItem>
+                  <SelectItem value="13:30">1:30 PM</SelectItem>
+                  <SelectItem value="14:00">2:00 PM</SelectItem>
+                  <SelectItem value="14:30">2:30 PM</SelectItem>
+                  <SelectItem value="15:00">3:00 PM</SelectItem>
+                  <SelectItem value="15:30">3:30 PM</SelectItem>
+                  <SelectItem value="16:00">4:00 PM</SelectItem>
+                  <SelectItem value="16:30">4:30 PM</SelectItem>
+                  <SelectItem value="17:00">5:00 PM</SelectItem>
+                  <SelectItem value="17:30">5:30 PM</SelectItem>
+                  <SelectItem value="18:00">6:00 PM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="duration">Duration (hours)</Label>
+              <Select
+                value={durationHours}
+                onValueChange={setDurationHours}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1 hour</SelectItem>
+                  <SelectItem value="2">2 hours</SelectItem>
+                  <SelectItem value="3">3 hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Notes (optional)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Add any special requests or notes here"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSubmit}
+              disabled={isSubmitting || !selectedDate || !selectedTime}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="pending">
@@ -142,6 +361,19 @@ export function PropertyViewingRequestsList({
                           </div>
                         )}
                       </CardContent>
+                      
+                      {/* Add button for "Request Different Time" */}
+                      {request.status === "pending" && user?.role === "buyer" && (
+                        <CardFooter className="bg-gray-50 pt-2 pb-3 px-4 flex justify-end">
+                          <Button 
+                            variant="outline"
+                            onClick={() => openRequestDialog(request)}
+                            className="text-sm"
+                          >
+                            Request Different Time
+                          </Button>
+                        </CardFooter>
+                      )}
                     </Card>
                   );
                 })}
