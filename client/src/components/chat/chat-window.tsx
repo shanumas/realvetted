@@ -6,14 +6,25 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Send, RefreshCw } from "lucide-react";
 import { ChatMessage } from "@shared/types";
 import websocketClient from "@/lib/websocket";
+import { UserProfilePhoto } from "@/components/user-profile-photo";
 
 interface ChatWindowProps {
   propertyId: number;
   receiverId: number;
   receiverName: string;
+  receiverPhoto?: string | null;
+  receiverDetails?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email: string;
+    profilePhotoUrl?: string | null;
+    phone?: string | null;
+    city?: string | null;
+    state?: string | null;
+  } | null;
 }
 
-export function ChatWindow({ propertyId, receiverId, receiverName }: ChatWindowProps) {
+export function ChatWindow({ propertyId, receiverId, receiverName, receiverPhoto, receiverDetails }: ChatWindowProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [message, setMessage] = useState("");
@@ -170,17 +181,43 @@ export function ChatWindow({ propertyId, receiverId, receiverName }: ChatWindowP
   return (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
-      <div className="p-2 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="text-sm font-medium">Chat with {receiverName}</h3>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={handleRefresh} 
-          disabled={isRefreshing || isLoading}
-          title="Refresh messages"
-        >
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-        </Button>
+      <div className="p-2 border-b border-gray-200">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center">
+            <h3 className="text-sm font-medium">Chat with {receiverName}</h3>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={isRefreshing || isLoading}
+            title="Refresh messages"
+          >
+            <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
+        </div>
+        
+        {/* Agent details (if available) */}
+        {receiverDetails && (
+          <div className="flex items-center p-2 bg-gray-50 rounded-md">
+            <UserProfilePhoto 
+              user={receiverDetails} 
+              size="sm"
+              className="mr-3"
+            />
+            <div className="text-xs">
+              <div className="font-medium">{receiverName}</div>
+              {receiverDetails.phone && (
+                <div className="text-gray-500">Phone: {receiverDetails.phone}</div>
+              )}
+              {(receiverDetails.city || receiverDetails.state) && (
+                <div className="text-gray-500">
+                  Location: {[receiverDetails.city, receiverDetails.state].filter(Boolean).join(", ")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Chat Messages */}
@@ -207,9 +244,13 @@ export function ChatWindow({ propertyId, receiverId, receiverName }: ChatWindowP
               >
                 {msg.senderId !== user?.id && (
                   <div className="flex-shrink-0 mr-3">
-                    <div className="h-8 w-8 rounded-full bg-accent-200 flex items-center justify-center text-accent-700">
-                      {receiverName.charAt(0).toUpperCase()}
-                    </div>
+                    {receiverDetails ? (
+                      <UserProfilePhoto user={receiverDetails} size="sm" />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-accent-200 flex items-center justify-center text-accent-700">
+                        {receiverName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -248,9 +289,7 @@ export function ChatWindow({ propertyId, receiverId, receiverName }: ChatWindowP
                 
                 {msg.senderId === user?.id && (
                   <div className="flex-shrink-0 ml-3">
-                    <div className="h-8 w-8 rounded-full bg-primary-200 flex items-center justify-center text-primary-700">
-                      {user?.firstName?.charAt(0).toUpperCase() || user?.email.charAt(0).toUpperCase()}
-                    </div>
+                    <UserProfilePhoto user={user} size="sm" />
                   </div>
                 )}
               </div>

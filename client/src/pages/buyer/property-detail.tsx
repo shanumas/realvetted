@@ -573,6 +573,7 @@ export default function BuyerPropertyDetail() {
                         propertyId={propertyId}
                         receiverId={property.sellerId}
                         receiverName={property.seller?.firstName || "Seller"}
+                        receiverDetails={property.seller || null}
                       />
                     ) : (
                       <div className="p-4 text-center text-gray-500">
@@ -588,6 +589,7 @@ export default function BuyerPropertyDetail() {
                         propertyId={propertyId}
                         receiverId={property.agentId}
                         receiverName={property.agent?.firstName || "Agent"}
+                        receiverDetails={property.agent || null}
                       />
                     ) : (
                       <div className="p-4 text-center">
