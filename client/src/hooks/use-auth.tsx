@@ -48,6 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/auth/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     initialData: null, // Explicitly set initial data to null
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
   
   // Connect to WebSocket when user is authenticated

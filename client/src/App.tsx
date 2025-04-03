@@ -1,7 +1,8 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { AuthProvider } from "./hooks/use-auth";
+import { AuthProvider, useAuth } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
@@ -14,6 +15,7 @@ import AgentPropertyDetail from "@/pages/agent/property-detail";
 import SellerDashboard from "@/pages/seller/dashboard";
 import SellerPropertyDetail from "@/pages/seller/property-detail";
 import AdminDashboard from "@/pages/admin/dashboard";
+import { Loader2 } from "lucide-react";
 
 function Router() {
   return (
@@ -37,10 +39,8 @@ function Router() {
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
       
-      {/* Default route redirects to auth */}
-      <Route path="/">
-        <AuthPage />
-      </Route>
+      {/* Default route redirects to auth page */}
+      <Route path="/" component={HomePage} />
       
       {/* Fallback to 404 */}
       <Route component={NotFound} />
@@ -55,6 +55,52 @@ function App() {
         <Router />
       </AuthProvider>
     </QueryClientProvider>
+  );
+}
+
+// Home page with redirection logic based on authentication status
+function HomePage() {
+  const { user, isLoading } = useAuth();
+  const [, setLocation] = useLocation();
+  
+  // Effect to redirect based on auth status and role
+  useEffect(() => {
+    if (!isLoading && user) {
+      // Redirect based on role and verification status
+      if (user.role === "buyer" && user.profileStatus !== "verified") {
+        setLocation("/buyer/kyc");
+      } else if (user.role === "agent" && user.profileStatus !== "verified") {
+        setLocation("/agent/kyc");
+      } else if (user.role === "buyer") {
+        setLocation("/buyer/dashboard");
+      } else if (user.role === "seller") {
+        setLocation("/seller/dashboard");
+      } else if (user.role === "agent") {
+        setLocation("/agent/dashboard");
+      } else if (user.role === "admin") {
+        setLocation("/admin/dashboard");
+      }
+    }
+  }, [user, isLoading, setLocation]);
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  // If not logged in or still loading, show the auth page
+  if (!user) {
+    return <AuthPage />;
+  }
+  
+  // This will show briefly during redirection
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
   );
 }
 
