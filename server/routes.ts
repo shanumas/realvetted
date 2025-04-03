@@ -1449,9 +1449,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     } catch (error) {
       console.error("Error creating agreement:", error);
+      // Log detailed error info for debugging
+      console.log("Agreement data:", JSON.stringify(req.body, null, 2));
+      console.log("Property ID:", req.params.id);
+      console.log("Current user:", req.user?.id, req.user?.role);
+      
       res.status(500).json({
         success: false,
-        error: "Failed to create agreement"
+        error: "Failed to create agreement",
+        details: error instanceof Error ? error.message : String(error)
       });
     }
   });
