@@ -293,34 +293,36 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </>
                           )}
                           
+                          {/* For agents: if status is accepted, show Mark Completed button */}
                           {role === 'agent' && request.status === 'accepted' && (
-                            <>
-                              <Button 
-                                variant="default"
-                                size="sm"
-                                onClick={() => handleStatusChange(request.id, 'completed')}
-                                disabled={updateRequestMutation.isPending}
-                              >
-                                {updateRequestMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                ) : null}
-                                Mark Completed
-                              </Button>
-                              
-                              <Button 
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  // Store the current request with its property and participants
-                                  setSelectedRequest(request);
-                                  setShowAgreementModal(true);
-                                }}
-                                className="bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
-                              >
-                                <FileSignature className="h-4 w-4 mr-1" />
-                                Buyer Representation Form
-                              </Button>
-                            </>
+                            <Button 
+                              variant="default"
+                              size="sm"
+                              onClick={() => handleStatusChange(request.id, 'completed')}
+                              disabled={updateRequestMutation.isPending}
+                            >
+                              {updateRequestMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : null}
+                              Mark Completed
+                            </Button>
+                          )}
+                          
+                          {/* For agents: always show Buyer Representation Form button */}
+                          {role === 'agent' && (
+                            <Button 
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                // Store the current request with its property and participants
+                                setSelectedRequest(request);
+                                setShowAgreementModal(true);
+                              }}
+                              className="bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
+                            >
+                              <FileSignature className="h-4 w-4 mr-1" />
+                              Buyer Representation Form
+                            </Button>
                           )}
                         </div>
                       </CardContent>
