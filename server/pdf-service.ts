@@ -44,7 +44,7 @@ export interface AgencyDisclosureFormData {
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   // Path to the template PDF
-  const templatePath = path.join(process.cwd(), 'attached_assets/brbc.pdf');
+  const templatePath = path.join(process.cwd(), 'uploads/pdf/agency_disclosure_template.pdf');
   
   // Read the template file
   const templateBytes = fs.readFileSync(templatePath);

@@ -10,6 +10,7 @@ import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AgencyDisclosureForm } from "@/components/agency-disclosure-form";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
@@ -47,6 +48,8 @@ export default function BuyerPropertyDetail() {
   const [viewingTime, setViewingTime] = useState<string>("");
   const [viewingEndTime, setViewingEndTime] = useState<string>("");
   const [viewingNotes, setViewingNotes] = useState<string>("");
+  const [isDisclosureFormOpen, setIsDisclosureFormOpen] = useState<boolean>(false);
+  const [viewingRequestData, setViewingRequestData] = useState<{ date: string; time: string; endTime: string; notes: string } | null>(null);
   const { toast } = useToast();
   
   // Fetch available agents
@@ -190,11 +193,60 @@ export default function BuyerPropertyDetail() {
       return;
     }
     
-    requestViewingMutation.mutate({
+    // Check if agent is assigned
+    if (!property?.agentId) {
+      toast({
+        title: "Agent required",
+        description: "Please choose an agent before requesting a viewing.",
+        variant: "destructive",
+      });
+      setIsAgentDialogOpen(true);
+      return;
+    }
+    
+    // Store viewing request data for later submission after signing the disclosure form
+    setViewingRequestData({
       date: viewingDate,
       time: viewingTime,
       endTime: viewingEndTime,
       notes: viewingNotes
+    });
+    
+    // Close the viewing modal
+    setIsViewingModalOpen(false);
+    
+    // Open the disclosure form
+    setIsDisclosureFormOpen(true);
+  };
+  
+  // Handle submission after the disclosure form is signed
+  const handleDisclosureFormComplete = () => {
+    // Close the disclosure form
+    setIsDisclosureFormOpen(false);
+    
+    // Submit the viewing request if we have stored data
+    if (viewingRequestData) {
+      requestViewingMutation.mutate({
+        date: viewingRequestData.date,
+        time: viewingRequestData.time,
+        endTime: viewingRequestData.endTime,
+        notes: viewingRequestData.notes
+      });
+      
+      // Clear the stored data
+      setViewingRequestData(null);
+    }
+  };
+  
+  // Handle cancellation of the disclosure form
+  const handleDisclosureFormCancel = () => {
+    setIsDisclosureFormOpen(false);
+    setViewingRequestData(null);
+    
+    toast({
+      title: "Viewing request cancelled",
+      description: "You can try again when you're ready to sign the disclosure form.",
+      variant: "default",
     });
   };
 
@@ -783,6 +835,32 @@ export default function BuyerPropertyDetail() {
               Assign Selected Agent
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Agency Disclosure Form Dialog */}
+      <Dialog open={isDisclosureFormOpen} onOpenChange={setIsDisclosureFormOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>California Real Estate Agency Relationships Disclosure</DialogTitle>
+            <DialogDescription>
+              Before you can schedule a viewing, you must review and sign this disclosure form as required by California law.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {property && (
+            <AgencyDisclosureForm
+              propertyId={propertyId}
+              propertyAddress={property.address}
+              propertyCity={property.city || ""}
+              propertyState={property.state || ""}
+              propertyZip={property.zip || ""}
+              buyerName={`${property.buyer?.firstName || ""} ${property.buyer?.lastName || ""}`.trim()}
+              agentName={`${property.agent?.firstName || ""} ${property.agent?.lastName || ""}`.trim()}
+              onComplete={handleDisclosureFormComplete}
+              onCancel={handleDisclosureFormCancel}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -199,20 +199,36 @@ export function ChatWindow({ propertyId, receiverId, receiverName, receiverPhoto
         
         {/* Agent details (if available) */}
         {receiverDetails && (
-          <div className="flex items-center p-2 bg-gray-50 rounded-md">
+          <div className="flex items-start p-3 bg-gray-50 rounded-md border border-gray-200">
             <UserProfilePhoto 
               user={receiverDetails} 
-              size="sm"
-              className="mr-3"
+              size="md"
+              className="mr-3 flex-shrink-0"
             />
-            <div className="text-xs">
-              <div className="font-medium">{receiverName}</div>
+            <div className="text-sm">
+              <div className="font-medium text-base">
+                {receiverDetails.firstName && receiverDetails.lastName 
+                  ? `${receiverDetails.firstName} ${receiverDetails.lastName}`
+                  : receiverName}
+              </div>
+              <div className="mt-1 flex items-center text-gray-600">
+                <span className="font-medium mr-1">Email:</span> 
+                <a href={`mailto:${receiverDetails.email}`} className="text-blue-600 hover:underline">
+                  {receiverDetails.email}
+                </a>
+              </div>
               {receiverDetails.phone && (
-                <div className="text-gray-500">Phone: {receiverDetails.phone}</div>
+                <div className="mt-1 flex items-center text-gray-600">
+                  <span className="font-medium mr-1">Phone:</span> 
+                  <a href={`tel:${receiverDetails.phone}`} className="text-blue-600 hover:underline">
+                    {receiverDetails.phone}
+                  </a>
+                </div>
               )}
               {(receiverDetails.city || receiverDetails.state) && (
-                <div className="text-gray-500">
-                  Location: {[receiverDetails.city, receiverDetails.state].filter(Boolean).join(", ")}
+                <div className="mt-1 text-gray-600">
+                  <span className="font-medium mr-1">Location:</span>
+                  {[receiverDetails.city, receiverDetails.state].filter(Boolean).join(", ")}
                 </div>
               )}
             </div>

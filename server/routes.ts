@@ -29,13 +29,28 @@ import path from "path";
 import fs from "fs";
 import { fillAgencyDisclosureForm, addSignatureToPdf, AgencyDisclosureFormData } from "./pdf-service";
 
-const scryptAsync = promisify(scrypt);
+// Create uploads directories if they don't exist
+const uploadsDir = path.join(process.cwd(), 'uploads');
+const pdfDir = path.join(uploadsDir, 'pdf');
+const imagesDir = path.join(uploadsDir, 'images');
+const idDir = path.join(uploadsDir, 'id');
 
-// Create uploads/pdf directory if it doesn't exist
-const pdfDir = path.join(process.cwd(), 'uploads', 'pdf');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 if (!fs.existsSync(pdfDir)) {
   fs.mkdirSync(pdfDir, { recursive: true });
 }
+if (!fs.existsSync(imagesDir)) {
+  fs.mkdirSync(imagesDir, { recursive: true });
+}
+if (!fs.existsSync(idDir)) {
+  fs.mkdirSync(idDir, { recursive: true });
+}
+
+const scryptAsync = promisify(scrypt);
+
+// pdfDir is already defined above
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -1323,61 +1338,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Only agents can create agreements
-      if (req.user.role !== "agent" && req.user.role !== "admin") {
-        return res.status(403).json({
-          success: false,
-          error: "Only agents can create agreements"
-        });
-      }
-      
-      // Ensure the agent is assigned to this property
-      if (req.user.role === "agent" && property.agentId !== req.user.id) {
-        return res.status(403).json({
-          success: false,
-          error: "You are not the agent assigned to this property"
-        });
-      }
-      
       const agreementData = req.body;
       
-      // Validate required fields
-      if (!agreementData.buyerId || !agreementData.agreementText || !agreementData.agentSignature) {
-        return res.status(400).json({
-          success: false,
-          error: "Missing required fields: buyerId, agreementText, and agentSignature are required"
-        });
-      }
-      
-      const agreement = await storage.createAgreement({
-        propertyId,
-        agentId: req.user.role === "admin" ? agreementData.agentId : req.user.id,
-        buyerId: agreementData.buyerId,
-        agreementText: agreementData.agreementText,
-        agentSignature: agreementData.agentSignature,
-        date: new Date(),
-        status: "pending_buyer"
-      });
-      
-      // Log this activity
-      try {
-        await storage.createPropertyActivityLog({
+      // Handle agency disclosure form type (can be created by buyers)
+      if (agreementData.type === "agency_disclosure") {
+        // Validate input for disclosure form
+        if (!agreementData.signatureData) {
+          return res.status(400).json({
+            success: false,
+            error: "Signature data is required for disclosure form"
+          });
+        }
+        
+        // Ensure the property has an assigned agent
+        if (!property.agentId) {
+          return res.status(400).json({
+            success: false,
+            error: "Property must have an assigned agent"
+          });
+        }
+        
+        // For agency disclosure, we need to fill the form with property/agent/buyer details
+        const agreement = await storage.createAgreement({
           propertyId,
-          userId: req.user.id,
-          activity: "Agreement created",
-          details: {
-            agreementId: agreement.id,
-            status: agreement.status
-          }
+          type: "agency_disclosure",
+          agentId: property.agentId,
+          buyerId: req.user.id,
+          agreementText: JSON.stringify(agreementData.details || {}),
+          buyerSignature: agreementData.signatureData,
+          date: new Date(),
+          status: "signed_by_buyer" // Buyer has signed the disclosure
         });
-      } catch (logError) {
-        console.error("Failed to create activity log for agreement creation, but agreement was created:", logError);
+        
+        // Log this activity
+        try {
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId: req.user.id,
+            activity: "Agency disclosure form signed by buyer",
+            details: {
+              agreementId: agreement.id,
+              agreementType: "agency_disclosure",
+              status: agreement.status
+            }
+          });
+        } catch (logError) {
+          console.error("Failed to create activity log for agreement creation, but agreement was created:", logError);
+        }
+        
+        return res.status(201).json({
+          success: true,
+          data: agreement
+        });
+      } else {
+        // For standard agreements, only agents can create them
+        if (req.user.role !== "agent" && req.user.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Only agents can create standard agreements"
+          });
+        }
+        
+        // Ensure the agent is assigned to this property
+        if (req.user.role === "agent" && property.agentId !== req.user.id) {
+          return res.status(403).json({
+            success: false,
+            error: "You are not the agent assigned to this property"
+          });
+        }
+        
+        // Validate required fields for standard agreement
+        if (!agreementData.buyerId || !agreementData.agreementText || !agreementData.agentSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Missing required fields: buyerId, agreementText, and agentSignature are required"
+          });
+        }
+        
+        const agreement = await storage.createAgreement({
+          propertyId,
+          type: "standard",
+          agentId: req.user.role === "admin" ? agreementData.agentId : req.user.id,
+          buyerId: agreementData.buyerId,
+          agreementText: agreementData.agreementText,
+          agentSignature: agreementData.agentSignature,
+          date: new Date(),
+          status: "pending_buyer"
+        });
+        
+        // Log this activity
+        try {
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId: req.user.id,
+            activity: "Agreement created",
+            details: {
+              agreementId: agreement.id,
+              agreementType: "standard",
+              status: agreement.status
+            }
+          });
+        } catch (logError) {
+          console.error("Failed to create activity log for agreement creation, but agreement was created:", logError);
+        }
+        
+        res.status(201).json({
+          success: true,
+          data: agreement
+        });
       }
-      
-      res.status(201).json({
-        success: true,
-        data: agreement
-      });
     } catch (error) {
       console.error("Error creating agreement:", error);
       res.status(500).json({
@@ -1411,8 +1480,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Update the status
-        updateData.status = "signed_buyer";
+        // Update the status - handle different agreement types
+        if (agreement.type === "agency_disclosure") {
+          updateData.status = "signed_by_buyer";
+        } else {
+          updateData.status = "signed_buyer";
+        }
+      } else if (updateData.agentSignature && agreement.type === "agency_disclosure") {
+        // For disclosure form, check if agent is assigned to this property
+        const property = await storage.getProperty(agreement.propertyId);
+        
+        if (!property) {
+          return res.status(404).json({
+            success: false,
+            error: "Property not found"
+          });
+        }
+        
+        if (req.user.id !== property.agentId && req.user.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Only the assigned agent can sign the disclosure form"
+          });
+        }
+        
+        // If buyer has already signed, mark as completed
+        if (agreement.buyerSignature) {
+          updateData.status = "completed";
+        } else {
+          updateData.status = "pending_buyer";
+        }
       } else if (updateData.sellerSignature) {
         // Only the seller can sign as the seller
         const property = await storage.getProperty(agreement.propertyId);
@@ -1431,8 +1528,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // Update the status
-        updateData.status = "completed";
+        // Update the status based on agreement type
+        if (agreement.type === "agency_disclosure") {
+          updateData.status = "signed_by_seller";
+          
+          // If both buyer and agent have signed, mark as completed
+          if (agreement.buyerSignature && agreement.agentSignature) {
+            updateData.status = "completed";
+          }
+        } else {
+          updateData.status = "completed";
+        }
       } else if (updateData.status) {
         // Only admins can update status directly
         if (req.user.role !== "admin") {

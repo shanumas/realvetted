@@ -92,12 +92,13 @@ export const agreements = pgTable("agreements", {
   propertyId: integer("property_id").notNull(),
   agentId: integer("agent_id").notNull(),
   buyerId: integer("buyer_id").notNull(),
+  type: text("type").notNull().default("standard"), // standard, agency_disclosure
   agreementText: text("agreement_text").notNull(),
-  agentSignature: text("agent_signature").notNull(),
+  agentSignature: text("agent_signature"),
   buyerSignature: text("buyer_signature"),
   sellerSignature: text("seller_signature"),
   date: timestamp("date").notNull(),
-  status: text("status").notNull().default("pending_buyer"), // pending_buyer, signed_buyer, signed_seller, completed, rejected
+  status: text("status").notNull().default("pending_buyer"), // pending_buyer, signed_by_buyer, signed_by_seller, completed, rejected
   createdAt: timestamp("created_at").defaultNow(),
 });
 
