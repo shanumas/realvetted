@@ -2019,12 +2019,56 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             });
           }
           
+          // Create or update an agreement record
+          let agreement;
+          const existingAgreements = await storage.getAgreementsByProperty(propertyId);
+          const agencyDisclosureAgreement = existingAgreements.find(a => 
+            a.type === 'agency_disclosure' && 
+            (a.status === 'draft' || a.status === 'pending_buyer')
+          );
+          
+          if (agencyDisclosureAgreement) {
+            // Update existing agreement
+            agreement = await storage.updateAgreement(agencyDisclosureAgreement.id, {
+              buyerSignature: formData.buyerSignature,
+              status: 'signed_by_buyer', // Update status to indicate buyer has signed
+              documentUrl: pdfUrl
+            });
+          } else {
+            // Create new agreement
+            agreement = await storage.createAgreement({
+              propertyId,
+              agentId: property.agentId || -1, // We need to handle this better
+              buyerId: userId,
+              type: 'agency_disclosure',
+              agreementText: `Agency Disclosure for ${property.address}`,
+              buyerSignature: formData.buyerSignature,
+              date: new Date(),
+              status: 'signed_by_buyer',
+              documentUrl: pdfUrl
+            });
+          }
+          
+          // Notify the seller if available
+          if (property.sellerId) {
+            websocketServer.broadcastToUsers([property.sellerId], {
+              type: 'notification',
+              data: {
+                message: 'The buyer has signed the Agency Disclosure form. Please review and sign.',
+                propertyId,
+                agreementId: agreement.id,
+                pdfUrl
+              }
+            });
+          }
+          
           // Return success with the PDF URL
           return res.status(200).json({
             success: true,
             data: {
               message: "Form signed successfully",
-              fileUrl: pdfUrl
+              fileUrl: pdfUrl,
+              agreementId: agreement.id
             }
           });
         } catch (pdfError) {
@@ -2118,11 +2162,177 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             error: "Failed to generate PDF form"
           });
         }
+      } else if (userRole === "seller") {
+        // Seller is signing the form
+        if (!formData.sellerSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Seller signature is required"
+          });
+        }
+        
+        // Seller can only sign if property belongs to them
+        if (property.sellerId !== userId) {
+          return res.status(403).json({
+            success: false,
+            error: "You are not authorized to sign this form as the seller"
+          });
+        }
+        
+        try {
+          // Get the latest agreement that the buyer has signed
+          const agreements = await storage.getAgreementsByProperty(propertyId);
+          const buyerSignedAgreement = agreements.find(a => 
+            a.type === 'agency_disclosure' && 
+            a.status === 'signed_by_buyer' && 
+            a.buyerSignature
+          );
+          
+          if (!buyerSignedAgreement) {
+            return res.status(400).json({
+              success: false,
+              error: "No buyer-signed agreement found. The buyer must sign first."
+            });
+          }
+          
+          // Get agent information
+          let agent = null;
+          if (property.agentId) {
+            agent = await storage.getUser(property.agentId);
+          }
+          
+          // Get buyer information
+          let buyer = null;
+          if (buyerSignedAgreement.buyerId) {
+            buyer = await storage.getUser(buyerSignedAgreement.buyerId);
+          }
+          
+          // Prepare form data
+          const formDataForPdf: AgencyDisclosureFormData = {
+            // Maintain existing buyer and agent data from the agreement
+            buyerName1: buyer ? `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : '',
+            agentName: agent ? `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email : '',
+            agentBrokerageName: "Coldwell Banker Grass Roots Realty",
+            agentLicenseNumber: "2244751", // Example license number
+            propertyAddress: property.address,
+            propertyCity: property.city || '',
+            propertyState: property.state || '',
+            propertyZip: property.zip || '',
+            // Add seller information
+            sellerName1: `${req.user!.firstName || ''} ${req.user!.lastName || ''}`.trim() || req.user!.email,
+            sellerSignature1: formData.sellerSignature,
+            sellerSignatureDate1: new Date().toISOString().split('T')[0]
+          };
+          
+          // Get the existing PDF file path if available
+          let pdfUrl = buyerSignedAgreement.documentUrl || '';
+          let pdfPath = '';
+          
+          if (pdfUrl && pdfUrl.startsWith('/uploads/')) {
+            // Convert URL to filesystem path
+            pdfPath = path.join(process.cwd(), pdfUrl.substring(1));
+          } else {
+            // If no existing file, use the template
+            pdfPath = path.join(process.cwd(), 'uploads', 'pdf', 'brbc.pdf');
+          }
+          
+          // Load the existing PDF or template
+          let pdfBuffer;
+          try {
+            pdfBuffer = fs.readFileSync(pdfPath);
+          } catch (readError) {
+            console.error("Error reading PDF:", readError);
+            // Fallback to template
+            pdfBuffer = fs.readFileSync(path.join(process.cwd(), 'uploads', 'pdf', 'brbc.pdf'));
+          }
+          
+          // Fill the PDF form with data
+          pdfBuffer = await fillAgencyDisclosureForm(formDataForPdf);
+          
+          // Add the buyer signature that was already there
+          if (buyerSignedAgreement.buyerSignature) {
+            pdfBuffer = await addSignatureToPdf(pdfBuffer, buyerSignedAgreement.buyerSignature, 'buyer1');
+          }
+          
+          // Add the agent signature if it exists
+          if (buyerSignedAgreement.agentSignature) {
+            pdfBuffer = await addSignatureToPdf(pdfBuffer, buyerSignedAgreement.agentSignature, 'agent');
+          }
+          
+          // Add seller signature to the PDF
+          if (formData.sellerSignature) {
+            pdfBuffer = await addSignatureToPdf(pdfBuffer, formData.sellerSignature, 'seller1');
+          }
+          
+          // Generate a unique filename
+          const timestamp = Date.now();
+          const filename = `agency_disclosure_${propertyId}_${timestamp}.pdf`;
+          const newPdfPath = path.join(process.cwd(), 'uploads', 'pdf', filename);
+          
+          // Save the PDF to disk
+          fs.writeFileSync(newPdfPath, pdfBuffer);
+          
+          // Create a URL for accessing the PDF
+          pdfUrl = `/uploads/pdf/${filename}`;
+          
+          // Update the agreement record
+          await storage.updateAgreement(buyerSignedAgreement.id, {
+            sellerSignature: formData.sellerSignature,
+            status: 'completed',
+            documentUrl: pdfUrl
+          });
+          
+          // Log the activity
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId,
+            activity: "Agency disclosure form signed by seller",
+            details: {
+              sellerId: userId,
+              date: new Date().toISOString(),
+              agreementId: buyerSignedAgreement.id,
+              pdfUrl
+            }
+          });
+          
+          // Notify the buyer and agent
+          const notifyUsers = [];
+          if (buyer) notifyUsers.push(buyer.id);
+          if (agent) notifyUsers.push(agent.id);
+          
+          if (notifyUsers.length > 0) {
+            websocketServer.broadcastToUsers(notifyUsers, {
+              type: 'notification',
+              data: {
+                message: 'The seller has signed the Agency Disclosure form. The form is now complete.',
+                propertyId,
+                agreementId: buyerSignedAgreement.id,
+                pdfUrl
+              }
+            });
+          }
+          
+          // Return success with the PDF URL
+          return res.status(200).json({
+            success: true,
+            data: {
+              message: "Form signed by seller successfully",
+              fileUrl: pdfUrl,
+              agreementId: buyerSignedAgreement.id
+            }
+          });
+        } catch (pdfError) {
+          console.error("Error processing seller signature:", pdfError);
+          return res.status(500).json({
+            success: false,
+            error: "Failed to process seller signature"
+          });
+        }
       } else {
-        // Only buyers and agents can interact with this form
+        // Only buyers, sellers, and agents can interact with this form
         return res.status(403).json({
           success: false,
-          error: "Only buyers and agents can access this functionality"
+          error: "Only buyers, sellers, and agents can access this functionality"
         });
       }
     } catch (error) {

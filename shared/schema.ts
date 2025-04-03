@@ -100,6 +100,7 @@ export const agreements = pgTable("agreements", {
   date: timestamp("date").notNull(),
   status: text("status").notNull().default("pending_buyer"), // pending_buyer, signed_by_buyer, signed_by_seller, completed, rejected
   createdAt: timestamp("created_at").defaultNow(),
+  documentUrl: text("document_url"), // URL to the PDF document
 });
 
 // Property viewing requests
