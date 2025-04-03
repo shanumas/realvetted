@@ -44,8 +44,8 @@ export interface AgencyDisclosureFormData {
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   try {
-    // Path to the new template PDF - using the decrypted version of brbc.pdf
-    const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc_decrypted.pdf');
+    // Path to the original PDF template
+    const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc.pdf');
     
     // Check if the file exists
     if (!fs.existsSync(templatePath)) {
@@ -56,119 +56,199 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     // Read the template file
     const templateBytes = fs.readFileSync(templatePath);
     
-    // Load the PDF document
+    // Load the PDF document - this is the original unmodified PDF
     const pdfDoc = await PDFDocument.load(templateBytes);
     
-    // Create a new PDF document with just the first two pages from the original
-    const newPdfDoc = await PDFDocument.create();
-    const [page1, page2] = await newPdfDoc.copyPages(pdfDoc, [0, 1]);
-    newPdfDoc.addPage(page1);
-    newPdfDoc.addPage(page2);
+    // Get the form fields to check what's available
+    const form = pdfDoc.getForm();
     
-    // We'll draw directly on the PDF with overlay text since the form doesn't have 
-    // fillable fields or they might have different names than we expect
+    // Now we can create a custom overlay on a separate page
+    // that we'll attach at the end with property and agent information
     
-    // Get pages to write on
-    const pages = newPdfDoc.getPages();
-    const firstPage = pages[0];
+    // Create a new page for our overlay information
+    const page = pdfDoc.addPage([612, 792]); // US Letter size
     
-    // Use a standard font
-    const helveticaFont = await newPdfDoc.embedFont(StandardFonts.Helvetica);
-    const helveticaBold = await newPdfDoc.embedFont(StandardFonts.HelveticaBold);
+    // Embed fonts
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    // Draw leasehold checkbox (if applicable)
-    if (formData.isLeasehold) {
-      firstPage.drawText('✓', {
-        x: 148,
-        y: 767,
-        size: 14,
+    // Add a header to the new page
+    page.drawText('ADDITIONAL PROPERTY & AGENT INFORMATION', {
+      x: 50,
+      y: 700,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Set up coordinates for our content
+    let y = 650;
+    const lineHeight = 20;
+    
+    // Add property information
+    if (formData.propertyAddress) {
+      page.drawText('PROPERTY INFORMATION:', {
+        x: 50,
+        y,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+      
+      page.drawText(`Address: ${formData.propertyAddress}`, {
+        x: 50,
+        y,
+        size: 11,
         font: helveticaFont,
         color: rgb(0, 0, 0),
       });
+      
+      y -= lineHeight;
+      
+      const cityStateZip = [
+        formData.propertyCity || '',
+        formData.propertyState || '',
+        formData.propertyZip || ''
+      ].filter(Boolean).join(', ');
+      
+      if (cityStateZip) {
+        page.drawText(`City, State, ZIP: ${cityStateZip}`, {
+          x: 50,
+          y,
+          size: 11,
+          font: helveticaFont,
+          color: rgb(0, 0, 0),
+        });
+        
+        y -= lineHeight;
+      }
     }
     
-    // Draw buyer checkbox
-    firstPage.drawText('✓', {
-      x: 144,
-      y: 464,
-      size: 14,
+    // Add spacing
+    y -= lineHeight;
+    
+    // Add agent information
+    if (formData.agentName) {
+      page.drawText('AGENT INFORMATION:', {
+        x: 50,
+        y,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+      
+      page.drawText(`Agent Name: ${formData.agentName}`, {
+        x: 50,
+        y,
+        size: 11,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+      
+      if (formData.agentBrokerageName) {
+        page.drawText(`Brokerage: ${formData.agentBrokerageName}`, {
+          x: 50,
+          y,
+          size: 11,
+          font: helveticaFont,
+          color: rgb(0, 0, 0),
+        });
+        
+        y -= lineHeight;
+      }
+      
+      if (formData.agentLicenseNumber) {
+        page.drawText(`License Number: ${formData.agentLicenseNumber}`, {
+          x: 50,
+          y,
+          size: 11,
+          font: helveticaFont,
+          color: rgb(0, 0, 0),
+        });
+        
+        y -= lineHeight;
+      }
+    }
+    
+    // Add a note about buyer signature
+    y -= lineHeight * 2;
+    
+    page.drawText('SIGNATURE INFORMATION:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    // Add buyer information
+    if (formData.buyerName1) {
+      page.drawText(`Buyer Name: ${formData.buyerName1}`, {
+        x: 50,
+        y,
+        size: 11,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+    }
+    
+    if (formData.buyerName2) {
+      page.drawText(`Buyer 2 Name: ${formData.buyerName2}`, {
+        x: 50,
+        y,
+        size: 11,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+    }
+    
+    if (formData.buyerSignatureDate1) {
+      page.drawText(`Date: ${formData.buyerSignatureDate1}`, {
+        x: 50,
+        y,
+        size: 11,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+    }
+    
+    // Add a note about the attachment
+    y -= lineHeight * 2;
+    
+    page.drawText('Note: This is an attachment to the California Agency Disclosure Form (BRBC). The information', {
+      x: 50,
+      y,
+      size: 10,
       font: helveticaFont,
       color: rgb(0, 0, 0),
     });
     
-    // Draw buyer name
-    if (formData.buyerName1) {
-      firstPage.drawText(formData.buyerName1, {
-        x: 290,
-        y: 464,
-        size: 10,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-    }
+    y -= lineHeight;
     
-    // Draw buyer signature date
-    if (formData.buyerSignatureDate1) {
-      firstPage.drawText(formData.buyerSignatureDate1, {
-        x: 728,
-        y: 464,
-        size: 10,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-    }
+    page.drawText('provided here supplements the main form and should be kept together with it.', {
+      x: 50,
+      y,
+      size: 10,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
     
-    // Draw property address information (optional)
-    if (formData.propertyAddress) {
-      // This would be drawn as annotation at proper coordinates
-      // These are just examples - you'll need to adjust coordinates
-      const addressText = [
-        formData.propertyAddress,
-        [
-          formData.propertyCity || '',
-          formData.propertyState || '',
-          formData.propertyZip || '',
-        ].filter(Boolean).join(', '),
-      ].filter(Boolean).join('\n');
-      
-      // We'll add this as an annotation on the side of the document
-      firstPage.drawText('Property:', {
-        x: 520,
-        y: 720,
-        size: 8,
-        font: helveticaBold,
-        color: rgb(0.3, 0.3, 0.3),
-      });
-      
-      firstPage.drawText(addressText, {
-        x: 520,
-        y: 710,
-        size: 8,
-        font: helveticaFont,
-        color: rgb(0.3, 0.3, 0.3),
-      });
-    }
-    
-    // Add agent information as an annotation
-    if (formData.agentName) {
-      // Agent data annotation
-      const agentText = [
-        `Agent: ${formData.agentName}`,
-        `Brokerage: ${formData.agentBrokerageName || 'Coldwell Banker Grass Roots Realty'}`,
-        `License: ${formData.agentLicenseNumber || '2244751'}`,
-      ].join('\n');
-      
-      firstPage.drawText(agentText, {
-        x: 520,
-        y: 680,
-        size: 8,
-        font: helveticaFont,
-        color: rgb(0.3, 0.3, 0.3),
-      });
-    }
-    
-    // Serialize the PDFDocument to bytes
-    const pdfBytes = await newPdfDoc.save();
+    // Save the modified document
+    const pdfBytes = await pdfDoc.save();
     
     // Return as Buffer
     return Buffer.from(pdfBytes);
@@ -190,79 +270,128 @@ export async function addSignatureToPdf(
   signatureDataUrl: string, 
   signatureType: 'buyer1' | 'buyer2' | 'agent' | 'seller1' | 'seller2'
 ): Promise<Buffer> {
-  // Load the PDF
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
-  
-  // Get the first page (assuming signature is on first page)
-  const pages = pdfDoc.getPages();
-  const firstPage = pages[0];
-  
-  // Convert data URL to image bytes
-  const signatureBase64 = signatureDataUrl.split(',')[1];
-  const signatureBytes = Buffer.from(signatureBase64, 'base64');
-  
-  // Embed the PNG image
-  const signatureImage = await pdfDoc.embedPng(signatureBytes);
-  
-  // Get the dimensions of the signature
-  const imgWidth = signatureImage.width;
-  const imgHeight = signatureImage.height;
-  
-  // Scale down if needed
-  const maxWidth = 150;
-  const maxHeight = 50;
-  let width = imgWidth;
-  let height = imgHeight;
-  
-  if (width > maxWidth) {
-    const scaleFactor = maxWidth / width;
-    width = maxWidth;
-    height = height * scaleFactor;
+  try {
+    // Load the PDF
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    
+    // Get the last page - that's where we'll add signatures
+    // Because we're assuming the last page is our custom attachment page
+    const pages = pdfDoc.getPages();
+    const signaturePage = pages[pages.length - 1];
+    
+    // Convert data URL to image bytes
+    const signatureBase64 = signatureDataUrl.split(',')[1];
+    const signatureBytes = Buffer.from(signatureBase64, 'base64');
+    
+    // Embed the PNG image
+    const signatureImage = await pdfDoc.embedPng(signatureBytes);
+    
+    // Get the dimensions of the signature
+    const imgWidth = signatureImage.width;
+    const imgHeight = signatureImage.height;
+    
+    // Scale down if needed
+    const maxWidth = 150;
+    const maxHeight = 50;
+    let width = imgWidth;
+    let height = imgHeight;
+    
+    if (width > maxWidth) {
+      const scaleFactor = maxWidth / width;
+      width = maxWidth;
+      height = height * scaleFactor;
+    }
+    
+    if (height > maxHeight) {
+      const scaleFactor = maxHeight / height;
+      height = maxHeight;
+      width = width * scaleFactor;
+    }
+    
+    // Define signature positions for our attachment page
+    let x = 250;
+    let y = 0;
+    
+    switch (signatureType) {
+      case 'buyer1':
+        // Positioning for the custom last page
+        y = 430; // Position for first buyer signature
+        signaturePage.drawText('Buyer 1 Signature:', {
+          x: 50,
+          y: y + 15,
+          size: 11,
+          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+          color: rgb(0, 0, 0),
+        });
+        break;
+      case 'buyer2':
+        y = 380; // Position for second buyer signature
+        signaturePage.drawText('Buyer 2 Signature:', {
+          x: 50,
+          y: y + 15,
+          size: 11,
+          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+          color: rgb(0, 0, 0),
+        });
+        break;
+      case 'seller1':
+        y = 330; // Position for first seller signature
+        signaturePage.drawText('Seller 1 Signature:', {
+          x: 50,
+          y: y + 15,
+          size: 11,
+          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+          color: rgb(0, 0, 0),
+        });
+        break;
+      case 'seller2':
+        y = 280; // Position for second seller signature
+        signaturePage.drawText('Seller 2 Signature:', {
+          x: 50,
+          y: y + 15,
+          size: 11,
+          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+          color: rgb(0, 0, 0),
+        });
+        break;
+      case 'agent':
+        y = 230; // Position for agent signature
+        signaturePage.drawText('Agent Signature:', {
+          x: 50,
+          y: y + 15,
+          size: 11,
+          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
+          color: rgb(0, 0, 0),
+        });
+        break;
+    }
+    
+    // Draw the signature on the page
+    signaturePage.drawImage(signatureImage, {
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+    });
+    
+    // Add date stamp next to signature
+    const today = new Date();
+    const formattedDate = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+    
+    signaturePage.drawText(`Date: ${formattedDate}`, {
+      x: x + width + 20, // Position to the right of signature
+      y: y + height / 2 - 5, // Center aligned with signature
+      size: 10,
+      font: await pdfDoc.embedFont(StandardFonts.Helvetica),
+      color: rgb(0, 0, 0),
+    });
+    
+    // Save the modified PDF
+    const modifiedPdfBytes = await pdfDoc.save();
+    
+    return Buffer.from(modifiedPdfBytes);
+  } catch (error) {
+    console.error('Error adding signature to PDF:', error);
+    throw new Error('Failed to add signature to the document');
   }
-  
-  if (height > maxHeight) {
-    const scaleFactor = maxHeight / height;
-    height = maxHeight;
-    width = width * scaleFactor;
-  }
-  
-  // Define signature positions based on type for the California Agency Disclosure Form
-  let x = 0;
-  let y = 0;
-  
-  switch (signatureType) {
-    case 'buyer1':
-      x = 220; // Position for buyer signature
-      y = 464;
-      break;
-    case 'buyer2':
-      x = 220;
-      y = 444; // Second buyer signature position
-      break;
-    case 'seller1':
-      x = 220;
-      y = 424; // Seller signature position
-      break;
-    case 'seller2':
-      x = 220;
-      y = 404; // Second seller signature position
-      break;
-    case 'agent':
-      x = 220;
-      y = 380; // Agent signature position
-      break;
-  }
-  
-  // Draw the signature on the page
-  firstPage.drawImage(signatureImage, {
-    x: x,
-    y: y,
-    width: width,
-    height: height,
-  });
-  
-  // Save the modified PDF
-  const modifiedPdfBytes = await pdfDoc.save();
-  
-  return Buffer.from(modifiedPdfBytes);
 }
