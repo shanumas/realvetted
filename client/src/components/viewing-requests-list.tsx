@@ -98,7 +98,10 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
         title: "Viewing request updated",
         description: "The viewing request status has been updated successfully.",
       });
+      // Invalidate the viewing requests
       queryClient.invalidateQueries({ queryKey: [endpoint] });
+      // Also invalidate the auth user query to ensure we're still logged in
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     },
     onError: (error) => {
       toast({

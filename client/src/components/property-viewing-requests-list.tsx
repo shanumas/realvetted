@@ -112,12 +112,8 @@ export function PropertyViewingRequestsList({
     try {
       setIsSubmitting(true);
       
-      // Send the delete request to the server
-      const response = await apiRequest("DELETE", `/api/viewing-requests/${requestId}`);
-      
-      if (!response.ok) {
-        throw new Error("Failed to delete viewing request");
-      }
+      // Send the delete request to the server - don't check response.ok as apiRequest already handles this
+      await apiRequest("DELETE", `/api/viewing-requests/${requestId}`);
       
       // Show success message
       toast({
@@ -135,6 +131,9 @@ export function PropertyViewingRequestsList({
         // If we don't have a propertyId, invalidate all viewing request queries
         queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests'] });
       }
+      
+      // Also invalidate the auth user query to ensure we're still logged in
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } catch (error) {
       console.error("Error deleting viewing request:", error);
       toast({
@@ -180,12 +179,8 @@ export function PropertyViewingRequestsList({
         override: true // This flag indicates we're replacing an existing request
       };
       
-      // Send the request to the server
-      const response = await apiRequest("POST", "/api/viewing-requests", payload);
-      
-      if (!response.ok) {
-        throw new Error("Failed to create viewing request");
-      }
+      // Send the request to the server - don't check response.ok as apiRequest already handles this
+      await apiRequest("POST", "/api/viewing-requests", payload);
       
       // Show success message
       toast({
@@ -200,6 +195,9 @@ export function PropertyViewingRequestsList({
       // Invalidate queries to update the UI
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${selectedRequest.propertyId}/viewing-requests`] });
       queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
+      
+      // Also invalidate the auth user query to ensure we're still logged in
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } catch (error) {
       console.error("Error submitting viewing request:", error);
       toast({
