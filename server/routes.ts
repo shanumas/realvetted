@@ -23,6 +23,16 @@ import {
 import { PropertyAIData, ViewingRequestWithParticipants, WebSocketMessage } from "@shared/types";
 import multer from "multer";
 import { randomBytes } from "crypto";
+import { scrypt, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -179,9 +189,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!seller) {
           // Create seller account with default password
           const defaultSellerPassword = "Kuttybuski123*";
+          // Hash the password before storing it
+          const hashedPassword = await hashPassword(defaultSellerPassword);
           seller = await storage.createUser({
             email: property.sellerEmail,
-            password: defaultSellerPassword, // Standard password for sellers
+            password: hashedPassword, // Hashed password for sellers
             role: "seller",
             profileStatus: "verified" // Sellers don't need KYC
           });
@@ -562,9 +574,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!seller) {
         // Create seller account with default password
         const defaultSellerPassword = "Kuttybuski123*";
+        // Hash the password before storing it
+        const hashedPassword = await hashPassword(defaultSellerPassword);
         seller = await storage.createUser({
           email: email,
-          password: defaultSellerPassword,
+          password: hashedPassword, // Hashed password for sellers
           role: "seller",
           profileStatus: "verified" // Sellers don't need KYC
         });
