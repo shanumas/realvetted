@@ -12,7 +12,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { ViewingRequestWithParticipants } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { ChatWindow } from "./chat/chat-window";
-import { BuyerRepresentationAgreement } from "./buyer-representation-agreement";
+import { AgencyDisclosureForm } from "./agency-disclosure-form";
 
 type ViewingRequestsListProps = {
   userId: number;
@@ -309,7 +309,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </Button>
                           )}
                           
-                          {/* For agents: always show Buyer Representation Form button */}
+                          {/* For agents: always show Agency Disclosure Form button */}
                           {role === 'agent' && (
                             <Button 
                               variant="outline"
@@ -324,7 +324,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                               className="bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
                             >
                               <FileSignature className="h-4 w-4 mr-1" />
-                              Buyer Representation Form
+                              Agency Disclosure Form
                             </Button>
                           )}
                         </div>
@@ -359,7 +359,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
         </Dialog>
       )}
       
-      {/* Buyer Representation Agreement Modal */}
+      {/* Agency Disclosure Form Modal */}
       {console.log("Modal conditions:", {
         showAgreementModal,
         selectedRequest,
@@ -368,7 +368,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
       })}
       
       {showAgreementModal && selectedRequest && selectedRequest.property && selectedRequest.agent ? (
-        <BuyerRepresentationAgreement
+        <AgencyDisclosureForm
           property={selectedRequest.property}
           agent={selectedRequest.agent}
           isOpen={showAgreementModal}
@@ -376,7 +376,6 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
             setShowAgreementModal(false);
             setSelectedRequest(null);
           }}
-          autoGenerate={true} // Auto-generate agreement for viewing requests
           viewingRequestId={selectedRequest.id} // Pass the viewing request ID
         />
       ) : showAgreementModal ? (

@@ -43,128 +43,139 @@ export interface AgencyDisclosureFormData {
  * @returns The filled PDF as a Buffer
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
-  // Path to the template PDF
-  const templatePath = path.join(process.cwd(), 'uploads/pdf/agency_disclosure_template.pdf');
-  
-  // Read the template file
-  const templateBytes = fs.readFileSync(templatePath);
-  
-  // Load the PDF document
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  
-  // Get the form
-  const form = pdfDoc.getForm();
-  
-  // Fill in the form fields
   try {
-    // Property address
-    if (formData.propertyAddress) {
-      const propertyAddressField = form.getTextField('propertyAddress');
-      propertyAddressField.setText(formData.propertyAddress);
+    // Path to the new template PDF - using brbc.pdf from assets folder
+    const templatePath = path.join(process.cwd(), 'assets/brbc.pdf');
+    
+    // Check if the file exists
+    if (!fs.existsSync(templatePath)) {
+      console.error('California Agency Disclosure form template not found at:', templatePath);
+      throw new Error('Form template not found');
     }
     
-    if (formData.propertyCity || formData.propertyState || formData.propertyZip) {
-      const cityStateZipField = form.getTextField('propertyCity');
-      const cityStateZip = [
-        formData.propertyCity || '',
-        formData.propertyState || '',
-        formData.propertyZip || ''
-      ].filter(Boolean).join(', ');
-      cityStateZipField.setText(cityStateZip);
+    // Read the template file
+    const templateBytes = fs.readFileSync(templatePath);
+    
+    // Load the PDF document
+    const pdfDoc = await PDFDocument.load(templateBytes);
+    
+    // Create a new PDF document with just the first two pages from the original
+    const newPdfDoc = await PDFDocument.create();
+    const [page1, page2] = await newPdfDoc.copyPages(pdfDoc, [0, 1]);
+    newPdfDoc.addPage(page1);
+    newPdfDoc.addPage(page2);
+    
+    // We'll draw directly on the PDF with overlay text since the form doesn't have 
+    // fillable fields or they might have different names than we expect
+    
+    // Get pages to write on
+    const pages = newPdfDoc.getPages();
+    const firstPage = pages[0];
+    
+    // Use a standard font
+    const helveticaFont = await newPdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await newPdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Draw leasehold checkbox (if applicable)
+    if (formData.isLeasehold) {
+      firstPage.drawText('✓', {
+        x: 148,
+        y: 767,
+        size: 14,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
     }
     
-    // Buyer names
+    // Draw buyer checkbox
+    firstPage.drawText('✓', {
+      x: 144,
+      y: 464,
+      size: 14,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Draw buyer name
     if (formData.buyerName1) {
-      const buyerName1Field = form.getTextField('buyerName1');
-      buyerName1Field.setText(formData.buyerName1);
+      firstPage.drawText(formData.buyerName1, {
+        x: 290,
+        y: 464,
+        size: 10,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
     }
     
-    if (formData.buyerName2) {
-      const buyerName2Field = form.getTextField('buyerName2');
-      buyerName2Field.setText(formData.buyerName2);
-    }
-    
-    // Buyer signature dates
+    // Draw buyer signature date
     if (formData.buyerSignatureDate1) {
-      const date1Field = form.getTextField('buyerDate1');
-      date1Field.setText(formData.buyerSignatureDate1);
+      firstPage.drawText(formData.buyerSignatureDate1, {
+        x: 728,
+        y: 464,
+        size: 10,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
     }
     
-    if (formData.buyerSignatureDate2) {
-      const date2Field = form.getTextField('buyerDate2');
-      date2Field.setText(formData.buyerSignatureDate2);
-    }
-    
-    // Seller names
-    if (formData.sellerName1) {
-      const sellerName1Field = form.getTextField('sellerName1');
-      sellerName1Field.setText(formData.sellerName1);
-    }
-    
-    if (formData.sellerName2) {
-      const sellerName2Field = form.getTextField('sellerName2');
-      sellerName2Field.setText(formData.sellerName2);
-    }
-    
-    // Seller signature dates
-    if (formData.sellerSignatureDate1) {
-      const date1Field = form.getTextField('sellerDate1');
-      date1Field.setText(formData.sellerSignatureDate1);
-    }
-    
-    if (formData.sellerSignatureDate2) {
-      const date2Field = form.getTextField('sellerDate2');
-      date2Field.setText(formData.sellerSignatureDate2);
-    }
-    
-    // Agent information
-    if (formData.agentName) {
-      const agentNameField = form.getTextField('agentName');
-      agentNameField.setText(formData.agentName);
-    }
-    
-    if (formData.agentBrokerageName) {
-      const brokerageField = form.getTextField('brokerageName');
-      brokerageField.setText(formData.agentBrokerageName);
-    }
-    
-    if (formData.agentLicenseNumber) {
-      const licenseField = form.getTextField('licenseNumber');
-      licenseField.setText(formData.agentLicenseNumber);
-    }
-    
-    if (formData.agentSignatureDate) {
-      const dateField = form.getTextField('agentDate');
-      dateField.setText(formData.agentSignatureDate);
-    }
-    
-    // Handle checkboxes for leasehold
-    if (formData.isLeasehold !== undefined) {
-      const yesBox = form.getCheckBox('leaseholdYes');
-      const noBox = form.getCheckBox('leaseholdNo');
+    // Draw property address information (optional)
+    if (formData.propertyAddress) {
+      // This would be drawn as annotation at proper coordinates
+      // These are just examples - you'll need to adjust coordinates
+      const addressText = [
+        formData.propertyAddress,
+        [
+          formData.propertyCity || '',
+          formData.propertyState || '',
+          formData.propertyZip || '',
+        ].filter(Boolean).join(', '),
+      ].filter(Boolean).join('\n');
       
-      if (formData.isLeasehold) {
-        yesBox.check();
-        noBox.uncheck();
-      } else {
-        yesBox.uncheck();
-        noBox.check();
-      }
+      // We'll add this as an annotation on the side of the document
+      firstPage.drawText('Property:', {
+        x: 520,
+        y: 720,
+        size: 8,
+        font: helveticaBold,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+      
+      firstPage.drawText(addressText, {
+        x: 520,
+        y: 710,
+        size: 8,
+        font: helveticaFont,
+        color: rgb(0.3, 0.3, 0.3),
+      });
     }
     
-    // Flatten the form (optional)
-    form.flatten();
+    // Add agent information as an annotation
+    if (formData.agentName) {
+      // Agent data annotation
+      const agentText = [
+        `Agent: ${formData.agentName}`,
+        `Brokerage: ${formData.agentBrokerageName || 'Coldwell Banker Grass Roots Realty'}`,
+        `License: ${formData.agentLicenseNumber || '2244751'}`,
+      ].join('\n');
+      
+      firstPage.drawText(agentText, {
+        x: 520,
+        y: 680,
+        size: 8,
+        font: helveticaFont,
+        color: rgb(0.3, 0.3, 0.3),
+      });
+    }
     
+    // Serialize the PDFDocument to bytes
+    const pdfBytes = await newPdfDoc.save();
+    
+    // Return as Buffer
+    return Buffer.from(pdfBytes);
   } catch (error) {
-    console.error('Error filling form: ', error);
-    throw new Error('Failed to fill out the PDF form');
+    console.error('Error filling Agency Disclosure form: ', error);
+    throw new Error('Failed to fill out the Agency Disclosure form');
   }
-  
-  // Serialize the PDFDocument to bytes
-  const pdfBytes = await pdfDoc.save();
-  
-  // Return as Buffer
-  return Buffer.from(pdfBytes);
 }
 
 /**
@@ -215,30 +226,30 @@ export async function addSignatureToPdf(
     width = width * scaleFactor;
   }
   
-  // Define signature positions based on type
+  // Define signature positions based on type for the California Agency Disclosure Form
   let x = 0;
   let y = 0;
   
   switch (signatureType) {
     case 'buyer1':
-      x = 150;
-      y = 400;
+      x = 220; // Position for buyer signature
+      y = 464;
       break;
     case 'buyer2':
-      x = 150;
-      y = 360;
+      x = 220;
+      y = 444; // Second buyer signature position
       break;
     case 'seller1':
-      x = 150;
-      y = 300;
+      x = 220;
+      y = 424; // Seller signature position
       break;
     case 'seller2':
-      x = 150;
-      y = 260;
+      x = 220;
+      y = 404; // Second seller signature position
       break;
     case 'agent':
-      x = 150;
-      y = 200;
+      x = 220;
+      y = 380; // Agent signature position
       break;
   }
   

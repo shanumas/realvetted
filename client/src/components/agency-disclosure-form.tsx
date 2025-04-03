@@ -1,262 +1,359 @@
-import React, { useState, useRef } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check, FileText } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { Property, User } from "@shared/schema";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Loader2, FileText, Download, Check } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 
 interface AgencyDisclosureFormProps {
-  propertyId: number;
-  propertyAddress: string;
-  propertyCity: string;
-  propertyState: string;
-  propertyZip: string;
-  buyerName: string;
-  agentName: string;
-  onComplete: () => void;
-  onCancel: () => void;
+  property?: Property;
+  agent?: User;
+  isOpen: boolean;
+  onClose: () => void;
+  viewingRequestId?: number;
 }
 
-export function AgencyDisclosureForm({
-  propertyId,
-  propertyAddress,
-  propertyCity,
-  propertyState,
-  propertyZip,
-  buyerName,
-  agentName,
-  onComplete,
-  onCancel
+export function AgencyDisclosureForm({ 
+  property, 
+  agent, 
+  isOpen, 
+  onClose,
+  viewingRequestId
 }: AgencyDisclosureFormProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [disclosureAccepted, setDisclosureAccepted] = useState(false);
-  const [showSignature, setShowSignature] = useState(false);
-  const [signatureSaved, setSignatureSaved] = useState(false);
-  
-  const signatureRef = useRef<SignatureCanvas>(null);
+  const { user } = useAuth();
   const { toast } = useToast();
-  
+  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [buyerSignature, setBuyerSignature] = useState<string>('');
+  const [buyerSignatureDate, setBuyerSignatureDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [isLeasehold, setIsLeasehold] = useState<boolean>(false);
+  const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
+
+  // Show an error message if property or agent is missing
+  if (!property || !agent) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error Opening Form</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="text-red-500">
+              {!property && !agent && "Missing property and agent data."}
+              {!property && agent && "Missing property data."}
+              {property && !agent && "Missing agent data."}
+            </div>
+            <p>This could be because the viewing request doesn't have complete data.</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Form data to be sent to the server
+  const formData = {
+    // Buyer information
+    buyerName1: user?.firstName && user?.lastName ? `${user?.firstName} ${user?.lastName}` : user?.email || '',
+    buyerSignature1: buyerSignature,
+    buyerSignatureDate1: buyerSignatureDate,
+    
+    // Property information
+    propertyAddress: property.address,
+    propertyCity: property.city || '',
+    propertyState: property.state || '',
+    propertyZip: property.zip || '',
+    
+    // Agent information
+    agentName: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
+    agentBrokerageName: "Coldwell Banker Grass Roots Realty",
+    agentLicenseNumber: "2244751",
+    
+    // Is this a leasehold exceeding one year?
+    isLeasehold: isLeasehold,
+  };
+
   const clearSignature = () => {
-    if (signatureRef.current) {
-      signatureRef.current.clear();
-      setSignatureSaved(false);
+    if (sigPad) {
+      sigPad.clear();
+      setBuyerSignature('');
     }
   };
-  
-  const saveSignature = async () => {
-    if (signatureRef.current?.isEmpty()) {
+
+  const handleSignEnd = () => {
+    if (sigPad) {
+      const signatureData = sigPad.toDataURL();
+      setBuyerSignature(signatureData);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!buyerSignature) {
       toast({
-        title: "Signature required",
-        description: "Please sign the form before submitting.",
+        title: "Signature Required",
+        description: "Please sign the form before saving",
         variant: "destructive",
       });
       return;
     }
-    
-    setIsLoading(true);
-    
+
+    setLoading(true);
     try {
-      const signatureDataUrl = signatureRef.current?.toDataURL('image/png');
-      
-      const res = await apiRequest("POST", `/api/properties/${propertyId}/agreements`, {
-        type: "agency_disclosure",
-        signatureData: signatureDataUrl,
-        details: {
-          propertyAddress,
-          propertyCity,
-          propertyState,
-          propertyZip,
-          buyerName,
-          agentName,
+      // Submit the form data to generate the PDF
+      const response = await apiRequest(
+        'POST', 
+        `/api/properties/${property.id}/generate-agency-disclosure`, 
+        {
+          ...formData,
+          viewingRequestId
         }
-      });
+      );
       
-      const data = await res.json();
+      const result = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.error || "Failed to save signature");
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate and save the agency disclosure form");
       }
       
-      setSignatureSaved(true);
-      
       toast({
-        title: "Disclosure form signed",
-        description: "Your signature has been saved.",
-        variant: "default",
+        title: "Form Submitted",
+        description: "Agency Disclosure Form has been successfully generated and saved.",
       });
       
-      queryClient.invalidateQueries({ queryKey: ['/api/agreements'] });
+      // Invalidate queries to refresh data
+      if (viewingRequestId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/agent'] });
+      }
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property.id}`] });
       
-      // Trigger the onComplete callback which will submit the viewing request
-      onComplete();
+      onClose();
     } catch (error) {
+      console.error("Error saving agency disclosure form:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "An error occurred",
+        description: error instanceof Error ? error.message : "Failed to save the form. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-  
+
+  const handleDownload = async () => {
+    try {
+      // Create a temporary form with the data
+      const response = await apiRequest(
+        'POST', 
+        `/api/properties/${property.id}/preview-agency-disclosure`, 
+        formData
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate preview");
+      }
+      
+      // Get the PDF as a blob
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Error downloading preview:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to download preview",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      {!showSignature ? (
-        <>
-          <div className="max-h-[400px] overflow-y-auto border rounded-md p-4 bg-gray-50">
-            <h3 className="font-bold text-lg text-center mb-4">DISCLOSURE REGARDING REAL ESTATE AGENCY RELATIONSHIPS</h3>
-            <p className="text-sm mb-4">
-              As required by the California Civil Code, before you enter into a contract regarding a property transaction,
-              you must read and acknowledge receipt of this disclosure.
-            </p>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            Agency Disclosure Form
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="isLeasehold" 
+                checked={isLeasehold} 
+                onCheckedChange={(checked) => {
+                  setIsLeasehold(!!checked);
+                }}
+              />
+              <Label htmlFor="isLeasehold" className="cursor-pointer">
+                This is for a leasehold interest exceeding one year
+              </Label>
+            </div>
             
-            <h4 className="font-bold text-md mb-2">SELLER'S AGENT</h4>
-            <p className="text-sm mb-4">
-              A Seller's agent under a listing agreement with the Seller acts as the agent for the Seller only. A Seller's agent or a subagent of that agent has the following affirmative obligations:
-            </p>
-            <p className="text-sm mb-4 pl-4">
-              <strong>To the Seller:</strong><br />
-              • A fiduciary duty of utmost care, integrity, honesty, and loyalty in dealings with the Seller.<br />
-              <strong>To the Buyer and the Seller:</strong><br />
-              • Diligent exercise of reasonable skill and care in performance of the agent's duties.<br />
-              • A duty of honest and fair dealing and good faith.<br />
-              • A duty to disclose all facts known to the agent materially affecting the value or desirability of the property that are not known to, or within the diligent attention and observation of, the parties.
-            </p>
-            
-            <h4 className="font-bold text-md mb-2">BUYER'S AGENT</h4>
-            <p className="text-sm mb-4">
-              A selling agent can, with a Buyer's consent, agree to act as agent for the Buyer only. In these situations, the agent is not the Seller's agent, even if by agreement the agent may receive compensation for services rendered, either in full or in part from the Seller. An agent acting only for a Buyer has the following affirmative obligations:
-            </p>
-            <p className="text-sm mb-4 pl-4">
-              <strong>To the Buyer:</strong><br />
-              • A fiduciary duty of utmost care, integrity, honesty, and loyalty in dealings with the Buyer.<br />
-              <strong>To the Buyer and the Seller:</strong><br />
-              • Diligent exercise of reasonable skill and care in performance of the agent's duties.<br />
-              • A duty of honest and fair dealing and good faith.<br />
-              • A duty to disclose all facts known to the agent materially affecting the value or desirability of the property that are not known to, or within the diligent attention and observation of, the parties.
-            </p>
-            
-            <h4 className="font-bold text-md mb-2">AGENT REPRESENTING BOTH SELLER AND BUYER</h4>
-            <p className="text-sm mb-4">
-              A real estate agent, either acting directly or through one or more associate licensees, can legally be the agent of both the Seller and the Buyer in a transaction, but only with the knowledge and consent of both the Seller and the Buyer. In a dual agency situation, the agent has the following affirmative obligations to both the Seller and the Buyer:
-            </p>
-            <p className="text-sm mb-4 pl-4">
-              • A fiduciary duty of utmost care, integrity, honesty and loyalty in the dealings with either the Seller or the Buyer.<br />
-              • Other duties to the Seller and the Buyer as stated above in their respective sections.
-            </p>
-            <p className="text-sm mb-4">
-              In representing both Seller and Buyer, the agent may not, without the express permission of the respective party, disclose to the other party that the Seller will accept a price less than the listing price or that the Buyer will pay a price greater than the price offered.
-            </p>
-            
-            <p className="text-sm mb-4">
-              The above duties of the agent in a real estate transaction do not relieve a Seller or Buyer from the responsibility to protect his or her own interests. You should carefully read all agreements to assure that they adequately express your understanding of the transaction. A real estate agent is a person qualified to advise about real estate. If legal or tax advice is desired, consult a competent professional.
-            </p>
-            
-            <p className="text-sm mb-4">
-              Throughout your real property transaction you may receive more than one disclosure form, depending upon the number of agents assisting in the transaction. The law requires each agent with whom you have more than a casual relationship to present you with this disclosure form. You should read its contents each time it is presented to you, considering the relationship between you and the real estate agent in your specific transaction.
-            </p>
-            
-            <p className="text-sm mb-4">
-              This disclosure form includes the provisions of Sections 2079.13 to 2079.24, inclusive, of the Civil Code set forth on the reverse hereof. Read it carefully.
-            </p>
-            
-            <div className="border-t border-gray-300 pt-4 mb-4">
-              <p className="text-sm font-bold">
-                Property Address: {propertyAddress}, {propertyCity}, {propertyState} {propertyZip}
+            <div>
+              <Label htmlFor="buyerName">Your Full Name</Label>
+              <Input
+                id="buyerName"
+                value={formData.buyerName1}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="propertyAddress">Property Address</Label>
+              <Input
+                id="propertyAddress"
+                value={formData.propertyAddress}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Label htmlFor="propertyCity">City</Label>
+                <Input
+                  id="propertyCity"
+                  value={formData.propertyCity}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+              <div>
+                <Label htmlFor="propertyState">State</Label>
+                <Input
+                  id="propertyState"
+                  value={formData.propertyState}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+              <div>
+                <Label htmlFor="propertyZip">ZIP</Label>
+                <Input
+                  id="propertyZip"
+                  value={formData.propertyZip}
+                  readOnly
+                  className="bg-gray-50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="agentInfo">Real Estate Agent</Label>
+              <Input
+                id="agentInfo"
+                value={`${formData.agentName} - License #${formData.agentLicenseNumber}`}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="brokerage">Brokerage</Label>
+              <Input
+                id="brokerage"
+                value={formData.agentBrokerageName}
+                readOnly
+                className="bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="signatureDate">Date</Label>
+              <Input
+                id="signatureDate"
+                type="date"
+                value={buyerSignatureDate}
+                onChange={(e) => setBuyerSignatureDate(e.target.value)}
+              />
+            </div>
+
+            <div className="pt-4">
+              <Label>Your Signature</Label>
+              <div className="relative border border-gray-300 rounded-md mt-1">
+                <SignatureCanvas
+                  ref={(ref) => setSigPad(ref)}
+                  canvasProps={{
+                    width: 600,
+                    height: 150,
+                    className: 'signature-canvas border rounded-md',
+                  }}
+                  onEnd={handleSignEnd}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="absolute top-2 right-2"
+                  onClick={clearSignature}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+
+            <div className="pt-4">
+              <p className="text-sm text-gray-600">
+                By signing, you acknowledge that you have received and read the California Agency Disclosure Form, 
+                which explains the different types of agency relationships in real estate transactions.
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
-              id="accept-disclosure" 
-              checked={disclosureAccepted}
-              onChange={() => setDisclosureAccepted(!disclosureAccepted)}
-              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <label htmlFor="accept-disclosure" className="text-sm text-gray-700">
-              I acknowledge receipt of a copy of this disclosure form.
-            </label>
+        </div>
+
+        <DialogFooter className="flex justify-between space-x-2">
+          <div className="flex space-x-2">
+            <Button variant="outline" type="button" onClick={handleDownload}>
+              <Download className="w-4 h-4 mr-2" />
+              Preview PDF
+            </Button>
           </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={onCancel}>
+          <div className="flex space-x-2">
+            <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              onClick={() => setShowSignature(true)} 
-              disabled={!disclosureAccepted}
-            >
-              Continue to Sign
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Sign & Submit
+                </>
+              )}
             </Button>
           </div>
-        </>
-      ) : (
-        <>
-          <div className="text-center mb-4">
-            <h3 className="font-medium text-lg">Sign Below</h3>
-            <p className="text-sm text-gray-500">
-              Use your mouse or touch screen to sign your name in the box below.
-            </p>
-          </div>
-          
-          <div className="border border-gray-300 rounded-md p-1 bg-white">
-            <SignatureCanvas
-              ref={signatureRef}
-              penColor="black"
-              canvasProps={{
-                className: "signature-canvas w-full h-32 cursor-crosshair",
-                style: { border: '1px solid #e5e7eb', borderRadius: '0.25rem' }
-              }}
-            />
-          </div>
-          
-          <div className="flex justify-between">
-            <Button 
-              variant="outline" 
-              onClick={clearSignature}
-              type="button"
-            >
-              Clear
-            </Button>
-            
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSignature(false)}
-                type="button"
-              >
-                Back
-              </Button>
-              
-              <Button 
-                onClick={saveSignature}
-                disabled={isLoading || signatureSaved}
-                type="button"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
-                  </>
-                ) : signatureSaved ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Signed
-                  </>
-                ) : (
-                  <>
-                    <FileText className="mr-2 h-4 w-4" />
-                    Sign & Submit
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

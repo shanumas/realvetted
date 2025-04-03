@@ -1735,7 +1735,184 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   
   // Agency Disclosure Form endpoints
   
-  // Generate and handle agency disclosure forms
+  // Route to generate a California Agency Disclosure Form (preview only)
+  app.post("/api/properties/:id/preview-agency-disclosure", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const formData = req.body;
+      
+      if (!propertyId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Property ID is required'
+        });
+      }
+      
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: 'Property not found'
+        });
+      }
+      
+      // Generate the PDF with filled form data
+      const pdfBuffer = await fillAgencyDisclosureForm(formData);
+      
+      // Set the appropriate headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+      
+      // Send the PDF directly to the client
+      res.send(pdfBuffer);
+      
+    } catch (error) {
+      console.error('Error generating agency disclosure preview:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate agency disclosure preview'
+      });
+    }
+  });
+  
+  // Route to generate and save a California Agency Disclosure Form
+  app.post("/api/properties/:id/generate-agency-disclosure", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const { 
+        buyerName1, 
+        buyerSignature1, 
+        buyerSignatureDate1, 
+        propertyAddress,
+        propertyCity,
+        propertyState,
+        propertyZip,
+        agentName,
+        agentBrokerageName,
+        agentLicenseNumber,
+        isLeasehold,
+        viewingRequestId
+      } = req.body;
+      
+      if (!propertyId || !buyerName1 || !buyerSignature1 || !buyerSignatureDate1) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required fields'
+        });
+      }
+      
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: 'Property not found'
+        });
+      }
+      
+      // Create the form data object
+      const formData = {
+        buyerName1,
+        buyerSignature1,
+        buyerSignatureDate1,
+        propertyAddress: propertyAddress || property.address,
+        propertyCity: propertyCity || property.city,
+        propertyState: propertyState || property.state,
+        propertyZip: propertyZip || property.zip,
+        agentName,
+        agentBrokerageName,
+        agentLicenseNumber,
+        isLeasehold: isLeasehold || false
+      };
+      
+      // Generate the PDF with filled form data
+      let pdfBuffer = await fillAgencyDisclosureForm(formData);
+      
+      // Add the buyer signature to the PDF if provided
+      if (buyerSignature1) {
+        pdfBuffer = await addSignatureToPdf(pdfBuffer, buyerSignature1, 'buyer1');
+      }
+      
+      // Save to disk
+      const uniqueId = Date.now();
+      const filename = `agency_disclosure_${propertyId}_${uniqueId}.pdf`;
+      const filePath = path.join(process.cwd(), 'uploads', 'agreements', filename);
+      
+      // Ensure the directory exists
+      await fs.promises.mkdir(path.join(process.cwd(), 'uploads', 'agreements'), { recursive: true });
+      
+      // Write the file
+      await fs.promises.writeFile(filePath, pdfBuffer);
+      
+      // Create an agreement record
+      const buyerId = req.user?.id;
+      
+      if (!buyerId) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated'
+        });
+      }
+      
+      // Get the agent ID if a viewing request ID is provided
+      let agentId = null;
+      if (viewingRequestId) {
+        const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
+        if (viewingRequest) {
+          agentId = viewingRequest.buyerAgentId;
+        }
+      }
+      
+      const agreement = await storage.createAgreement({
+        propertyId,
+        type: 'agency_disclosure',
+        agreementText: `California Agency Disclosure Form for property ${property.address}`,
+        buyerId,
+        agentId,
+        date: new Date(),
+        documentUrl: `/uploads/agreements/${filename}`,
+        status: 'completed'
+      });
+      
+      // If this is associated with a viewing request, update its status
+      if (viewingRequestId) {
+        const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
+        if (viewingRequest) {
+          await storage.updateViewingRequest(viewingRequest.id, {
+            status: 'completed'
+          });
+          
+          // Create activity log
+          await storage.createPropertyActivityLog({
+            propertyId,
+            userId: buyerId,
+            activity: 'agency_disclosure_signed',
+            details: {
+              viewingRequestId,
+              agreementId: agreement.id,
+              agreementType: 'agency_disclosure'
+            },
+            timestamp: new Date()
+          });
+        }
+      }
+      
+      res.json({
+        success: true,
+        data: agreement
+      });
+      
+    } catch (error) {
+      console.error('Error generating agency disclosure form:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to generate agency disclosure form'
+      });
+    }
+  });
+  
+  // Generate and handle agency disclosure forms (original endpoint)
   app.post("/api/properties/:id/agency-disclosure", isAuthenticated, async (req, res) => {
     try {
       const propertyId = parseInt(req.params.id);
