@@ -68,7 +68,7 @@ export function PropertyViewingRequestsList({
     console.log("Request being filtered:", request, "Status:", request.status, "Active tab:", activeTab);
     
     if (activeTab === "pending") return request.status === "pending";
-    if (activeTab === "approved") return request.status === "approved";
+    if (activeTab === "approved") return request.status === "accepted"; // Use 'accepted' status from backend
     if (activeTab === "rejected") return request.status === "rejected";
     if (activeTab === "completed") return request.status === "completed";
     return true; // Show all requests on "all" tab
@@ -78,7 +78,7 @@ export function PropertyViewingRequestsList({
   
   // Get counts for badges
   const pendingCount = validRequests.filter(req => req.status === "pending").length || 0;
-  const approvedCount = validRequests.filter(req => req.status === "approved").length || 0;
+  const approvedCount = validRequests.filter(req => req.status === "accepted").length || 0; // Use 'accepted' status from backend
   const rejectedCount = validRequests.filter(req => req.status === "rejected").length || 0;
   const completedCount = validRequests.filter(req => req.status === "completed").length || 0;
   
@@ -354,7 +354,7 @@ export function PropertyViewingRequestsList({
                           <Badge 
                             variant={
                               request.status === 'pending' ? 'outline' : 
-                              request.status === 'approved' ? 'success' :
+                              request.status === 'accepted' ? 'success' : // Use 'accepted' status from backend
                               request.status === 'rejected' ? 'destructive' : 'default'
                             }
                           >
