@@ -44,8 +44,8 @@ export interface AgencyDisclosureFormData {
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   try {
-    // Path to the new template PDF - using brbc.pdf from assets folder
-    const templatePath = path.join(process.cwd(), 'assets/brbc.pdf');
+    // Path to the new template PDF - using the decrypted version of brbc.pdf
+    const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc_decrypted.pdf');
     
     // Check if the file exists
     if (!fs.existsSync(templatePath)) {
