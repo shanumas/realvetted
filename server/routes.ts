@@ -734,7 +734,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const propertyData = await extractPropertyData(address);
       
-      res.json(propertyData);
+      res.json({
+        success: true,
+        data: propertyData
+      });
     } catch (error) {
       console.error("Property data extraction error:", error);
       res.status(500).json({
