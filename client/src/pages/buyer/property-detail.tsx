@@ -164,11 +164,33 @@ export default function BuyerPropertyDetail() {
       setActiveTab("viewings");
     },
     onError: (error: Error) => {
-      toast({
-        title: "Could not request viewing",
-        description: error.message,
-        variant: "destructive",
-      });
+      // Check if this is a duplicate viewing request error
+      if (error.message.includes("already exists")) {
+        toast({
+          title: "Viewing request already exists",
+          description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
+          variant: "warning",
+          action: (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setActiveTab("viewings")}
+              className="mt-2"
+            >
+              View My Requests
+            </Button>
+          ),
+        });
+        
+        // Automatically switch to the viewings tab
+        setActiveTab("viewings");
+      } else {
+        toast({
+          title: "Could not request viewing",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   });
   
