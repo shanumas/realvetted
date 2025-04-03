@@ -1837,6 +1837,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check if a viewing request already exists for this property and buyer
+      const existingRequests = await storage.getViewingRequestsByBuyer(req.user!.id);
+      const existingRequestForProperty = existingRequests.find(
+        request => request.propertyId === requestData.propertyId && 
+                  (request.status === "pending" || 
+                   request.status === "approved" || 
+                   request.status === "rescheduled")
+      );
+      
+      if (existingRequestForProperty) {
+        return res.status(400).json({
+          success: false,
+          error: "A viewing request for this property already exists. Please check your existing requests."
+        });
+      }
+      
       // Ensure the buyer's agent is assigned to the viewing request
       const requestDataWithAgent = { ...requestData };
       if (property.agentId) {
@@ -2085,7 +2101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Update a viewing request (accept, reject, reschedule)
-  app.put("/api/viewing-requests/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/viewing-requests/:id", isAuthenticated, async (req, res) => {
     try {
       const requestId = parseInt(req.params.id);
       const viewingRequest = await storage.getViewingRequest(requestId);

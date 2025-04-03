@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -9,8 +9,10 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2 } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ViewingRequestsList } from "@/components/viewing-requests-list";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +29,41 @@ export default function BuyerDashboard() {
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
+  // Check if there's a tab preference stored in localStorage
+  const [activeTab, setActiveTab] = useState(() => {
+    // Read from localStorage or default to properties
+    const savedTab = localStorage.getItem('buyerDashboardActiveTab');
+    // Clear the localStorage preference after reading it
+    if (savedTab) {
+      localStorage.removeItem('buyerDashboardActiveTab');
+    }
+    return savedTab || "properties";
+  });
+  
+  // Setup WebSocket for real-time updates
+  useEffect(() => {
+    // Set up WebSocket listener for property updates and viewing request changes
+    const onMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'notification' || data.type === 'property_update') {
+          // Refresh property data and viewing requests
+          queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
+        }
+      } catch (e) {
+        console.error("Error parsing WebSocket message:", e);
+      }
+    };
+
+    // Connect event listener
+    window.addEventListener('message', onMessage);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('message', onMessage);
+    };
+  }, []);
 
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
@@ -83,51 +120,80 @@ export default function BuyerDashboard() {
           </div>
         </div>
         
-        {/* Property List */}
+        {/* Main Content Tabs */}
         <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">My Properties</h3>
-            <p className="mt-1 text-sm text-gray-500">Properties you've added to track</p>
-          </div>
-          
-          {isLoading ? (
-            <div className="p-8 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="px-4 pt-4 border-b border-gray-200">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="properties">
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Properties
+                </TabsTrigger>
+                <TabsTrigger value="viewingRequests">
+                  <CalendarRange className="h-4 w-4 mr-2" />
+                  Viewing Requests
+                </TabsTrigger>
+              </TabsList>
             </div>
-          ) : properties && properties.length > 0 ? (
-            <div className="divide-y divide-gray-200">
-              {properties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property}
-                  actionButton={
-                    <div className="flex space-x-2">
-                      <Link href={`/buyer/property/${property.id}`}>
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </Link>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        onClick={() => property.agentId ? null : setPropertyToDelete(property.id)}
-                        title={property.agentId ? "Cannot delete after agent has accepted" : "Delete property"}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  }
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="px-4 sm:px-6 py-10">
-              <p className="text-center text-gray-500">
-                You haven't added any properties yet. Add your first property to get started.
-              </p>
-            </div>
-          )}
+            
+            <TabsContent value="properties" className="p-0">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">My Properties</h3>
+                <p className="mt-1 text-sm text-gray-500">Properties you've added to track</p>
+              </div>
+              
+              {isLoading ? (
+                <div className="p-8 flex justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : properties && properties.length > 0 ? (
+                <div className="divide-y divide-gray-200">
+                  {properties.map((property) => (
+                    <PropertyCard
+                      key={property.id}
+                      property={property}
+                      actionButton={
+                        <div className="flex space-x-2">
+                          <Link href={`/buyer/property/${property.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Details
+                            </Button>
+                          </Link>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onClick={() => property.agentId ? null : setPropertyToDelete(property.id)}
+                            title={property.agentId ? "Cannot delete after agent has accepted" : "Delete property"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="px-4 sm:px-6 py-10">
+                  <p className="text-center text-gray-500">
+                    You haven't added any properties yet. Add your first property to get started.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="viewingRequests" className="p-0">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">My Viewing Requests</h3>
+                <p className="mt-1 text-sm text-gray-500">Track the status of your property viewing requests</p>
+              </div>
+              {user && (
+                <div className="p-4">
+                  <ViewingRequestsList userId={user.id} role="buyer" />
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
       

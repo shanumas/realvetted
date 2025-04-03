@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Property, User } from "@shared/schema";
@@ -39,6 +39,7 @@ import {
 export default function BuyerPropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("seller");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
@@ -155,6 +156,12 @@ export default function BuyerPropertyDetail() {
       setViewingNotes("");
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
+      
+      // Navigate to buyer dashboard with viewing requests tab active
+      // Using localStorage to temporarily store the active tab preference
+      localStorage.setItem('buyerDashboardActiveTab', 'viewingRequests');
+      navigate('/buyer/dashboard');
     },
     onError: (error: Error) => {
       toast({

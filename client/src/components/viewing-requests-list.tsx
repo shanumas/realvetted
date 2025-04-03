@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, parseISO } from "date-fns";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, MessageSquare, Calendar, Clock } from "lucide-react";
+import { Loader2, MessageSquare, Calendar, Clock, AlertCircle } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { ViewingRequestWithParticipants } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +22,8 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("pending");
   const [selectedChat, setSelectedChat] = useState<{ propertyId: number; userId: number; userName: string } | null>(null);
+  const [lastUpdateMessage, setLastUpdateMessage] = useState<string | null>(null);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
   // Determine the API endpoint based on the user's role
   const endpoint = role === "agent" 
@@ -31,10 +33,50 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
       : "/api/viewing-requests";
 
   // Fetch viewing requests
-  const { data: viewingRequests, isLoading } = useQuery<ViewingRequestWithParticipants[]>({
+  const { data: viewingRequests, isLoading, refetch } = useQuery<ViewingRequestWithParticipants[]>({
     queryKey: [endpoint],
     queryFn: getQueryFn({ on401: "throw" }),
   });
+  
+  // Setup WebSocket listener for real-time updates
+  useEffect(() => {
+    const handleWebSocketMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // If it's a property_update or notification message that affects viewing requests
+        if (data.type === 'property_update' || 
+           (data.type === 'notification' && data.data && data.data.viewingRequestId)) {
+          
+          console.log("Received update for viewing requests:", data);
+          
+          // Show notification
+          if (data.data.message) {
+            setLastUpdateMessage(data.data.message);
+            setShowUpdateBanner(true);
+            
+            // Auto-hide message after 5 seconds
+            setTimeout(() => {
+              setShowUpdateBanner(false);
+            }, 5000);
+          }
+          
+          // Refresh viewing requests data
+          refetch();
+        }
+      } catch (e) {
+        console.error("Error processing WebSocket message:", e);
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('message', handleWebSocketMessage);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('message', handleWebSocketMessage);
+    };
+  }, [refetch]);
 
   // Filter requests based on active tab
   const filteredRequests = viewingRequests?.filter(request => {
@@ -95,6 +137,23 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
 
   return (
     <div className="space-y-4">
+      {/* Notification Banner */}
+      {showUpdateBanner && lastUpdateMessage && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-md flex items-center justify-between mb-2">
+          <div className="flex items-center">
+            <AlertCircle className="h-5 w-5 mr-2 text-blue-500" />
+            <span>{lastUpdateMessage}</span>
+          </div>
+          <button 
+            onClick={() => setShowUpdateBanner(false)} 
+            className="text-blue-500 hover:text-blue-700 focus:outline-none"
+          >
+            <span className="sr-only">Dismiss</span>
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+      )}
+    
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
           <TabsTrigger value="pending">
