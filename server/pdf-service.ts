@@ -57,7 +57,8 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     const templateBytes = fs.readFileSync(templatePath);
     
     // Load the PDF document - this is the original unmodified PDF
-    const pdfDoc = await PDFDocument.load(templateBytes);
+    // We need to handle encrypted PDFs by ignoring the encryption
+    const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
     
     // Get the form fields to check what's available
     const form = pdfDoc.getForm();
@@ -271,8 +272,8 @@ export async function addSignatureToPdf(
   signatureType: 'buyer1' | 'buyer2' | 'agent' | 'seller1' | 'seller2'
 ): Promise<Buffer> {
   try {
-    // Load the PDF
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    // Load the PDF - handle encryption if present
+    const pdfDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
     
     // Get the last page - that's where we'll add signatures
     // Because we're assuming the last page is our custom attachment page
