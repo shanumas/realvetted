@@ -25,8 +25,11 @@ export function PropertyViewingRequestsList({
   // Debugging output
   console.log("ViewingRequests received:", viewingRequests);
   
+  // Ensure viewingRequests is not undefined and is an array
+  const validRequests = Array.isArray(viewingRequests) ? viewingRequests : [];
+  
   // Filter requests based on active tab
-  const filteredRequests = viewingRequests?.filter(request => {
+  const filteredRequests = validRequests.filter(request => {
     if (activeTab === "pending") return request.status === "pending";
     if (activeTab === "approved") return request.status === "approved";
     if (activeTab === "rejected") return request.status === "rejected";
@@ -35,10 +38,10 @@ export function PropertyViewingRequestsList({
   });
   
   // Get counts for badges
-  const pendingCount = viewingRequests?.filter(req => req.status === "pending").length || 0;
-  const approvedCount = viewingRequests?.filter(req => req.status === "approved").length || 0;
-  const rejectedCount = viewingRequests?.filter(req => req.status === "rejected").length || 0;
-  const completedCount = viewingRequests?.filter(req => req.status === "completed").length || 0;
+  const pendingCount = validRequests.filter(req => req.status === "pending").length || 0;
+  const approvedCount = validRequests.filter(req => req.status === "approved").length || 0;
+  const rejectedCount = validRequests.filter(req => req.status === "rejected").length || 0;
+  const completedCount = validRequests.filter(req => req.status === "completed").length || 0;
 
   return (
     <div className="space-y-4">

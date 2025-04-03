@@ -369,7 +369,7 @@ export default function BuyerPropertyDetail() {
   });
   
   // Fetch viewing requests for this property
-  const { data: viewingRequests, isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
+  const { data: viewingRequests = [], isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
     queryKey: [`/api/properties/${propertyId}/viewing-requests`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!propertyId, // Only run query if propertyId is valid
@@ -802,7 +802,7 @@ export default function BuyerPropertyDetail() {
                         <div className="flex justify-center py-8">
                           <Loader2 className="h-8 w-8 animate-spin text-primary" />
                         </div>
-                      ) : viewingRequests && viewingRequests.length > 0 ? (
+                      ) : viewingRequests.length > 0 ? (
                         <PropertyViewingRequestsList 
                           viewingRequests={viewingRequests} 
                           showPropertyDetails={false}
