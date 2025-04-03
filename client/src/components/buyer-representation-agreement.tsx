@@ -124,8 +124,8 @@ function SignatureCanvas({ onChange, label }: SignatureCanvasProps) {
 }
 
 interface BuyerRepresentationAgreementProps {
-  property: Property;
-  agent: User;
+  property?: Property;
+  agent?: User;
   isOpen: boolean;
   onClose: () => void;
   draftId?: number; // Optional ID of existing draft agreement to edit
@@ -145,6 +145,31 @@ export function BuyerRepresentationAgreement({
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Show an error message if property or agent is missing
+  if (!property || !agent) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Error Opening Agreement</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="text-red-500">
+              {!property && !agent && "Missing property and agent data."}
+              {!property && agent && "Missing property data."}
+              {property && !agent && "Missing agent data."}
+            </div>
+            <p>This could be because the viewing request doesn't have complete data.</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const [agentSignature, setAgentSignature] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingDraft, setLoadingDraft] = useState(false);

@@ -30,6 +30,11 @@ export function ProtectedRoute({
           return <Redirect to="/auth" />;
         }
 
+        // Special case: Allow agents to access buyer property pages
+        if (path.startsWith('/buyer/property/') && user.role === 'agent') {
+          return <Component />;
+        }
+        
         if (!allowedRoles.includes(user.role)) {
           // Redirect to the appropriate dashboard based on role
           if (user.role === "buyer") {

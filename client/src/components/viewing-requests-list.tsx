@@ -262,7 +262,8 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </Button>
                           )}
                           
-                          <Link href={`/${role}/property/${property.id}`}>
+                          {/* Use the buyer route for property view if agent, since agent route isn't set up */}
+                          <Link href={role === 'agent' ? `/buyer/property/${property.id}` : `/${role}/property/${property.id}`}>
                             <Button variant="outline" size="sm">
                               View Property
                             </Button>

@@ -2206,19 +2206,23 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.get("/api/viewing-requests/agent", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
       const viewingRequests = await storage.getViewingRequestsByAgent(req.user!.id);
+      const agent = await storage.getUser(req.user!.id);
       
       // For each viewing request, get the full property and buyer details
       const enhancedRequests = await Promise.all(viewingRequests.map(async (request) => {
         const property = await storage.getProperty(request.propertyId);
         const buyer = request.buyerId ? await storage.getUser(request.buyerId) : undefined;
         
+        // Include the agent information to fix the missing agent data issue
         return {
           ...request,
           property,
-          buyer
+          buyer,
+          agent
         };
       }));
       
+      console.log("Enhanced agent viewing requests:", JSON.stringify(enhancedRequests, null, 2).substring(0, 500) + "...");
       res.json(enhancedRequests);
     } catch (error) {
       console.error("Get agent viewing requests error:", error);
