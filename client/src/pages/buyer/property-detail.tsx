@@ -131,17 +131,10 @@ export default function BuyerPropertyDetail() {
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
     mutationFn: async (data: { date: string, time: string, endTime: string, notes: string }) => {
-      // If endTime is not provided, default to 1 hour after start time
-      let endTime = data.endTime;
-      if (!endTime) {
-        const [hours, minutes] = data.time.split(':').map(Number);
-        endTime = `${String(hours + 1).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-      }
-      
       const res = await apiRequest("POST", `/api/viewing-requests`, {
         propertyId: propertyId,
         requestedDate: `${data.date}T${data.time}:00`,
-        requestedEndDate: `${data.date}T${endTime}:00`,
+        requestedEndDate: data.endTime ? `${data.date}T${data.endTime}:00` : undefined,
         notes: data.notes
       });
       return await res.json();

@@ -125,29 +125,9 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
   });
 
   const handleAddProperty = () => {
-    if (!propertyData) {
-      return;
+    if (propertyData) {
+      addPropertyMutation.mutate(propertyData);
     }
-    
-    // Ensure address field is present and not empty
-    if (!propertyData.address || propertyData.address.trim() === "") {
-      toast({
-        title: "Missing information",
-        description: "Property address is required but missing from the extracted data. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Clone and ensure all required fields have at least default values
-    const propertyToSubmit = {
-      ...propertyData,
-      // Convert any null/undefined values to empty strings for required fields
-      address: propertyData.address,
-      // Add other failsafe defaults if needed
-    };
-    
-    addPropertyMutation.mutate(propertyToSubmit);
   };
 
   return (

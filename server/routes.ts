@@ -734,10 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const propertyData = await extractPropertyData(address);
       
-      res.json({
-        success: true,
-        data: propertyData
-      });
+      res.json(propertyData);
     } catch (error) {
       console.error("Property data extraction error:", error);
       res.status(500).json({
@@ -759,61 +756,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Verify SERPAPI_KEY is available before proceeding
-      if (!process.env.SERPAPI_KEY) {
-        console.error("SERPAPI_KEY is missing for property URL extraction");
-        return res.status(503).json({
-          success: false,
-          error: "Search API service is unavailable. Please contact support for assistance."
-        });
-      }
-      
       // Use web search to find information about the property URL
       // This avoids direct scraping and potential blocking from real estate websites
       const propertyData = await extractPropertyFromUrl(url);
       
-      res.json({
-        success: true,
-        data: propertyData
-      });
+      res.json(propertyData);
     } catch (error) {
       console.error("Property URL extraction error:", error);
-      
-      // Provide more specific error messages based on the error type
-      if (error instanceof Error) {
-        const errorMessage = error.message;
-        
-        if (errorMessage.includes("SerpAPI")) {
-          // SerpAPI specific errors
-          if (errorMessage.includes("403")) {
-            return res.status(403).json({
-              success: false,
-              error: "Search API key permissions issue. The API key may not have the proper permissions or has reached its quota limit."
-            });
-          } else if (errorMessage.includes("401")) {
-            return res.status(401).json({
-              success: false,
-              error: "Invalid Search API key. Please contact support to update the API key."
-            });
-          } else if (errorMessage.includes("429")) {
-            return res.status(429).json({
-              success: false,
-              error: "Search API rate limit exceeded. Please try again later."
-            });
-          }
-        }
-        
-        // Return the specific error message from the API
-        return res.status(500).json({ 
-          success: false, 
-          error: errorMessage
-        });
-      }
-      
-      // Generic error
       res.status(500).json({
         success: false,
-        error: "Failed to extract property data from URL. Please try again later."
+        error: error instanceof Error ? error.message : "Failed to extract property data from URL"
       });
     }
   });
@@ -1451,15 +1403,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create a viewing request
   app.post("/api/viewing-requests", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
-      // Convert string dates to Date objects before validation
-      const requestBody = {
+      const requestData = viewingRequestSchema.parse({
         ...req.body,
-        buyerId: req.user!.id,
-        requestedDate: req.body.requestedDate ? new Date(req.body.requestedDate) : undefined,
-        requestedEndDate: req.body.requestedEndDate ? new Date(req.body.requestedEndDate) : undefined
-      };
-      
-      const requestData = viewingRequestSchema.parse(requestBody);
+        buyerId: req.user!.id
+      });
       
       const property = await storage.getProperty(requestData.propertyId);
       if (!property) {
@@ -1575,23 +1522,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             buyer = await storage.getUser(request.buyerId);
           }
 
-          // Get buyer agent if assigned
-          let buyerAgent = undefined;
-          if (request.buyerAgentId) {
-            buyerAgent = await storage.getUser(request.buyerAgentId);
-          }
-          
-          // Get seller agent if assigned
-          let sellerAgent = undefined;
-          if (request.sellerAgentId) {
-            sellerAgent = await storage.getUser(request.sellerAgentId);
+          let agent = undefined;
+          if (request.agentId) {
+            agent = await storage.getUser(request.agentId);
           }
 
           return {
             ...request,
             buyer,
-            buyerAgent,
-            sellerAgent
+            agent
           } as ViewingRequestWithParticipants;
         })
       );
