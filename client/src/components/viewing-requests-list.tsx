@@ -7,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, MessageSquare, Calendar, Clock, AlertCircle } from "lucide-react";
+import { Loader2, MessageSquare, Calendar, Clock, AlertCircle, FileSignature } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { ViewingRequestWithParticipants } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
 import { ChatWindow } from "./chat/chat-window";
+import { BuyerRepresentationAgreement } from "./buyer-representation-agreement";
 
 type ViewingRequestsListProps = {
   userId: number;
@@ -24,6 +25,8 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   const [selectedChat, setSelectedChat] = useState<{ propertyId: number; userId: number; userName: string } | null>(null);
   const [lastUpdateMessage, setLastUpdateMessage] = useState<string | null>(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
+  const [showAgreementModal, setShowAgreementModal] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<ViewingRequestWithParticipants | null>(null);
 
   // Determine the API endpoint based on the user's role
   const endpoint = role === "agent" 
@@ -291,17 +294,33 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                           )}
                           
                           {role === 'agent' && request.status === 'accepted' && (
-                            <Button 
-                              variant="default"
-                              size="sm"
-                              onClick={() => handleStatusChange(request.id, 'completed')}
-                              disabled={updateRequestMutation.isPending}
-                            >
-                              {updateRequestMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              ) : null}
-                              Mark Completed
-                            </Button>
+                            <>
+                              <Button 
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleStatusChange(request.id, 'completed')}
+                                disabled={updateRequestMutation.isPending}
+                              >
+                                {updateRequestMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : null}
+                                Mark Completed
+                              </Button>
+                              
+                              <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Store the current request with its property and participants
+                                  setSelectedRequest(request);
+                                  setShowAgreementModal(true);
+                                }}
+                                className="bg-primary/5 border-primary/30 text-primary hover:bg-primary/10"
+                              >
+                                <FileSignature className="h-4 w-4 mr-1" />
+                                Buyer Representation Form
+                              </Button>
+                            </>
                           )}
                         </div>
                       </CardContent>
@@ -333,6 +352,21 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
             </div>
           </DialogContent>
         </Dialog>
+      )}
+      
+      {/* Buyer Representation Agreement Modal */}
+      {showAgreementModal && selectedRequest && selectedRequest.property && selectedRequest.agent && (
+        <BuyerRepresentationAgreement
+          property={selectedRequest.property}
+          agent={selectedRequest.agent}
+          isOpen={showAgreementModal}
+          onClose={() => {
+            setShowAgreementModal(false);
+            setSelectedRequest(null);
+          }}
+          autoGenerate={true} // Auto-generate agreement for viewing requests
+          viewingRequestId={selectedRequest.id} // Pass the viewing request ID
+        />
       )}
     </div>
   );
