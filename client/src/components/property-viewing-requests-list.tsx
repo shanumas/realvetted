@@ -70,6 +70,7 @@ export function PropertyViewingRequestsList({
     if (activeTab === "pending") return request.status === "pending";
     if (activeTab === "approved") return request.status === "accepted"; // Use 'accepted' status from backend
     if (activeTab === "rejected") return request.status === "rejected";
+    if (activeTab === "cancelled") return request.status === "cancelled";
     if (activeTab === "completed") return request.status === "completed";
     return true; // Show all requests on "all" tab
   });
@@ -103,22 +104,30 @@ export function PropertyViewingRequestsList({
     setDialogOpen(true);
   };
   
+  // State for delete confirmation dialog
+  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<number | null>(null);
+
+  // Show delete confirmation dialog
+  const showDeleteConfirmation = (requestId: number) => {
+    setRequestToDelete(requestId);
+    setDeleteConfirmDialogOpen(true);
+  };
+  
   // Handle delete request
-  const handleDeleteRequest = async (requestId: number) => {
-    if (!confirm("Are you sure you want to delete this viewing request?")) {
-      return;
-    }
+  const handleDeleteRequest = async () => {
+    if (!requestToDelete) return;
     
     try {
       setIsSubmitting(true);
       
       // Send the delete request to the server - don't check response.ok as apiRequest already handles this
-      await apiRequest("DELETE", `/api/viewing-requests/${requestId}`);
+      await apiRequest("DELETE", `/api/viewing-requests/${requestToDelete}`);
       
       // Show success message
       toast({
-        title: "Request Deleted",
-        description: "Your viewing request has been deleted successfully.",
+        title: "Request Cancelled",
+        description: "Your viewing request has been cancelled successfully.",
         variant: "default"
       });
       
@@ -134,11 +143,14 @@ export function PropertyViewingRequestsList({
       
       // Also invalidate the auth user query to ensure we're still logged in
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      // Close the dialog
+      setDeleteConfirmDialogOpen(false);
     } catch (error) {
       console.error("Error deleting viewing request:", error);
       toast({
         title: "Error",
-        description: "Failed to delete viewing request. Please try again.",
+        description: "Failed to cancel viewing request. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -209,6 +221,9 @@ export function PropertyViewingRequestsList({
       setIsSubmitting(false);
     }
   };
+
+  // Get counts for cancelled requests
+  const cancelledCount = validRequests.filter(req => req.status === "cancelled").length || 0;
 
   return (
     <div className="space-y-4">
@@ -312,6 +327,34 @@ export function PropertyViewingRequestsList({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog for delete confirmation */}
+      <Dialog open={deleteConfirmDialogOpen} onOpenChange={setDeleteConfirmDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cancel Viewing Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this viewing request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteConfirmDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              Keep Request
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleDeleteRequest}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Cancelling..." : "Yes, Cancel Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-4">
@@ -324,13 +367,16 @@ export function PropertyViewingRequestsList({
           <TabsTrigger value="rejected">
             Rejected {rejectedCount > 0 && <Badge variant="outline" className="ml-1">{rejectedCount}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="cancelled">
+            Cancelled {cancelledCount > 0 && <Badge variant="outline" className="ml-1">{cancelledCount}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="completed">
             Completed {completedCount > 0 && <Badge variant="outline" className="ml-1">{completedCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="all">All</TabsTrigger>
         </TabsList>
 
-        {["pending", "approved", "rejected", "completed", "all"].map(tab => (
+        {["pending", "approved", "rejected", "cancelled", "completed", "all"].map(tab => (
           <TabsContent key={tab} value={tab}>
             {!filteredRequests || filteredRequests.length === 0 ? (
               <div className="text-center p-8 text-gray-500">
@@ -417,10 +463,10 @@ export function PropertyViewingRequestsList({
                           </Button>
                           <Button 
                             variant="destructive"
-                            onClick={() => handleDeleteRequest(request.id)}
+                            onClick={() => showDeleteConfirmation(request.id)}
                             className="text-sm"
                           >
-                            Delete Request
+                            Cancel Request
                           </Button>
                         </CardFooter>
                       )}
