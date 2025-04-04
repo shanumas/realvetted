@@ -858,56 +858,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // PDF placeholder replacement route
+  // PDF placeholder replacement route - directly modifies the brbc.pdf form
   app.get("/api/placeholder-replacement", async (req, res) => {
     try {
-      // Create a basic PDF document
-      const pdfDoc = await PDFDocument.create();
-      
-      // Add a page
-      const page = pdfDoc.addPage([612, 792]); // US Letter size
-      
-      // Embed a standard font
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      
-      // Add text to the page with no fancy formatting
-      page.drawText('Placeholder Replacement Demo', {
-        x: 50,
-        y: 700,
-        size: 24,
-        font: font
-      });
-      
-      page.drawText('Original text: Text with placeholder {1}', {
-        x: 50,
-        y: 650,
-        size: 14,
-        font: font
-      });
-      
-      page.drawText('After replacement: Text with placeholder uma', {
-        x: 50,
-        y: 600,
-        size: 14,
-        font: font
-      });
-      
-      page.drawText('Code used: form.getTextField("{1}").setText("uma");', {
-        x: 50,
-        y: 550,
-        size: 14,
-        font: font
-      });
-      
-      // Save the PDF
-      const pdfBytes = await pdfDoc.save();
+      // Path to the original PDF
+      const templatePath = path.join(process.cwd(), "uploads/pdf/brbc.pdf");
+
+      // Check if the file exists
+      if (!fs.existsSync(templatePath)) {
+        console.error("PDF template not found at:", templatePath);
+        
+        // Try the alternative location in attached_assets
+        const altTemplatePath = path.join(process.cwd(), "attached_assets/brbc.pdf");
+        
+        if (!fs.existsSync(altTemplatePath)) {
+          console.error("PDF template not found at alternative location either:", altTemplatePath);
+          throw new Error("Form template not found");
+        }
+        
+        // If found in attached_assets, copy it to uploads/pdf
+        const uploadsDir = path.join(process.cwd(), "uploads/pdf");
+        
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        
+        // Copy the file
+        fs.copyFileSync(altTemplatePath, templatePath);
+        console.log("Copied PDF template from attached_assets to uploads/pdf");
+      }
+
+      // Read the template file
+      const templateBytes = fs.readFileSync(templatePath);
+      console.log(`Read PDF template, size: ${templateBytes.length} bytes`);
+
+      // Replace the placeholder "1" with "uma"
+      const modifiedPdfBytes = await replacePlaceholderInPdf(templateBytes, "1", "uma");
+      console.log(`Generated modified PDF, size: ${modifiedPdfBytes.length} bytes`);
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="placeholder_replacement.pdf"');
+      res.setHeader('Content-Disposition', 'inline; filename="modified_brbc.pdf"');
       
-      // Send the PDF
-      res.send(Buffer.from(pdfBytes));
+      // Send the modified PDF
+      res.send(modifiedPdfBytes);
     } catch (error) {
       console.error("PDF placeholder replacement error:", error);
       res.status(500).json({
