@@ -122,14 +122,13 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create a text field for buyer 1 name
-    const buyerName1Field = form.createTextField("buyerName1");
-    buyerName1Field.setText(formData.buyerName1 || "");
-    buyerName1Field.addToPage(page, {
+    // Draw text for buyer 1 name
+    page.drawText(formData.buyerName1 || "", {
       x: 180,
-      y: y - 15,
-      width: 380,
-      height: 20,
+      y: y - 12,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
     });
 
     y -= lineHeight;
@@ -142,14 +141,13 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create a text field for buyer 2 name
-    const buyerName2Field = form.createTextField("buyerName2");
-    buyerName2Field.setText(formData.buyerName2 || "");
-    buyerName2Field.addToPage(page, {
+    // Draw text for buyer 2 name
+    page.drawText(formData.buyerName2 || "", {
       x: 240,
-      y: y - 15,
-      width: 320,
-      height: 20,
+      y: y - 12,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
     });
 
     y -= lineHeight * 2;
@@ -173,15 +171,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create a text field for property address
-    const propertyAddressField = form.createTextField("propertyAddress");
-    propertyAddressField.setText(formData.propertyAddress || "");
-    propertyAddressField.addToPage(page, {
-      x: 170,
-      y: y - 15,
-      width: 390,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     y -= lineHeight;
 
@@ -194,14 +185,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    const cityField = form.createTextField("propertyCity");
-    cityField.setText(formData.propertyCity || "");
-    cityField.addToPage(page, {
-      x: 80,
-      y: y - 15,
-      width: 150,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     page.drawText("State:", {
       x: 250,
@@ -211,14 +196,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    const stateField = form.createTextField("propertyState");
-    stateField.setText(formData.propertyState || "");
-    stateField.addToPage(page, {
-      x: 290,
-      y: y - 15,
-      width: 80,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     page.drawText("ZIP:", {
       x: 390,
@@ -228,14 +207,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    const zipField = form.createTextField("propertyZip");
-    zipField.setText(formData.propertyZip || "");
-    zipField.addToPage(page, {
-      x: 420,
-      y: y - 15,
-      width: 140,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     y -= lineHeight * 2;
 
@@ -258,15 +231,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create field for agent name
-    const agentNameField = form.createTextField("agentName");
-    agentNameField.setText(formData.agentName || "");
-    agentNameField.addToPage(page, {
-      x: 160,
-      y: y - 15,
-      width: 400,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     y -= lineHeight;
 
@@ -278,15 +244,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create field for license number
-    const licenseField = form.createTextField("agentLicenseNumber");
-    licenseField.setText(formData.agentLicenseNumber || "");
-    licenseField.addToPage(page, {
-      x: 120,
-      y: y - 15,
-      width: 150,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     page.drawText("Brokerage:", {
       x: 290,
@@ -296,15 +255,8 @@ async function createEditableAgencyDisclosureForm(
       color: rgb(0, 0, 0),
     });
 
-    // Create field for brokerage
-    const brokerageField = form.createTextField("agentBrokerageName");
-    brokerageField.setText(formData.agentBrokerageName || "");
-    brokerageField.addToPage(page, {
-      x: 360,
-      y: y - 15,
-      width: 200,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     y -= lineHeight;
 
@@ -323,15 +275,8 @@ async function createEditableAgencyDisclosureForm(
       formData.agentSignatureDate ||
       new Date().toISOString().split("T")[0];
 
-    // Create date field
-    const dateField = form.createTextField("signatureDate");
-    dateField.setText(dateToShow);
-    dateField.addToPage(page, {
-      x: 90,
-      y: y - 15,
-      width: 150,
-      height: 20,
-    });
+    // Form fields are already in the PDF template
+    // We don't need to create text fields programmatically
 
     y -= lineHeight * 2;
 
@@ -406,15 +351,8 @@ async function createEditableAgencyDisclosureForm(
         color: rgb(0, 0, 0),
       });
 
-      // Create a text field for seller 1 name
-      const sellerName1Field = form.createTextField("sellerName1");
-      sellerName1Field.setText(formData.sellerName1 || "");
-      sellerName1Field.addToPage(page, {
-        x: 180,
-        y: y - 15,
-        width: 380,
-        height: 20,
-      });
+      // Form fields are already in the PDF template
+      // We don't need to create text fields programmatically
 
       y -= lineHeight;
 
@@ -426,15 +364,8 @@ async function createEditableAgencyDisclosureForm(
         color: rgb(0, 0, 0),
       });
 
-      // Create a text field for seller 2 name
-      const sellerName2Field = form.createTextField("sellerName2");
-      sellerName2Field.setText(formData.sellerName2 || "");
-      sellerName2Field.addToPage(page, {
-        x: 240,
-        y: y - 15,
-        width: 320,
-        height: 20,
-      });
+      // Form fields are already in the PDF template
+      // We don't need to create text fields programmatically
     }
 
     // If we need to flatten the form (make it non-editable), we would do this:
