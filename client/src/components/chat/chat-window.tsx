@@ -50,27 +50,25 @@ export function ChatWindow({ propertyId, receiverId, receiverName, receiverPhoto
 
       const data = await response.json();
       
-      // Filter out any temporary messages
-      const existingTempMessageIds = messages
-        .filter(msg => typeof msg.id === 'string' && msg.id.startsWith('temp-'))
-        .map(msg => msg.id);
-      
-      // Keep the messages that are from the server plus any pending temp messages
-      // that haven't been received from the server yet
-      const updatedMessages = [
-        ...data,
-        ...messages.filter(msg => 
-          typeof msg.id === 'string' && 
-          msg.id.startsWith('temp-') && 
-          !data.some((serverMsg: ChatMessage) => 
-            serverMsg.content === msg.content && 
-            serverMsg.senderId === msg.senderId && 
-            serverMsg.receiverId === msg.receiverId
+      setMessages(prevMessages => {
+        // Filter out any temporary messages
+        // Keep the messages that are from the server plus any pending temp messages
+        // that haven't been received from the server yet
+        const updatedMessages = [
+          ...data,
+          ...prevMessages.filter(msg => 
+            typeof msg.id === 'string' && 
+            msg.id.startsWith('temp-') && 
+            !data.some((serverMsg: ChatMessage) => 
+              serverMsg.content === msg.content && 
+              serverMsg.senderId === msg.senderId && 
+              serverMsg.receiverId === msg.receiverId
+            )
           )
-        )
-      ];
-      
-      setMessages(updatedMessages);
+        ];
+        
+        return updatedMessages;
+      });
     } catch (error) {
       console.error("Error fetching messages:", error);
       toast({
@@ -82,7 +80,7 @@ export function ChatWindow({ propertyId, receiverId, receiverName, receiverPhoto
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [propertyId, receiverId, toast, user, messages]);
+  }, [propertyId, receiverId, toast, user]);
 
   // Initial message fetch
   useEffect(() => {
