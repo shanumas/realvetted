@@ -31,12 +31,56 @@ export function AgencyDisclosureForm({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [buyerSignature, setBuyerSignature] = useState<string>('');
-  const [buyerSignatureDate, setBuyerSignatureDate] = useState<string>(
+  const [signature, setSignature] = useState<string>('');
+  const [signatureDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [isLeasehold, setIsLeasehold] = useState<boolean>(false);
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
+  
+  // Determine if current user is agent or buyer
+  const isAgent = user?.role === 'agent';
+  
+  // State to store existing agreements
+  const [existingSignature, setExistingSignature] = useState<string | null>(null);
+  
+  // Check for existing agreement when the modal opens
+  useEffect(() => {
+    if (isOpen && property?.id && viewingRequestId) {
+      const fetchExistingAgreement = async () => {
+        try {
+          // Get agreements for this property
+          const response = await apiRequest('GET', `/api/properties/${property.id}/agreements`);
+          const data = await response.json();
+          
+          if (data.success && data.data && data.data.length > 0) {
+            // Find agency disclosure agreements
+            const agencyAgreements = data.data.filter(
+              (agreement: any) => agreement.type === 'agency_disclosure'
+            );
+            
+            if (agencyAgreements.length > 0) {
+              // Use most recent agreement
+              const latestAgreement = agencyAgreements[agencyAgreements.length - 1];
+              
+              // If the current user is an agent, check for existing agent signature
+              if (isAgent && latestAgreement.agentSignature) {
+                setExistingSignature(latestAgreement.agentSignature);
+              }
+              // If the user is a buyer, check for existing buyer signature
+              else if (!isAgent && latestAgreement.buyerSignature) {
+                setExistingSignature(latestAgreement.buyerSignature);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching agreements:", error);
+        }
+      };
+      
+      fetchExistingAgreement();
+    }
+  }, [isOpen, property?.id, viewingRequestId, isAgent]);
 
   // Show an error message if property or agent is missing
   if (!property || !agent) {
@@ -65,9 +109,9 @@ export function AgencyDisclosureForm({
   // Form data to be sent to the server
   const formData = {
     // Buyer information
-    buyerName1: user?.firstName && user?.lastName ? `${user?.firstName} ${user?.lastName}` : user?.email || '',
-    buyerSignature1: buyerSignature,
-    buyerSignatureDate1: buyerSignatureDate,
+    buyerName1: user?.firstName && user?.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user?.email || '',
     
     // Property information
     propertyAddress: property.address,
@@ -82,24 +126,38 @@ export function AgencyDisclosureForm({
     
     // Is this a leasehold exceeding one year?
     isLeasehold: isLeasehold,
+    
+    // Set the appropriate signature based on user role
+    ...(isAgent 
+      ? {
+          agentSignature: signature,
+          agentSignatureDate: signatureDate
+        } 
+      : {
+          buyerSignature1: signature,
+          buyerSignatureDate1: signatureDate
+        }),
   };
 
   const clearSignature = () => {
     if (sigPad) {
       sigPad.clear();
-      setBuyerSignature('');
+      setSignature('');
     }
   };
 
   const handleSignEnd = () => {
     if (sigPad) {
       const signatureData = sigPad.toDataURL();
-      setBuyerSignature(signatureData);
+      setSignature(signatureData);
     }
   };
 
   const handleSave = async () => {
-    if (!buyerSignature) {
+    // Use existing signature if it exists, otherwise require a new one
+    const signatureToUse = existingSignature || signature;
+    
+    if (!signatureToUse) {
       toast({
         title: "Signature Required",
         description: "Please sign the form before saving",
@@ -110,14 +168,21 @@ export function AgencyDisclosureForm({
 
     setLoading(true);
     try {
-      // Submit the form data to generate the PDF
+      // Submit the form data to generate the PDF with the appropriate signature
+      const formDataToSubmit = {
+        ...formData,
+        // Override with the signature we're actually using
+        ...(isAgent 
+          ? { agentSignature: signatureToUse }
+          : { buyerSignature1: signatureToUse }
+        ),
+        viewingRequestId
+      };
+      
       const response = await apiRequest(
         'POST', 
         `/api/properties/${property.id}/generate-agency-disclosure`, 
-        {
-          ...formData,
-          viewingRequestId
-        }
+        formDataToSubmit
       );
       
       const result = await response.json();
@@ -134,8 +199,10 @@ export function AgencyDisclosureForm({
       // Invalidate queries to refresh data
       if (viewingRequestId) {
         queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/agent'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
       }
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${property.id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/properties/${property.id}/agreements`] });
       
       onClose();
     } catch (error) {
@@ -289,33 +356,60 @@ export function AgencyDisclosureForm({
               <Input
                 id="signatureDate"
                 type="date"
-                value={buyerSignatureDate}
-                onChange={(e) => setBuyerSignatureDate(e.target.value)}
+                value={signatureDate}
+                readOnly
+                className="bg-gray-50"
               />
             </div>
 
             <div className="pt-4">
               <Label>Your Signature</Label>
-              <div className="relative border border-gray-300 rounded-md mt-1">
-                <SignatureCanvas
-                  ref={(ref) => setSigPad(ref)}
-                  canvasProps={{
-                    width: 600,
-                    height: 150,
-                    className: 'signature-canvas border rounded-md',
-                  }}
-                  onEnd={handleSignEnd}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  className="absolute top-2 right-2"
-                  onClick={clearSignature}
-                >
-                  Clear
-                </Button>
-              </div>
+              
+              {existingSignature ? (
+                <>
+                  <div className="mt-2 p-2 border border-gray-300 rounded-md bg-gray-50">
+                    <p className="text-sm text-gray-600 mb-2">You have already signed this form:</p>
+                    <img 
+                      src={existingSignature} 
+                      alt="Your existing signature" 
+                      className="max-h-[150px] mx-auto"
+                    />
+                    <p className="text-xs text-gray-500 mt-2 text-center">
+                      Signed on {signatureDate}
+                    </p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setExistingSignature(null)}
+                  >
+                    Sign Again
+                  </Button>
+                </>
+              ) : (
+                <div className="relative border border-gray-300 rounded-md mt-1">
+                  <SignatureCanvas
+                    ref={(ref) => setSigPad(ref)}
+                    canvasProps={{
+                      width: 600,
+                      height: 150,
+                      className: 'signature-canvas border rounded-md',
+                    }}
+                    onEnd={handleSignEnd}
+                  />
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    className="absolute top-2 right-2"
+                    onClick={clearSignature}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="pt-4">

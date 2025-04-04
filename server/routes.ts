@@ -415,6 +415,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Get all agreements for a property
+  app.get("/api/properties/:id/agreements", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if user has permission to access the property
+      const userId = req.user.id;
+      const userRole = req.user.role;
+      
+      const hasAccess = 
+        (userRole === "admin") ||
+        (userRole === "buyer" && property.createdBy === userId) ||
+        (userRole === "agent" && property.agentId === userId) ||
+        (userRole === "seller" && property.sellerId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to access agreements for this property"
+        });
+      }
+      
+      const agreements = await storage.getAgreementsByProperty(propertyId);
+      
+      res.json({
+        success: true,
+        data: agreements
+      });
+    } catch (error) {
+      console.error("Error fetching property agreements:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get property agreements"
+      });
+    }
+  });
+  
   // Delete a property
   app.delete("/api/properties/:id", isAuthenticated, async (req, res) => {
     try {
@@ -1783,7 +1828,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       const { 
         buyerName1, 
         buyerSignature1, 
-        buyerSignatureDate1, 
+        buyerSignatureDate1,
+        agentSignature,
+        agentSignatureDate,
         propertyAddress,
         propertyCity,
         propertyState,
@@ -1795,10 +1842,13 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         viewingRequestId
       } = req.body;
       
-      if (!propertyId || !buyerName1 || !buyerSignature1 || !buyerSignatureDate1) {
+      // Check if we have either buyer or agent signature
+      if (!propertyId || 
+          (!buyerSignature1 && !agentSignature) ||
+          (!buyerSignatureDate1 && !agentSignatureDate)) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields'
+          error: 'Missing required fields - either buyer or agent must sign the form'
         });
       }
       
@@ -1816,6 +1866,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         buyerName1,
         buyerSignature1,
         buyerSignatureDate1,
+        agentSignature,
+        agentSignatureDate,
         propertyAddress: propertyAddress || property.address,
         propertyCity: propertyCity || property.city,
         propertyState: propertyState || property.state,
@@ -1832,6 +1884,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       // Add the buyer signature to the PDF if provided
       if (buyerSignature1) {
         pdfBuffer = await addSignatureToPdf(pdfBuffer, buyerSignature1, 'buyer1');
+      }
+      
+      // Add the agent signature to the PDF if provided
+      if (agentSignature) {
+        pdfBuffer = await addSignatureToPdf(pdfBuffer, agentSignature, 'agent');
       }
       
       // Save to disk
@@ -1895,25 +1952,81 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         }
       }
       
-      // Create the agreement with a valid agent ID
-      const agreement = await storage.createAgreement({
-        propertyId,
-        type: 'agency_disclosure',
-        agreementText: `California Agency Disclosure Form for property ${property.address}`,
-        buyerId,
-        agentId, // Now this will never be null
-        date: new Date(),
+      // Check if there's already an agreement for this property and update it if so
+      const existingAgreements = await storage.getAgreementsByProperty(propertyId);
+      const agencyDisclosureAgreements = existingAgreements.filter(a => 
+        a.type === 'agency_disclosure' && 
+        !a.sellerSignature // Not yet signed by seller
+      );
+      
+      let agreement;
+      
+      // Store the appropriate signatures based on who's signing
+      const signatureData: {
+        documentUrl: string;
+        status: string;
+        buyerSignature?: string;
+        agentSignature?: string;
+      } = {
         documentUrl: `/uploads/agreements/${filename}`,
-        status: 'completed'
-      });
+        status: 'pending' // Keep as pending to await seller review
+      };
+      
+      // Add buyer or agent signature based on what was provided
+      if (buyerSignature1) {
+        signatureData.buyerSignature = buyerSignature1;
+      }
+      
+      if (agentSignature) {
+        signatureData.agentSignature = agentSignature;
+      }
+      
+      if (agencyDisclosureAgreements.length > 0) {
+        // Update the most recent agreement
+        const mostRecentAgreement = agencyDisclosureAgreements[agencyDisclosureAgreements.length - 1];
+        
+        // Preserve existing signatures
+        if (!signatureData.buyerSignature && mostRecentAgreement.buyerSignature) {
+          signatureData.buyerSignature = mostRecentAgreement.buyerSignature;
+        }
+        
+        if (!signatureData.agentSignature && mostRecentAgreement.agentSignature) {
+          signatureData.agentSignature = mostRecentAgreement.agentSignature;
+        }
+        
+        agreement = await storage.updateAgreement(mostRecentAgreement.id, {
+          ...signatureData,
+          agentId // In case it wasn't set before
+        });
+        console.log(`Updated existing agreement ${mostRecentAgreement.id} with signatures`);
+      } else {
+        // Create a new agreement if none exists
+        agreement = await storage.createAgreement({
+          propertyId,
+          type: 'agency_disclosure',
+          agreementText: `California Agency Disclosure Form for property ${property.address}`,
+          buyerId,
+          agentId, // Now this will never be null
+          ...signatureData,
+          date: new Date()
+        });
+        console.log(`Created new agreement ${agreement.id} with signatures`);
+      }
       
       // If this is associated with a viewing request, update activity but keep it in pending status
       // so it can be sent to the seller after the agent signs
       if (viewingRequestId) {
-        const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
+        const viewingRequestId_num = parseInt(viewingRequestId);
+        const viewingRequest = await storage.getViewingRequest(viewingRequestId_num);
         if (viewingRequest) {
-          // Keep the status as 'pending' instead of completed to allow seller review
-          // Just update the activity log to indicate the agent has signed
+          // Make sure the viewing request status stays as 'pending' if it was being auto-completed
+          if (viewingRequest.status === 'completed') {
+            await storage.updateViewingRequest(viewingRequestId_num, {
+              status: 'pending'
+            });
+          }
+          
+          // Add activity log to indicate the agent has signed
           await storage.createPropertyActivityLog({
             propertyId,
             userId: buyerId,
@@ -1923,9 +2036,21 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               agreementId: agreement.id,
               agreementType: 'agency_disclosure',
               message: 'Agent has signed the disclosure form. Awaiting seller review.'
-            },
-            timestamp: new Date()
+            }
+            // timestamp is automatically added in the storage method
           });
+          
+          // Notify seller if available
+          if (property.sellerId) {
+            websocketServer.broadcastToUsers([property.sellerId], {
+              type: 'notification',
+              data: {
+                message: 'The agent has signed the Agency Disclosure form. Please review.',
+                propertyId,
+                agreementId: agreement.id
+              }
+            });
+          }
         }
       }
       
