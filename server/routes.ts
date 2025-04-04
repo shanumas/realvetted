@@ -27,7 +27,7 @@ import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
-import { fillAgencyDisclosureForm, addSignatureToPdf, AgencyDisclosureFormData } from "./pdf-service";
+import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData } from "./pdf-service";
 
 // Create uploads directories if they don't exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -853,6 +853,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to upload profile photo"
+      });
+    }
+  });
+
+  // PDF placeholder replacement route
+  app.get("/api/placeholder-replacement", async (req, res) => {
+    try {
+      // Path to the template PDF
+      const templatePath = path.join(process.cwd(), 'assets/converted/brbc_decrypted.pdf');
+      
+      // Check if the file exists
+      if (!fs.existsSync(templatePath)) {
+        console.error('PDF template not found at:', templatePath);
+        return res.status(404).json({
+          success: false,
+          error: "PDF template not found"
+        });
+      }
+      
+      // Read the template file
+      const templateBytes = fs.readFileSync(templatePath);
+      
+      // Replace the placeholder with "uma"
+      const pdfBuffer = await replacePlaceholderInPdf(templateBytes, "{1}", "uma");
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="placeholder_replaced.pdf"');
+      
+      // Send the PDF
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("PDF placeholder replacement error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to replace placeholder in PDF"
       });
     }
   });

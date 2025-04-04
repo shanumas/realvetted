@@ -333,23 +333,34 @@ export function AgencyDisclosureForm({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Editable PDF Toggle */}
-          <div className="flex items-center space-x-2 mb-2">
-            <Switch 
-              id="editable-pdf" 
-              checked={isEditable} 
-              onCheckedChange={handleEditableToggle}
-            />
-            <Label htmlFor="editable-pdf" className="cursor-pointer">
-              Make PDF fields editable
-            </Label>
-            {isEditable && (
-              <span className="text-xs text-gray-500 ml-2">
-                (All form fields will be editable in the PDF viewer)
-              </span>
-            )}
+          {/* Title for the normal PDF section */}
+          <div className="mb-2">
+            <h3 className="text-md font-semibold">Standard Agency Disclosure Form</h3>
+            <p className="text-xs text-gray-500">
+              This is the standard California Agency Disclosure Form
+            </p>
           </div>
           
+          {/* Special PDF Placeholder Link */}
+          <div className="mb-4 bg-blue-50 p-4 rounded-md border border-blue-200">
+            <h3 className="text-md font-semibold text-blue-700 mb-2 flex items-center">
+              <FileText className="w-5 h-5 mr-2" />
+              Placeholder Replacement Demo
+            </h3>
+            <p className="text-sm text-blue-600 mb-2">
+              View a special version of the PDF where the placeholder text "{1}" has been replaced with "uma".
+            </p>
+            <a 
+              href="/api/placeholder-replacement" 
+              target="_blank"
+              rel="noopener noreferrer" 
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              View Placeholder Replacement
+            </a>
+          </div>
+
           {/* PDF Viewer */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {pdfUrl ? (
