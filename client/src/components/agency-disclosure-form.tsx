@@ -342,22 +342,28 @@ export function AgencyDisclosureForm({
           </div>
           
           {/* Special PDF Placeholder Link */}
-          <div className="mb-4 bg-blue-50 p-4 rounded-md border border-blue-200">
-            <h3 className="text-md font-semibold text-blue-700 mb-2 flex items-center">
+          <div className="mb-4 bg-green-50 p-4 rounded-md border border-green-200">
+            <h3 className="text-md font-semibold text-green-700 mb-2 flex items-center">
               <FileText className="w-5 h-5 mr-2" />
               Placeholder Replacement Demo
             </h3>
-            <p className="text-sm text-blue-600 mb-2">
-              View a special version of the PDF where the placeholder text "{1}" has been replaced with "uma".
+            <p className="text-sm text-green-600 mb-2">
+              This demo shows how we can replace the placeholder text "{1}" with "uma" in the PDF.
             </p>
+            <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 mb-3">
+              <p className="text-sm text-yellow-700 font-medium">
+                Important: Click the button below to open the modified PDF in a new tab. 
+                The text replacement will appear on a new page appended to the original document.
+              </p>
+            </div>
             <a 
               href="/api/placeholder-replacement" 
               target="_blank"
               rel="noopener noreferrer" 
-              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
             >
               <FileText className="w-4 h-4 mr-2" />
-              View Placeholder Replacement
+              View Placeholder Replacement PDF
             </a>
           </div>
 
