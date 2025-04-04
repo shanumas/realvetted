@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts, PDFForm, PDFCheckBox, PDFTextField, PDFButton } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -34,6 +34,402 @@ export interface AgencyDisclosureFormData {
   
   // Is this a leasehold exceeding one year?
   isLeasehold?: boolean;
+  
+  // Flag to determine if the form should be editable by the end user
+  isEditable?: boolean;
+}
+
+/**
+ * Creates an editable PDF form with fields that can be filled in by the user
+ * 
+ * @param formData Initial data to pre-fill the form fields
+ * @returns PDF document with editable form fields
+ */
+async function createEditableAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
+  try {
+    // Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    
+    // Add a page
+    const page = pdfDoc.addPage([612, 792]); // US Letter size
+    
+    // Embed fonts
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    
+    // Get the form instance
+    const form = pdfDoc.getForm();
+    
+    // Add header
+    page.drawText('CALIFORNIA AGENCY DISCLOSURE FORM', {
+      x: 50,
+      y: 750,
+      size: 16,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Set up coordinates for our form content
+    let y = 700;
+    const lineHeight = 25;
+    
+    // Add leasehold checkbox
+    page.drawText('This is for a leasehold interest exceeding one year:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create checkbox for leasehold
+    const leaseholdCheckbox = form.createCheckBox('leasehold');
+    leaseholdCheckbox.addToPage(page, { x: 350, y: y - 10 });
+    if (formData.isLeasehold) {
+      leaseholdCheckbox.check();
+    } else {
+      leaseholdCheckbox.uncheck();
+    }
+    
+    y -= lineHeight * 2;
+    
+    // Add buyer information section
+    page.drawText('BUYER INFORMATION:', {
+      x: 50,
+      y,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Buyer 1 Full Name:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create a text field for buyer 1 name
+    const buyerName1Field = form.createTextField('buyerName1');
+    buyerName1Field.setText(formData.buyerName1 || '');
+    buyerName1Field.addToPage(page, { 
+      x: 180, 
+      y: y - 15, 
+      width: 380,
+      height: 20
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Buyer 2 Full Name (if applicable):', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create a text field for buyer 2 name
+    const buyerName2Field = form.createTextField('buyerName2');
+    buyerName2Field.setText(formData.buyerName2 || '');
+    buyerName2Field.addToPage(page, { 
+      x: 240, 
+      y: y - 15, 
+      width: 320,
+      height: 20
+    });
+    
+    y -= lineHeight * 2;
+    
+    // Add property information section
+    page.drawText('PROPERTY INFORMATION:', {
+      x: 50,
+      y,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Property Address:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create a text field for property address
+    const propertyAddressField = form.createTextField('propertyAddress');
+    propertyAddressField.setText(formData.propertyAddress || '');
+    propertyAddressField.addToPage(page, { 
+      x: 170, 
+      y: y - 15, 
+      width: 390,
+      height: 20
+    });
+    
+    y -= lineHeight;
+    
+    // City, state, zip fields in a row
+    page.drawText('City:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    const cityField = form.createTextField('propertyCity');
+    cityField.setText(formData.propertyCity || '');
+    cityField.addToPage(page, { 
+      x: 80, 
+      y: y - 15, 
+      width: 150,
+      height: 20
+    });
+    
+    page.drawText('State:', {
+      x: 250,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    const stateField = form.createTextField('propertyState');
+    stateField.setText(formData.propertyState || '');
+    stateField.addToPage(page, { 
+      x: 290, 
+      y: y - 15, 
+      width: 80,
+      height: 20
+    });
+    
+    page.drawText('ZIP:', {
+      x: 390,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    const zipField = form.createTextField('propertyZip');
+    zipField.setText(formData.propertyZip || '');
+    zipField.addToPage(page, { 
+      x: 420, 
+      y: y - 15, 
+      width: 140,
+      height: 20
+    });
+    
+    y -= lineHeight * 2;
+    
+    // Add agent information section
+    page.drawText('AGENT INFORMATION:', {
+      x: 50,
+      y,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Real Estate Agent:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create field for agent name
+    const agentNameField = form.createTextField('agentName');
+    agentNameField.setText(formData.agentName || '');
+    agentNameField.addToPage(page, { 
+      x: 160, 
+      y: y - 15, 
+      width: 400,
+      height: 20
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('License #:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create field for license number
+    const licenseField = form.createTextField('agentLicenseNumber');
+    licenseField.setText(formData.agentLicenseNumber || '');
+    licenseField.addToPage(page, { 
+      x: 120, 
+      y: y - 15, 
+      width: 150,
+      height: 20
+    });
+    
+    page.drawText('Brokerage:', {
+      x: 290,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Create field for brokerage
+    const brokerageField = form.createTextField('agentBrokerageName');
+    brokerageField.setText(formData.agentBrokerageName || '');
+    brokerageField.addToPage(page, { 
+      x: 360, 
+      y: y - 15, 
+      width: 200,
+      height: 20
+    });
+    
+    y -= lineHeight;
+    
+    // Add date fields
+    page.drawText('Date:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Use either buyer or agent date, or current date
+    const dateToShow = formData.buyerSignatureDate1 || formData.agentSignatureDate || new Date().toISOString().split('T')[0];
+    
+    // Create date field
+    const dateField = form.createTextField('signatureDate');
+    dateField.setText(dateToShow);
+    dateField.addToPage(page, { 
+      x: 90, 
+      y: y - 15, 
+      width: 150,
+      height: 20
+    });
+    
+    y -= lineHeight * 2;
+    
+    // Add signature section
+    page.drawText('Signature Area:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    // Add a signature box (we'll add the actual signature image separately)
+    page.drawRectangle({
+      x: 50,
+      y: y - 100, // Height of signature box
+      width: 300,
+      height: 100,
+      borderWidth: 1,
+      borderColor: rgb(0.7, 0.7, 0.7),
+      opacity: 0.3,
+    });
+    
+    y -= 120; // Move below the signature box
+    
+    // Add a note about the form
+    page.drawText('By signing, you acknowledge that you have received and read the California Agency Disclosure Form,', {
+      x: 50,
+      y,
+      size: 10,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight * 0.7;
+    
+    page.drawText('which explains the different types of agency relationships in real estate transactions.', {
+      x: 50,
+      y,
+      size: 10,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Add seller section if information is provided
+    if (formData.sellerName1) {
+      y -= lineHeight * 2;
+      
+      page.drawText('SELLER INFORMATION:', {
+        x: 50,
+        y,
+        size: 14,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      y -= lineHeight;
+      
+      page.drawText('Seller 1 Full Name:', {
+        x: 50,
+        y,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Create a text field for seller 1 name
+      const sellerName1Field = form.createTextField('sellerName1');
+      sellerName1Field.setText(formData.sellerName1 || '');
+      sellerName1Field.addToPage(page, { 
+        x: 180, 
+        y: y - 15, 
+        width: 380,
+        height: 20
+      });
+      
+      y -= lineHeight;
+      
+      page.drawText('Seller 2 Full Name (if applicable):', {
+        x: 50,
+        y,
+        size: 12,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Create a text field for seller 2 name
+      const sellerName2Field = form.createTextField('sellerName2');
+      sellerName2Field.setText(formData.sellerName2 || '');
+      sellerName2Field.addToPage(page, { 
+        x: 240, 
+        y: y - 15, 
+        width: 320,
+        height: 20
+      });
+    }
+    
+    // If we need to flatten the form (make it non-editable), we would do this:
+    // form.flatten();
+    // But since we want editable fields, we don't flatten
+    
+    // Save the document
+    const pdfBytes = await pdfDoc.save();
+    
+    return Buffer.from(pdfBytes);
+  } catch (error) {
+    console.error('Error creating editable Agency Disclosure form: ', error);
+    throw new Error('Failed to create editable Agency Disclosure form');
+  }
 }
 
 /**
@@ -44,6 +440,11 @@ export interface AgencyDisclosureFormData {
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   try {
+    // If isEditable flag is true, create an editable PDF form instead of static text
+    if (formData.isEditable) {
+      return await createEditableAgencyDisclosureForm(formData);
+    }
+    
     // Path to the template PDF - using the decrypted version as requested
     const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc_decrypted.pdf');
     

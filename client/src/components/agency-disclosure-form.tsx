@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
@@ -34,6 +36,7 @@ export function AgencyDisclosureForm({
   );
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [isEditable, setIsEditable] = useState<boolean>(false);
   
   // Determine if current user is agent or buyer
   const isAgent = user?.role === 'agent';
@@ -51,6 +54,13 @@ export function AgencyDisclosureForm({
       generatePdfPreview();
     }
   }, [isOpen, property?.id]);
+  
+  // Update PDF when editable toggle changes
+  useEffect(() => {
+    if (isOpen && property?.id) {
+      generatePdfPreview();
+    }
+  }, [isEditable]);
   
   // Check for existing agreement when the modal opens
   useEffect(() => {
@@ -162,10 +172,17 @@ export function AgencyDisclosureForm({
     try {
       if (!property?.id) return;
       
-      // Generate a preview of the form
+      // Revoke any existing object URLs to prevent memory leaks
+      if (pdfUrl) {
+        window.URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(null);
+      }
+      
+      // Generate a preview of the form, adding the editable query parameter if needed
+      const queryParams = isEditable ? '?editable=true' : '';
       const response = await apiRequest(
         'POST', 
-        `/api/properties/${property.id}/preview-agency-disclosure`, 
+        `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`, 
         formData
       );
       
@@ -191,6 +208,13 @@ export function AgencyDisclosureForm({
       });
       return null;
     }
+  };
+  
+  // Handle toggle change for editable PDF
+  const handleEditableToggle = (checked: boolean) => {
+    setIsEditable(checked);
+    // Regenerate the PDF preview whenever the editable toggle changes
+    generatePdfPreview();
   };
 
   const handleSave = async () => {
@@ -259,30 +283,20 @@ export function AgencyDisclosureForm({
 
   const handleDownload = async () => {
     try {
-      if (!pdfUrl) {
-        const url = await generatePdfPreview();
-        if (!url) throw new Error("Failed to generate PDF");
-        
-        // Create a link and trigger download
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up will happen when component unmounts
-        document.body.removeChild(a);
-      } else {
-        // Create a link and trigger download
-        const a = document.createElement('a');
-        a.href = pdfUrl;
-        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Clean up
-        document.body.removeChild(a);
-      }
+      // Always generate a fresh PDF for download to ensure it has the current editable state
+      const url = await generatePdfPreview();
+      if (!url) throw new Error("Failed to generate PDF");
+      
+      // Create a link and trigger download
+      const a = document.createElement('a');
+      a.href = url;
+      const fileNameSuffix = isEditable ? '_editable' : '';
+      a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      
+      // Clean up
+      document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading preview:", error);
       toast({
@@ -319,6 +333,23 @@ export function AgencyDisclosureForm({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Editable PDF Toggle */}
+          <div className="flex items-center space-x-2 mb-2">
+            <Switch 
+              id="editable-pdf" 
+              checked={isEditable} 
+              onCheckedChange={handleEditableToggle}
+            />
+            <Label htmlFor="editable-pdf" className="cursor-pointer">
+              Make PDF fields editable
+            </Label>
+            {isEditable && (
+              <span className="text-xs text-gray-500 ml-2">
+                (All form fields will be editable in the PDF viewer)
+              </span>
+            )}
+          </div>
+          
           {/* PDF Viewer */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {pdfUrl ? (

@@ -1785,6 +1785,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     try {
       const propertyId = parseInt(req.params.id);
       const formData = req.body;
+      const isEditable = req.query.editable === 'true'; // Check for editable flag in query params
       
       if (!propertyId) {
         return res.status(400).json({
@@ -1802,8 +1803,14 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         });
       }
       
+      // Add editable flag to form data
+      const formDataWithEditableFlag = {
+        ...formData,
+        isEditable: isEditable
+      };
+      
       // Generate the PDF with filled form data
-      const pdfBuffer = await fillAgencyDisclosureForm(formData);
+      const pdfBuffer = await fillAgencyDisclosureForm(formDataWithEditableFlag);
       
       // Set the appropriate headers for PDF download
       res.setHeader('Content-Type', 'application/pdf');
@@ -1875,7 +1882,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         agentName,
         agentBrokerageName,
         agentLicenseNumber,
-        isLeasehold: isLeasehold || false
+        isLeasehold: isLeasehold || false,
+        isEditable: req.query.editable === 'true' // Add support for editable PDFs
       };
       
       // Generate the PDF with filled form data
@@ -2129,7 +2137,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             // Add agent info if available
             agentName: agent ? `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email : '',
             agentBrokerageName: "Coldwell Banker Grass Roots Realty",
-            agentLicenseNumber: "2244751" // Example license number
+            agentLicenseNumber: "2244751", // Example license number
+            isEditable: formData.isEditable === true // Support for editable PDFs
           };
           
           // Fill the PDF form with data
@@ -2279,7 +2288,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             propertyAddress: property.address,
             propertyCity: property.city || '',
             propertyState: property.state || '',
-            propertyZip: property.zip || ''
+            propertyZip: property.zip || '',
+            isEditable: formData.isEditable === true // Support for editable PDFs
           };
           
           // Fill the PDF form with data
@@ -2398,7 +2408,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             // Add seller information
             sellerName1: `${req.user!.firstName || ''} ${req.user!.lastName || ''}`.trim() || req.user!.email,
             sellerSignature1: formData.sellerSignature,
-            sellerSignatureDate1: new Date().toISOString().split('T')[0]
+            sellerSignatureDate1: new Date().toISOString().split('T')[0],
+            // Support for editable PDFs
+            isEditable: formData.isEditable === true
           };
           
           // Get the existing PDF file path if available
