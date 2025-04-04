@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
-import { execSync } from "child_process";
+import { exec, execSync } from "child_process";
 import { 
   extractPropertyData, 
   verifyKYCDocuments, 
@@ -28,8 +28,13 @@ import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
-import { exec, execSync } from "child_process";
-import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData, createSimpleReplacementDocument } from "./pdf-service";
+import { 
+  addSignatureToPdf, 
+  replacePlaceholderInPdf, 
+  AgencyDisclosureFormData, 
+  createSimpleReplacementDocument,
+  fillAgencyDisclosureForm
+} from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 // Create uploads directories if they don't exist
