@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
 import { PropertyWithParticipants, ViewingRequestWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -77,6 +78,7 @@ export default function BuyerPropertyDetail() {
   } | null>(null);
   
   const { toast } = useToast();
+  const { user } = useAuth();
   
   // Fetch available agents
   const { data: agents } = useQuery<Array<{
@@ -338,7 +340,7 @@ export default function BuyerPropertyDetail() {
   };
   
   // Handle submission after the disclosure form is signed
-  const handleDisclosureFormComplete = () => {
+  const handleDisclosureFormComplete = useCallback(() => {
     // Close the disclosure form
     setIsDisclosureFormOpen(false);
     
@@ -355,11 +357,10 @@ export default function BuyerPropertyDetail() {
       // Clear the stored data
       setViewingRequestData(null);
     }
-  };
+  }, [viewingRequestData, requestViewingMutation, setViewingRequestData, setIsDisclosureFormOpen]);
   
   // Handle cancellation of the disclosure form
-  const handleDisclosureFormCancel = () => {
-    setIsDisclosureFormOpen(false);
+  const handleDisclosureFormCancel = useCallback(() => {
     setViewingRequestData(null);
     
     toast({
@@ -367,7 +368,46 @@ export default function BuyerPropertyDetail() {
       description: "You can try again when you're ready to sign the disclosure form.",
       variant: "default",
     });
-  };
+  }, [toast, setViewingRequestData]);
+  
+  // Monitor disclosure form closing
+  useEffect(() => {
+    // When disclosure form is closed (isDisclosureFormOpen changes from true to false)
+    if (!isDisclosureFormOpen) {
+      // If we just closed the form and we still have viewing request data,
+      // query for the latest agreement to see if it was signed
+      if (viewingRequestData && propertyId) {
+        apiRequest("GET", `/api/properties/${propertyId}/agreements`)
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.data) {
+              // Check for a recently signed agency disclosure agreement
+              const recentDisclosures = data.data.filter((agreement: any) => 
+                agreement.type === "agency_disclosure" && 
+                agreement.status === "signed_by_buyer" &&
+                user?.id && agreement.buyerId === user.id &&
+                new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
+              );
+              
+              if (recentDisclosures.length > 0) {
+                // If we found a recent disclosure, proceed with the viewing request
+                handleDisclosureFormComplete();
+              } else {
+                // Otherwise, assume the user cancelled
+                handleDisclosureFormCancel();
+              }
+            } else {
+              // If the API call fails or returns no data, assume cancellation
+              handleDisclosureFormCancel();
+            }
+          })
+          .catch(() => {
+            // On error, assume cancellation
+            handleDisclosureFormCancel();
+          });
+      }
+    }
+  }, [isDisclosureFormOpen, viewingRequestData, propertyId, user?.id, handleDisclosureFormComplete, handleDisclosureFormCancel]);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -1023,30 +1063,19 @@ export default function BuyerPropertyDetail() {
       </Dialog>
       
       {/* Agency Disclosure Form Dialog */}
-      <Dialog open={isDisclosureFormOpen} onOpenChange={setIsDisclosureFormOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>California Real Estate Agency Relationships Disclosure</DialogTitle>
-            <DialogDescription>
-              Before you can schedule a viewing, you must review and sign this disclosure form as required by California law.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {property && (
-            <AgencyDisclosureForm
-              propertyId={propertyId}
-              propertyAddress={property.address}
-              propertyCity={property.city || ""}
-              propertyState={property.state || ""}
-              propertyZip={property.zip || ""}
-              buyerName={`${property.buyer?.firstName || ""} ${property.buyer?.lastName || ""}`.trim()}
-              agentName={`${property.agent?.firstName || ""} ${property.agent?.lastName || ""}`.trim()}
-              onComplete={handleDisclosureFormComplete}
-              onCancel={handleDisclosureFormCancel}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {property && property.agent && (
+        <AgencyDisclosureForm
+          property={property}
+          agent={property.agent}
+          isOpen={isDisclosureFormOpen}
+          onClose={() => {
+            // The form handles its own close event. If user clicked Cancel or X,
+            // we want to cancel the viewing request, otherwise we want to proceed with it
+            // We'll detect which scenario occurred in useEffect by checking for agreements
+            setIsDisclosureFormOpen(false);
+          }}
+        />
+      )}
       
       {/* Alert Dialog for confirming override of existing viewing request */}
       <AlertDialog open={showOverrideDialog} onOpenChange={setShowOverrideDialog}>
