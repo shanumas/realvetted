@@ -51,6 +51,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2, // Add retries for more reliability
+    retryDelay: 1000, // Wait 1 second between retries
   });
   
   // Connect to WebSocket when user is authenticated
