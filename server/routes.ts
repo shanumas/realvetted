@@ -28,6 +28,7 @@ import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
+import { exec, execSync } from "child_process";
 import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData, createSimpleReplacementDocument } from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
