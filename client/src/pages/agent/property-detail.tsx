@@ -436,12 +436,6 @@ export default function AgentPropertyDetail() {
                                                 ? "bg-blue-100 text-blue-800"
                                                 : agreement.status === "signed_by_buyer" 
                                                 ? "bg-green-100 text-green-800"
-                                                : agreement.status === "pending_seller"
-                                                ? "bg-orange-100 text-orange-800"
-                                                : agreement.status === "signed_by_seller"
-                                                ? "bg-purple-100 text-purple-800"
-                                                : agreement.status === "completed"
-                                                ? "bg-green-100 text-green-800"
                                                 : "bg-gray-100 text-gray-800"
                                             }`}
                                           >
@@ -450,13 +444,7 @@ export default function AgentPropertyDetail() {
                                               : agreement.status === "pending_buyer"
                                               ? "Awaiting Buyer"
                                               : agreement.status === "signed_by_buyer" 
-                                              ? "Signed by Buyer" 
-                                              : agreement.status === "pending_seller"
-                                              ? "Awaiting Seller"
-                                              : agreement.status === "signed_by_seller"
-                                              ? "Signed by Seller"
-                                              : agreement.status === "completed"
-                                              ? "Completed"
+                                              ? "Signed" 
                                               : agreement.status}
                                           </span>
                                         </div>
@@ -482,7 +470,8 @@ export default function AgentPropertyDetail() {
                                           variant="outline"
                                           onClick={() => {
                                             // Open a preview of the agreement
-                                            window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                            // This is a placeholder for viewing signed agreements
+                                            alert("Viewing signed agreements is not implemented yet");
                                           }}
                                         >
                                           View

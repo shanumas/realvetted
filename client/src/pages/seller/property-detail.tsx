@@ -11,19 +11,15 @@ import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, FileSignature, File, PencilLine
+  Activity, FileSignature, File
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
-import { SellerAgencyDisclosureForm } from "@/components/seller-agency-disclosure-form";
-import { Agreement, Property } from "@shared/schema";
 
 export default function SellerPropertyDetail() {
   const [, params] = useRoute("/seller/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
-  const [selectedAgreement, setSelectedAgreement] = useState<Agreement | null>(null);
-  const [isAgencyDisclosureFormOpen, setIsAgencyDisclosureFormOpen] = useState(false);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -333,14 +329,14 @@ export default function SellerPropertyDetail() {
                       
                       {/* Agreements List */}
                       {(() => {
-                        const { data: agreementsResponse, isLoading: loadingAgreements } = useQuery<any>({
+                        const { data, isLoading: loadingAgreements } = useQuery({
                           queryKey: [`/api/properties/${propertyId}/agreements`],
                           queryFn: getQueryFn({ on401: "throw" }),
                         });
                         
                         // Debug output
                         console.log("Property ID:", propertyId);
-                        console.log("Agreements data:", agreementsResponse);
+                        console.log("Agreements data:", data);
                         
                         if (loadingAgreements) {
                           return (
@@ -351,7 +347,7 @@ export default function SellerPropertyDetail() {
                           );
                         }
                         
-                        const agreements = agreementsResponse?.data || [];
+                        const agreements = data?.data || [];
                         
                         if (!agreements || agreements.length === 0) {
                           return (
@@ -384,10 +380,6 @@ export default function SellerPropertyDetail() {
                                             ? "bg-green-100 text-green-800"
                                             : agreement.status === "pending_seller"
                                             ? "bg-orange-100 text-orange-800"
-                                            : agreement.status === "signed_by_seller"
-                                            ? "bg-purple-100 text-purple-800"
-                                            : agreement.status === "completed"
-                                            ? "bg-green-100 text-green-800"
                                             : "bg-gray-100 text-gray-800"
                                         }`}
                                       >
@@ -399,42 +391,22 @@ export default function SellerPropertyDetail() {
                                           ? "Signed by Buyer" 
                                           : agreement.status === "pending_seller"
                                           ? "Awaiting Your Signature"
-                                          : agreement.status === "signed_by_seller"
-                                          ? "Signed by You"
-                                          : agreement.status === "completed"
-                                          ? "Completed"
                                           : agreement.status}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
                                 
-                                <div className="flex space-x-2">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => {
-                                      // Open a preview of the agreement
-                                      window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
-                                    }}
-                                  >
-                                    View
-                                  </Button>
-                                  
-                                  {agreement.status === "pending_seller" && agreement.type === "agency_disclosure" && (
-                                    <Button 
-                                      size="sm" 
-                                      variant="default"
-                                      onClick={() => {
-                                        // Open the seller agency disclosure form for signing
-                                        setSelectedAgreement(agreement);
-                                        setIsAgencyDisclosureFormOpen(true);
-                                      }}
-                                    >
-                                      <PencilLine className="mr-1 h-4 w-4" /> Sign
-                                    </Button>
-                                  )}
-                                </div>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => {
+                                    // Open a preview of the agreement
+                                    window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                  }}
+                                >
+                                  View
+                                </Button>
                               </div>
                             ))}
                           </div>
@@ -463,16 +435,6 @@ export default function SellerPropertyDetail() {
           </div>
         </div>
       </main>
-
-      {/* Seller Agency Disclosure Form Modal */}
-      {isAgencyDisclosureFormOpen && selectedAgreement && property && (
-        <SellerAgencyDisclosureForm
-          isOpen={isAgencyDisclosureFormOpen}
-          onClose={() => setIsAgencyDisclosureFormOpen(false)}
-          property={property as Property}
-          agreement={selectedAgreement}
-        />
-      )}
     </div>
   );
 }
