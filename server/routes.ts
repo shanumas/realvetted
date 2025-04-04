@@ -1907,23 +1907,22 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         status: 'completed'
       });
       
-      // If this is associated with a viewing request, update its status
+      // If this is associated with a viewing request, update activity but keep it in pending status
+      // so it can be sent to the seller after the agent signs
       if (viewingRequestId) {
         const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
         if (viewingRequest) {
-          await storage.updateViewingRequest(viewingRequest.id, {
-            status: 'completed'
-          });
-          
-          // Create activity log
+          // Keep the status as 'pending' instead of completed to allow seller review
+          // Just update the activity log to indicate the agent has signed
           await storage.createPropertyActivityLog({
             propertyId,
             userId: buyerId,
-            activity: 'agency_disclosure_signed',
+            activity: 'agency_disclosure_signed_by_agent',
             details: {
               viewingRequestId,
               agreementId: agreement.id,
-              agreementType: 'agency_disclosure'
+              agreementType: 'agency_disclosure',
+              message: 'Agent has signed the disclosure form. Awaiting seller review.'
             },
             timestamp: new Date()
           });
