@@ -62,13 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<User | null, Error>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/auth/user", Date.now()], // Add timestamp to force refetch on page loads
     queryFn: getQueryFn({ on401: "returnNull" }),
     initialData: null, // Explicitly set initial data to null
     refetchOnWindowFocus: true,
     refetchOnMount: true,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2, // Add retries for more reliability
+    refetchInterval: 60000, // Refresh session every minute
+    staleTime: 0, // Always consider auth data stale to force refetch
+    retry: 3, // Increase retries for more reliability
     retryDelay: 1000, // Wait 1 second between retries
   });
   

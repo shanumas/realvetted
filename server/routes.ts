@@ -1856,20 +1856,52 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       }
       
       // Get the agent ID if a viewing request ID is provided
-      let agentId = null;
+      let agentId: number;
+      
       if (viewingRequestId) {
         const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
-        if (viewingRequest) {
+        if (viewingRequest && viewingRequest.buyerAgentId) {
           agentId = viewingRequest.buyerAgentId;
+        } else {
+          // Get first available agent if viewing request has no agent
+          const agents = await storage.getUsersByRole('agent');
+          if (agents.length > 0) {
+            agentId = agents[0].id;
+            console.log(`No agent found in viewing request, using agent ID ${agentId}`);
+          } else {
+            // Use a system agent (admin) if no agents found
+            const admin = await storage.getUserByEmail('admin@realestateapp.com');
+            if (!admin) {
+              return res.status(500).json({ error: 'No agent or admin found in the system' });
+            }
+            agentId = admin.id;
+            console.log(`No agents found, using admin ID ${agentId} as fallback`);
+          }
+        }
+      } else {
+        // Get the first available agent if no viewing request
+        const agents = await storage.getUsersByRole('agent');
+        if (agents.length > 0) {
+          agentId = agents[0].id;
+          console.log(`No viewing request provided, using agent ID ${agentId}`);
+        } else {
+          // Use a system agent (admin) if no agents found
+          const admin = await storage.getUserByEmail('admin@realestateapp.com');
+          if (!admin) {
+            return res.status(500).json({ error: 'No agent or admin found in the system' });
+          }
+          agentId = admin.id;
+          console.log(`No agents found, using admin ID ${agentId} as fallback`);
         }
       }
       
+      // Create the agreement with a valid agent ID
       const agreement = await storage.createAgreement({
         propertyId,
         type: 'agency_disclosure',
         agreementText: `California Agency Disclosure Form for property ${property.address}`,
         buyerId,
-        agentId,
+        agentId, // Now this will never be null
         date: new Date(),
         documentUrl: `/uploads/agreements/${filename}`,
         status: 'completed'
@@ -2035,10 +2067,31 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               documentUrl: pdfUrl
             });
           } else {
-            // Create new agreement
+            // Create new agreement - ensure we have a valid agent ID
+            let validAgentId: number;
+            
+            if (property.agentId) {
+              validAgentId = property.agentId;
+            } else {
+              // Get first available agent if no agent assigned to property
+              const agents = await storage.getUsersByRole('agent');
+              if (agents.length > 0) {
+                validAgentId = agents[0].id;
+                console.log(`No agent assigned to property, using agent ID ${validAgentId}`);
+              } else {
+                // Use a system agent (admin) if no agents found
+                const admin = await storage.getUserByEmail('admin@realestateapp.com');
+                if (!admin) {
+                  throw new Error('No agent or admin found in the system');
+                }
+                validAgentId = admin.id;
+                console.log(`No agents found, using admin ID ${validAgentId} as fallback`);
+              }
+            }
+            
             agreement = await storage.createAgreement({
               propertyId,
-              agentId: property.agentId || -1, // We need to handle this better
+              agentId: validAgentId, // Now this will always be a valid ID
               buyerId: userId,
               type: 'agency_disclosure',
               agreementText: `Agency Disclosure for ${property.address}`,
