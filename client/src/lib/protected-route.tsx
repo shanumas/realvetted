@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 import { Redirect, Route } from "wouter";
+import { useEffect, useState } from "react";
 
 interface ProtectedRouteProps {
   path: string;
@@ -14,11 +15,21 @@ export function ProtectedRoute({
   allowedRoles,
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  
+  // Use this effect to handle initial authentication check
+  useEffect(() => {
+    // Only complete the auth check once we've confirmed loading is done
+    if (!isLoading) {
+      setIsCheckingAuth(false);
+    }
+  }, [isLoading]);
 
   return (
     <Route path={path}>
       {() => {
-        if (isLoading) {
+        // Show loading spinner while initially checking auth
+        if (isLoading || isCheckingAuth) {
           return (
             <div className="flex items-center justify-center min-h-screen">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -26,6 +37,7 @@ export function ProtectedRoute({
           );
         }
 
+        // If user is not authenticated, redirect to auth page
         if (!user) {
           return <Redirect to="/auth" />;
         }
@@ -35,6 +47,7 @@ export function ProtectedRoute({
           return <Component />;
         }
         
+        // If user doesn't have the required role, redirect to their dashboard
         if (!allowedRoles.includes(user.role)) {
           // Redirect to the appropriate dashboard based on role
           if (user.role === "buyer") {
@@ -51,6 +64,7 @@ export function ProtectedRoute({
           return <Redirect to="/auth" />;
         }
 
+        // User is authenticated and has the right role
         return <Component />;
       }}
     </Route>

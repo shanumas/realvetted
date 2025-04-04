@@ -44,13 +44,20 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      const res = await fetch(queryKey[0] as string, {
+      // Add a timestamp to ensure cache-busting for critical endpoints like authentication
+      const url = queryKey[0] as string;
+      const urlWithTimestamp = url.includes('auth') 
+        ? `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}` 
+        : url;
+      
+      const res = await fetch(urlWithTimestamp, {
         credentials: "include",
         cache: "no-cache", // Prevent caching of authentication state
         headers: {
-          // Add a cache-busting header
+          // Add cache-busting headers
           'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Expires': '0'
         }
       });
 
@@ -61,7 +68,38 @@ export const getQueryFn: <T>(options: {
       await throwIfResNotOk(res);
       return await res.json();
     } catch (error) {
-      console.error("Query error:", error);
+      console.error("Query error:", error, "on query key:", queryKey[0]);
+      
+      // For auth endpoints, retry up to 2 times on network errors
+      // Safe way to convert queryKey to string for comparison
+      const queryKeyString = typeof queryKey[0] === 'string' ? queryKey[0] : '';
+      if (queryKeyString.includes('auth') && 
+          (error instanceof TypeError || error instanceof Error && error.message.includes('5'))) {
+        console.log("Retrying auth query...");
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+          const retryRes = await fetch(queryKey[0] as string, {
+            credentials: "include",
+            cache: "no-cache",
+            headers: {
+              'Pragma': 'no-cache',
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Expires': '0'
+            }
+          });
+          
+          if (unauthorizedBehavior === "returnNull" && retryRes.status === 401) {
+            return null;
+          }
+          
+          await throwIfResNotOk(retryRes);
+          return await retryRes.json();
+        } catch (retryError) {
+          console.error("Retry failed:", retryError);
+        }
+      }
       
       // Rethrow 401 errors (or return null depending on options)
       if (error instanceof Error && error.message.includes("401")) {
@@ -79,12 +117,17 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes instead of Infinity
-      retry: 1, // Default retry once for all queries
+      refetchOnWindowFocus: true, // Enable refetching on window focus for better sync
+      refetchOnReconnect: true,   // Refetch when internet reconnects
+      staleTime: 5 * 60 * 1000,   // 5 minutes before data is considered stale
+      // Removed gcTime property - using default value instead
+      retry: 2,                   // Retry twice for better reliability
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
     },
     mutations: {
-      retry: 1, // Retry mutations once by default
+      retry: 1,                   // Retry mutations once by default
+      // Use a function for retryDelay instead of a constant value to match type expectations
+      retryDelay: () => 1000,     // Wait 1 second between mutation retries
     },
   },
 });

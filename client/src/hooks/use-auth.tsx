@@ -10,6 +10,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import websocketClient from "@/lib/websocket";
 
+// Helper function to save the current location
+function saveCurrentLocation(location: string) {
+  // Don't save auth page
+  if (location === "/auth") return;
+  localStorage.setItem("lastLocation", location);
+}
+
+// Helper function to get the last saved location
+function getLastLocation(): string | null {
+  return localStorage.getItem("lastLocation");
+}
+
 type LoginData = {
   email: string;
   password: string;
@@ -38,7 +50,12 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Save current location whenever it changes
+  useEffect(() => {
+    saveCurrentLocation(location);
+  }, [location]);
   
   const {
     data: user,
@@ -62,6 +79,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       websocketClient.setUserId(user.id);
     }
   }, [user?.id]);
+  
+  // Restore last location on authentication if on the root path
+  useEffect(() => {
+    // Only run when authentication is confirmed and we're at the root
+    if (!isLoading && user && location === '/') {
+      const lastLocation = getLastLocation();
+      if (lastLocation) {
+        console.log('Restoring last location:', lastLocation);
+        setLocation(lastLocation);
+      }
+    }
+  }, [isLoading, user, location, setLocation]);
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
@@ -152,8 +181,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
+      // Clear user data from query client cache
       queryClient.setQueryData(["/api/auth/user"], null);
+      
+      // Clear last location from localStorage to ensure clean session
+      localStorage.removeItem("lastLocation");
+      
+      // Redirect to auth page
       setLocation("/auth");
+      
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",

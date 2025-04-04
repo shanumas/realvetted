@@ -66,19 +66,29 @@ function HomePage() {
   // Effect to redirect based on auth status and role
   useEffect(() => {
     if (!isLoading && user) {
-      // Redirect based on role and verification status
-      if (user.role === "buyer" && user.profileStatus !== "verified") {
-        setLocation("/buyer/kyc");
-      } else if (user.role === "agent" && user.profileStatus !== "verified") {
-        setLocation("/agent/kyc");
-      } else if (user.role === "buyer") {
-        setLocation("/buyer/dashboard");
-      } else if (user.role === "seller") {
-        setLocation("/seller/dashboard");
-      } else if (user.role === "agent") {
-        setLocation("/agent/dashboard");
-      } else if (user.role === "admin") {
-        setLocation("/admin/dashboard");
+      // Try to restore the last visited location from localStorage
+      const lastLocation = localStorage.getItem("lastLocation");
+      
+      // Only redirect if there's no saved location or the saved location is the root/auth page
+      if (!lastLocation || lastLocation === '/' || lastLocation === '/auth') {
+        // Default redirection based on role and verification status
+        if (user.role === "buyer" && user.profileStatus !== "verified") {
+          setLocation("/buyer/kyc");
+        } else if (user.role === "agent" && user.profileStatus !== "verified") {
+          setLocation("/agent/kyc");
+        } else if (user.role === "buyer") {
+          setLocation("/buyer/dashboard");
+        } else if (user.role === "seller") {
+          setLocation("/seller/dashboard");
+        } else if (user.role === "agent") {
+          setLocation("/agent/dashboard");
+        } else if (user.role === "admin") {
+          setLocation("/admin/dashboard");
+        }
+      } else {
+        // Restore the last visited location
+        console.log("Restoring last location:", lastLocation);
+        setLocation(lastLocation);
       }
     }
   }, [user, isLoading, setLocation]);
