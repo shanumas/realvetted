@@ -86,22 +86,42 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     let y = 700;
     const lineHeight = 20;
     
-    // Add leasehold checkbox
+    // Add leasehold checkbox - using rectangle for compatibility with standard fonts
     if (formData.isLeasehold) {
-      page.drawText('☑', {
+      // Draw a filled checkbox
+      page.drawRectangle({
         x: 50,
-        y,
-        size: 14,
-        font: helveticaFont,
+        y: y - 10,
+        width: 14,
+        height: 14,
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0),
+        color: rgb(0.7, 0.7, 0.7), // Gray fill to indicate checked
+      });
+      // Add an X mark inside
+      page.drawLine({
+        start: { x: 50, y: y - 10 },
+        end: { x: 64, y: y + 4 },
+        thickness: 1,
+        color: rgb(0, 0, 0),
+      });
+      page.drawLine({
+        start: { x: 64, y: y - 10 },
+        end: { x: 50, y: y + 4 },
+        thickness: 1,
         color: rgb(0, 0, 0),
       });
     } else {
-      page.drawText('☐', {
+      // Draw an empty checkbox
+      page.drawRectangle({
         x: 50,
-        y,
-        size: 14,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
+        y: y - 10,
+        width: 14,
+        height: 14,
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0),
+        color: rgb(1, 1, 1), // White fill (unchecked)
+        opacity: 0,
       });
     }
     
@@ -403,8 +423,8 @@ export async function addSignatureToPdf(
     
     // Get the signature box position from our template
     // The coordinates are hardcoded based on our template's layout
-    let x = 60; // Inside the signature box
-    let y = 370; // Position in the signature area
+    let x = 90; // Inside the signature box
+    let y = 240; // Position in the signature area
     
     // Draw the signature on the page - centered in the signature box
     signaturePage.drawImage(signatureImage, {
