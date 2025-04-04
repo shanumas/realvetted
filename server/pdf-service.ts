@@ -533,7 +533,7 @@ export async function fillAgencyDisclosureForm(
       // Path to the original PDF
       const templatePath = path.join(
         process.cwd(),
-        "assets/converted/brbc_decrypted.pdf",
+        "assets/converted/brbc.pdf",
       );
 
       // Check if the file exists
@@ -555,10 +555,7 @@ export async function fillAgencyDisclosureForm(
     }
 
     // Path to the template PDF - using the decrypted version as requested
-    const templatePath = path.join(
-      process.cwd(),
-      "uploads/pdf/brbc_decrypted.pdf",
-    );
+    const templatePath = path.join(process.cwd(), "uploads/pdf/brbc.pdf");
 
     // Check if the file exists
     if (!fs.existsSync(templatePath)) {

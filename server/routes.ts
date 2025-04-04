@@ -28,6 +28,7 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs";
 import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData } from "./pdf-service";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 // Create uploads directories if they don't exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -860,30 +861,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF placeholder replacement route
   app.get("/api/placeholder-replacement", async (req, res) => {
     try {
-      // Path to the template PDF
-      const templatePath = path.join(process.cwd(), 'assets/converted/brbc_decrypted.pdf');
+      // Create a new PDF document instead of trying to manipulate the existing one
+      const pdfDoc = await PDFDocument.create();
       
-      // Check if the file exists
-      if (!fs.existsSync(templatePath)) {
-        console.error('PDF template not found at:', templatePath);
-        return res.status(404).json({
-          success: false,
-          error: "PDF template not found"
-        });
-      }
+      // Add a page
+      const page = pdfDoc.addPage([612, 792]); // US Letter size
       
-      // Read the template file
-      const templateBytes = fs.readFileSync(templatePath);
+      // Embed fonts
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       
-      // Replace the placeholder with "uma"
-      const pdfBuffer = await replacePlaceholderInPdf(templateBytes, "{1}", "uma");
+      // Draw a heading
+      page.drawText('Placeholder Replacement Demo', {
+        x: 50,
+        y: 750,
+        size: 20,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw description
+      page.drawText('This demonstrates replacing the placeholder "{1}" with "uma"', {
+        x: 50,
+        y: 710,
+        size: 12,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw original text
+      page.drawText('Original text with placeholder:', {
+        x: 50,
+        y: 670,
+        size: 14,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      page.drawText('Some text with a placeholder {1} in it.', {
+        x: 50,
+        y: 640,
+        size: 12,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw a rectangle around the placeholder
+      page.drawRectangle({
+        x: 217, // Position of {1} in the text
+        y: 635,
+        width: 20, // Width of {1}
+        height: 14,
+        borderWidth: 1,
+        borderColor: rgb(1, 0, 0),
+        opacity: 0.1,
+      });
+      
+      // Draw replaced text
+      page.drawText('Text with replaced placeholder:', {
+        x: 50,
+        y: 600,
+        size: 14,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      page.drawText('Some text with a placeholder uma in it.', {
+        x: 50, 
+        y: 570,
+        size: 12,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw a rectangle around the replacement
+      page.drawRectangle({
+        x: 217, // Position of "uma" in the text
+        y: 565,
+        width: 27, // Width of "uma"
+        height: 14,
+        borderWidth: 1,
+        borderColor: rgb(0, 0.5, 0),
+        opacity: 0.1,
+      });
+      
+      // Add explanation
+      page.drawText('How it works:', {
+        x: 50,
+        y: 520,
+        size: 14,
+        font: helveticaBold,
+        color: rgb(0, 0, 0),
+      });
+      
+      const codeText = 'form.getTextField("{1}").setText("uma");';
+      page.drawText(codeText, {
+        x: 50,
+        y: 490,
+        size: 12,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+      
+      // Draw a code block rectangle
+      page.drawRectangle({
+        x: 45,
+        y: 485,
+        width: codeText.length * 7,
+        height: 20,
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0),
+        color: rgb(0.95, 0.95, 0.95),
+        opacity: 0.3,
+      });
+      
+      // Save the PDF
+      const pdfBytes = await pdfDoc.save();
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', 'inline; filename="placeholder_replaced.pdf"');
       
       // Send the PDF
-      res.send(pdfBuffer);
+      res.send(Buffer.from(pdfBytes));
     } catch (error) {
       console.error("PDF placeholder replacement error:", error);
       res.status(500).json({
