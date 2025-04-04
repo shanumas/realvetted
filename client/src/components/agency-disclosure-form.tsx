@@ -1,9 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
@@ -35,14 +32,25 @@ export function AgencyDisclosureForm({
   const [signatureDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [isLeasehold, setIsLeasehold] = useState<boolean>(false);
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   
   // Determine if current user is agent or buyer
   const isAgent = user?.role === 'agent';
   
   // State to store existing agreements
   const [existingSignature, setExistingSignature] = useState<string | null>(null);
+  
+  // Reference to the iframe for PDF viewing
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  // Initial load of PDF
+  useEffect(() => {
+    if (isOpen && property?.id) {
+      // Generate a PDF preview for the form
+      generatePdfPreview();
+    }
+  }, [isOpen, property?.id]);
   
   // Check for existing agreement when the modal opens
   useEffect(() => {
@@ -124,9 +132,6 @@ export function AgencyDisclosureForm({
     agentBrokerageName: "Coldwell Banker Grass Roots Realty",
     agentLicenseNumber: "2244751",
     
-    // Is this a leasehold exceeding one year?
-    isLeasehold: isLeasehold,
-    
     // Set the appropriate signature based on user role
     ...(isAgent 
       ? {
@@ -150,6 +155,41 @@ export function AgencyDisclosureForm({
     if (sigPad) {
       const signatureData = sigPad.toDataURL();
       setSignature(signatureData);
+    }
+  };
+
+  const generatePdfPreview = async () => {
+    try {
+      if (!property?.id) return;
+      
+      // Generate a preview of the form
+      const response = await apiRequest(
+        'POST', 
+        `/api/properties/${property.id}/preview-agency-disclosure`, 
+        formData
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate preview");
+      }
+      
+      // Get the PDF as a blob
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      setPdfUrl(url);
+      
+      return url;
+    } catch (error) {
+      console.error("Error generating PDF preview:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate preview",
+        variant: "destructive",
+      });
+      return null;
     }
   };
 
@@ -193,7 +233,7 @@ export function AgencyDisclosureForm({
       
       toast({
         title: "Form Submitted",
-        description: "Agency Disclosure Form has been successfully generated and saved.",
+        description: "Agency Disclosure Form has been successfully signed and saved.",
       });
       
       // Invalidate queries to refresh data
@@ -219,34 +259,30 @@ export function AgencyDisclosureForm({
 
   const handleDownload = async () => {
     try {
-      // Create a temporary form with the data
-      const response = await apiRequest(
-        'POST', 
-        `/api/properties/${property.id}/preview-agency-disclosure`, 
-        formData
-      );
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate preview");
+      if (!pdfUrl) {
+        const url = await generatePdfPreview();
+        if (!url) throw new Error("Failed to generate PDF");
+        
+        // Create a link and trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up will happen when component unmounts
+        document.body.removeChild(a);
+      } else {
+        // Create a link and trigger download
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        document.body.removeChild(a);
       }
-      
-      // Get the PDF as a blob
-      const blob = await response.blob();
-      
-      // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a link and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (error) {
       console.error("Error downloading preview:", error);
       toast({
@@ -256,10 +292,26 @@ export function AgencyDisclosureForm({
       });
     }
   };
-
+  
+  // Clean up URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      if (pdfUrl) {
+        window.URL.revokeObjectURL(pdfUrl);
+      }
+    };
+  }, [pdfUrl]);
+  
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={() => {
+      // Clean up before closing
+      if (pdfUrl) {
+        window.URL.revokeObjectURL(pdfUrl);
+        setPdfUrl(null);
+      }
+      onClose();
+    }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             Agency Disclosure Form
@@ -267,157 +319,76 @@ export function AgencyDisclosureForm({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="grid grid-cols-1 gap-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="isLeasehold" 
-                checked={isLeasehold} 
-                onCheckedChange={(checked) => {
-                  setIsLeasehold(!!checked);
-                }}
+          {/* PDF Viewer */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {pdfUrl ? (
+              <iframe
+                ref={iframeRef}
+                src={pdfUrl}
+                className="w-full h-[500px]"
+                title="Agency Disclosure Form"
               />
-              <Label htmlFor="isLeasehold" className="cursor-pointer">
-                This is for a leasehold interest exceeding one year
-              </Label>
-            </div>
+            ) : (
+              <div className="flex items-center justify-center w-full h-[500px] bg-gray-100">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
+              </div>
+            )}
+          </div>
+
+          {/* Signature Area */}
+          <div className="pt-4">
+            <h3 className="text-lg font-medium mb-2">Your Signature</h3>
             
-            <div>
-              <Label htmlFor="buyerName">Your Full Name</Label>
-              <Input
-                id="buyerName"
-                value={formData.buyerName1}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="propertyAddress">Property Address</Label>
-              <Input
-                id="propertyAddress"
-                value={formData.propertyAddress}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <Label htmlFor="propertyCity">City</Label>
-                <Input
-                  id="propertyCity"
-                  value={formData.propertyCity}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-              <div>
-                <Label htmlFor="propertyState">State</Label>
-                <Input
-                  id="propertyState"
-                  value={formData.propertyState}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-              <div>
-                <Label htmlFor="propertyZip">ZIP</Label>
-                <Input
-                  id="propertyZip"
-                  value={formData.propertyZip}
-                  readOnly
-                  className="bg-gray-50"
-                />
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="agentInfo">Real Estate Agent</Label>
-              <Input
-                id="agentInfo"
-                value={`${formData.agentName} - License #${formData.agentLicenseNumber}`}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="brokerage">Brokerage</Label>
-              <Input
-                id="brokerage"
-                value={formData.agentBrokerageName}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="signatureDate">Date</Label>
-              <Input
-                id="signatureDate"
-                type="date"
-                value={signatureDate}
-                readOnly
-                className="bg-gray-50"
-              />
-            </div>
-
-            <div className="pt-4">
-              <Label>Your Signature</Label>
-              
-              {existingSignature ? (
-                <>
-                  <div className="mt-2 p-2 border border-gray-300 rounded-md bg-gray-50">
-                    <p className="text-sm text-gray-600 mb-2">You have already signed this form:</p>
-                    <img 
-                      src={existingSignature} 
-                      alt="Your existing signature" 
-                      className="max-h-[150px] mx-auto"
-                    />
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      Signed on {signatureDate}
-                    </p>
-                  </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm"
-                    className="mt-2"
-                    onClick={() => setExistingSignature(null)}
-                  >
-                    Sign Again
-                  </Button>
-                </>
-              ) : (
-                <div className="relative border border-gray-300 rounded-md mt-1">
-                  <SignatureCanvas
-                    ref={(ref) => setSigPad(ref)}
-                    canvasProps={{
-                      width: 600,
-                      height: 150,
-                      className: 'signature-canvas border rounded-md',
-                    }}
-                    onEnd={handleSignEnd}
+            {existingSignature ? (
+              <>
+                <div className="mt-2 p-4 border border-gray-300 rounded-md bg-gray-50">
+                  <p className="text-sm text-gray-600 mb-2">You have already signed this form:</p>
+                  <img 
+                    src={existingSignature} 
+                    alt="Your existing signature" 
+                    className="max-h-[100px] mx-auto"
                   />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
-                    className="absolute top-2 right-2"
-                    onClick={clearSignature}
-                  >
-                    Clear
-                  </Button>
+                  <p className="text-xs text-gray-500 mt-2 text-center">
+                    Signed on {signatureDate}
+                  </p>
                 </div>
-              )}
-            </div>
-
-            <div className="pt-4">
-              <p className="text-sm text-gray-600">
-                By signing, you acknowledge that you have received and read the California Agency Disclosure Form, 
-                which explains the different types of agency relationships in real estate transactions.
-              </p>
-            </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setExistingSignature(null)}
+                >
+                  Sign Again
+                </Button>
+              </>
+            ) : (
+              <div className="relative border border-gray-300 rounded-md mt-1 bg-white">
+                <SignatureCanvas
+                  ref={(ref) => setSigPad(ref)}
+                  canvasProps={{
+                    width: 600,
+                    height: 150,
+                    className: 'signature-canvas border rounded-md',
+                  }}
+                  onEnd={handleSignEnd}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="absolute top-2 right-2"
+                  onClick={clearSignature}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
+            
+            <p className="text-sm text-gray-600 mt-4">
+              By signing, you acknowledge that you have received and read the California Agency Disclosure Form, 
+              which explains the different types of agency relationships in real estate transactions.
+            </p>
           </div>
         </div>
 
@@ -425,7 +396,7 @@ export function AgencyDisclosureForm({
           <div className="flex space-x-2">
             <Button variant="outline" type="button" onClick={handleDownload}>
               <Download className="w-4 h-4 mr-2" />
-              Preview PDF
+              Download PDF
             </Button>
           </div>
           <div className="flex space-x-2">

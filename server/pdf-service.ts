@@ -45,7 +45,13 @@ export interface AgencyDisclosureFormData {
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   try {
     // Path to the original PDF template
-    const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc.pdf');
+    // First check if we have a new custom agency disclosure form template
+    let templatePath = path.join(process.cwd(), 'uploads/pdf/agency_disclosure_template.pdf');
+    
+    // Check if the custom template exists, otherwise fall back to the original
+    if (!fs.existsSync(templatePath)) {
+      templatePath = path.join(process.cwd(), 'uploads/pdf/brbc.pdf');
+    }
     
     // Check if the file exists
     if (!fs.existsSync(templatePath)) {
@@ -60,127 +66,238 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     // We need to handle encrypted PDFs by ignoring the encryption
     const pdfDoc = await PDFDocument.load(templateBytes, { ignoreEncryption: true });
     
-    // Get the form fields to check what's available
-    const form = pdfDoc.getForm();
-    
-    // Now we can create a custom overlay on a separate page
-    // that we'll attach at the end with property and agent information
-    
-    // Create a new page for our overlay information
+    // Create a new page for our form data
     const page = pdfDoc.addPage([612, 792]); // US Letter size
     
     // Embed fonts
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    // Add a header to the new page
-    page.drawText('ADDITIONAL PROPERTY & AGENT INFORMATION', {
+    // Add header
+    page.drawText('Agency Disclosure Form', {
       x: 50,
-      y: 700,
+      y: 750,
+      size: 20,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Set up coordinates for our form content
+    let y = 700;
+    const lineHeight = 20;
+    
+    // Add leasehold checkbox
+    if (formData.isLeasehold) {
+      page.drawText('☑', {
+        x: 50,
+        y,
+        size: 14,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+    } else {
+      page.drawText('☐', {
+        x: 50,
+        y,
+        size: 14,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+    }
+    
+    page.drawText('This is for a leasehold interest exceeding one year', {
+      x: 70,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight * 2;
+    
+    // Add buyer information section
+    page.drawText('BUYER INFORMATION:', {
+      x: 50,
+      y,
       size: 14,
       font: helveticaBold,
       color: rgb(0, 0, 0),
     });
     
-    // Set up coordinates for our content
-    let y = 650;
-    const lineHeight = 20;
-    
-    // Add property information
-    if (formData.propertyAddress) {
-      page.drawText('PROPERTY INFORMATION:', {
-        x: 50,
-        y,
-        size: 12,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-      
-      page.drawText(`Address: ${formData.propertyAddress}`, {
-        x: 50,
-        y,
-        size: 11,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-      
-      const cityStateZip = [
-        formData.propertyCity || '',
-        formData.propertyState || '',
-        formData.propertyZip || ''
-      ].filter(Boolean).join(', ');
-      
-      if (cityStateZip) {
-        page.drawText(`City, State, ZIP: ${cityStateZip}`, {
-          x: 50,
-          y,
-          size: 11,
-          font: helveticaFont,
-          color: rgb(0, 0, 0),
-        });
-        
-        y -= lineHeight;
-      }
-    }
-    
-    // Add spacing
     y -= lineHeight;
     
-    // Add agent information
-    if (formData.agentName) {
-      page.drawText('AGENT INFORMATION:', {
-        x: 50,
-        y,
-        size: 12,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-      
-      page.drawText(`Agent Name: ${formData.agentName}`, {
-        x: 50,
-        y,
-        size: 11,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-      
-      if (formData.agentBrokerageName) {
-        page.drawText(`Brokerage: ${formData.agentBrokerageName}`, {
-          x: 50,
-          y,
-          size: 11,
-          font: helveticaFont,
-          color: rgb(0, 0, 0),
-        });
-        
-        y -= lineHeight;
-      }
-      
-      if (formData.agentLicenseNumber) {
-        page.drawText(`License Number: ${formData.agentLicenseNumber}`, {
-          x: 50,
-          y,
-          size: 11,
-          font: helveticaFont,
-          color: rgb(0, 0, 0),
-        });
-        
-        y -= lineHeight;
-      }
-    }
+    page.drawText('Your Full Name:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
     
-    // Add a note about buyer signature
+    // Draw a field for buyer name
+    page.drawText(formData.buyerName1 || '', {
+      x: 150,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
     y -= lineHeight * 2;
     
-    page.drawText('SIGNATURE INFORMATION:', {
+    // Add property information section
+    page.drawText('PROPERTY INFORMATION:', {
+      x: 50,
+      y,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Property Address:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Draw a field for property address
+    page.drawText(formData.propertyAddress || '', {
+      x: 170,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    // Draw city, state, zip in a row
+    page.drawText('City:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText(formData.propertyCity || '', {
+      x: 80,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText('State:', {
+      x: 250,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText(formData.propertyState || '', {
+      x: 290,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText('ZIP:', {
+      x: 400,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText(formData.propertyZip || '', {
+      x: 430,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight * 2;
+    
+    // Add agent information section
+    page.drawText('AGENT INFORMATION:', {
+      x: 50,
+      y,
+      size: 14,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Real Estate Agent:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Draw agent name and license
+    page.drawText(`${formData.agentName || ''} - License #${formData.agentLicenseNumber || ''}`, {
+      x: 160,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    page.drawText('Brokerage:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    page.drawText(formData.agentBrokerageName || '', {
+      x: 120,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight;
+    
+    // Add date
+    page.drawText('Date:', {
+      x: 50,
+      y,
+      size: 12,
+      font: helveticaBold,
+      color: rgb(0, 0, 0),
+    });
+    
+    // Use either buyer or agent date
+    const dateToShow = formData.buyerSignatureDate1 || formData.agentSignatureDate || new Date().toISOString().split('T')[0];
+    
+    page.drawText(dateToShow, {
+      x: 90,
+      y,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    y -= lineHeight * 3;
+    
+    // Add signature section
+    page.drawText('Signature:', {
       x: 50,
       y,
       size: 12,
@@ -190,47 +307,22 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     
     y -= lineHeight;
     
-    // Add buyer information
-    if (formData.buyerName1) {
-      page.drawText(`Buyer Name: ${formData.buyerName1}`, {
-        x: 50,
-        y,
-        size: 11,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-    }
+    // Add a signature box (we'll add the actual signature image later)
+    page.drawRectangle({
+      x: 50,
+      y: y - 100, // Height of signature box
+      width: 300,
+      height: 100,
+      borderWidth: 1,
+      borderColor: rgb(0.7, 0.7, 0.7),
+      color: rgb(0.95, 0.95, 0.95),
+      opacity: 0.3,
+    });
     
-    if (formData.buyerName2) {
-      page.drawText(`Buyer 2 Name: ${formData.buyerName2}`, {
-        x: 50,
-        y,
-        size: 11,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-    }
+    y -= 120; // Move below the signature box
     
-    if (formData.buyerSignatureDate1) {
-      page.drawText(`Date: ${formData.buyerSignatureDate1}`, {
-        x: 50,
-        y,
-        size: 11,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      y -= lineHeight;
-    }
-    
-    // Add a note about the attachment
-    y -= lineHeight * 2;
-    
-    page.drawText('Note: This is an attachment to the California Agency Disclosure Form (BRBC). The information', {
+    // Add a note about the form
+    page.drawText('By signing, you acknowledge that you have received and read the California Agency Disclosure Form,', {
       x: 50,
       y,
       size: 10,
@@ -240,7 +332,7 @@ export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormDat
     
     y -= lineHeight;
     
-    page.drawText('provided here supplements the main form and should be kept together with it.', {
+    page.drawText('which explains the different types of agency relationships in real estate transactions.', {
       x: 50,
       y,
       size: 10,
@@ -292,8 +384,8 @@ export async function addSignatureToPdf(
     const imgHeight = signatureImage.height;
     
     // Scale down if needed
-    const maxWidth = 150;
-    const maxHeight = 50;
+    const maxWidth = 280;
+    const maxHeight = 90;
     let width = imgWidth;
     let height = imgHeight;
     
@@ -309,65 +401,12 @@ export async function addSignatureToPdf(
       width = width * scaleFactor;
     }
     
-    // Define signature positions for our attachment page
-    let x = 250;
-    let y = 0;
+    // Get the signature box position from our template
+    // The coordinates are hardcoded based on our template's layout
+    let x = 60; // Inside the signature box
+    let y = 370; // Position in the signature area
     
-    switch (signatureType) {
-      case 'buyer1':
-        // Positioning for the custom last page
-        y = 430; // Position for first buyer signature
-        signaturePage.drawText('Buyer 1 Signature:', {
-          x: 50,
-          y: y + 15,
-          size: 11,
-          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          color: rgb(0, 0, 0),
-        });
-        break;
-      case 'buyer2':
-        y = 380; // Position for second buyer signature
-        signaturePage.drawText('Buyer 2 Signature:', {
-          x: 50,
-          y: y + 15,
-          size: 11,
-          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          color: rgb(0, 0, 0),
-        });
-        break;
-      case 'seller1':
-        y = 330; // Position for first seller signature
-        signaturePage.drawText('Seller 1 Signature:', {
-          x: 50,
-          y: y + 15,
-          size: 11,
-          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          color: rgb(0, 0, 0),
-        });
-        break;
-      case 'seller2':
-        y = 280; // Position for second seller signature
-        signaturePage.drawText('Seller 2 Signature:', {
-          x: 50,
-          y: y + 15,
-          size: 11,
-          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          color: rgb(0, 0, 0),
-        });
-        break;
-      case 'agent':
-        y = 230; // Position for agent signature
-        signaturePage.drawText('Agent Signature:', {
-          x: 50,
-          y: y + 15,
-          size: 11,
-          font: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          color: rgb(0, 0, 0),
-        });
-        break;
-    }
-    
-    // Draw the signature on the page
+    // Draw the signature on the page - centered in the signature box
     signaturePage.drawImage(signatureImage, {
       x: x,
       y: y,
@@ -375,17 +414,8 @@ export async function addSignatureToPdf(
       height: height,
     });
     
-    // Add date stamp next to signature
-    const today = new Date();
-    const formattedDate = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-    
-    signaturePage.drawText(`Date: ${formattedDate}`, {
-      x: x + width + 20, // Position to the right of signature
-      y: y + height / 2 - 5, // Center aligned with signature
-      size: 10,
-      font: await pdfDoc.embedFont(StandardFonts.Helvetica),
-      color: rgb(0, 0, 0),
-    });
+    // Add date stamp below the signature - we already have this in our template
+    // so we don't need to add it again
     
     // Save the modified PDF
     const modifiedPdfBytes = await pdfDoc.save();
