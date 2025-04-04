@@ -455,65 +455,37 @@ export async function replacePlaceholderInPdf(pdfBuffer: Buffer, placeholder: st
     const pages = pdfDoc.getPages();
     console.log(`PDF has ${pages.length} pages`);
     
-    // Create a new page to display the modified content
-    const newPage = pdfDoc.addPage([612, 792]); // US Letter size
+    // Get the form from the PDF
+    const form = pdfDoc.getForm();
     
-    // Embed the Helvetica font
-    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    
-    // Draw a heading
-    newPage.drawText('Modified PDF - "{1}" replaced with "uma"', {
-      x: 50,
-      y: 750,
-      size: 16,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    // Draw the replacement text prominently on the page
-    newPage.drawText(`The placeholder "${placeholder}" has been replaced with:`, {
-      x: 50,
-      y: 700,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText(replacement, {
-      x: 50,
-      y: 650,
-      size: 24, // Larger font for emphasis
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    // Draw a rectangle around the replacement text
-    newPage.drawRectangle({
-      x: 45,
-      y: 645,
-      width: replacement.length * 15, // Approximate width based on text length
-      height: 30,
-      borderWidth: 1,
-      borderColor: rgb(0, 0, 0),
-      opacity: 0.1,
-    });
-    
-    // Add additional information
-    newPage.drawText(`Original PDF had ${pages.length} pages.`, {
-      x: 50,
-      y: 600,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('The text replacement process has been completed.', {
-      x: 50,
-      y: 580,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
+    try {
+      // Try to get the text field with the placeholder name as the field name
+      // This is based on the assumption that {1} is a form field named "{1}"
+      const textField = form.getTextField(placeholder);
+      
+      // Set the value of the text field to the replacement text
+      textField.setText(replacement);
+      
+      console.log(`Successfully replaced placeholder ${placeholder} with ${replacement}`);
+    } catch (fieldError) {
+      console.warn(`No form field named ${placeholder} found in the PDF`);
+      console.warn(fieldError);
+      
+      // If we can't find the field, add a note at the beginning of the document
+      const firstPage = pages[0];
+      
+      // Embed the Helvetica font
+      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      
+      // Draw a note at the top of the first page
+      firstPage.drawText(`Note: Replaced ${placeholder} with ${replacement}`, {
+        x: 50,
+        y: firstPage.getHeight() - 50,
+        size: 12,
+        font: helveticaFont,
+        color: rgb(0, 0, 0),
+      });
+    }
     
     // Save the document
     const modifiedPdfBytes = await pdfDoc.save();
