@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
+import { execSync } from "child_process";
 import { 
   extractPropertyData, 
   verifyKYCDocuments, 
@@ -27,7 +28,7 @@ import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs";
-import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData } from "./pdf-service";
+import { fillAgencyDisclosureForm, addSignatureToPdf, replacePlaceholderInPdf, AgencyDisclosureFormData, createSimpleReplacementDocument } from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 // Create uploads directories if they don't exist
@@ -861,41 +862,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF placeholder replacement route - directly modifies the brbc.pdf form
   app.get("/api/placeholder-replacement", async (req, res) => {
     try {
+      console.log("Starting placeholder replacement PDF generation");
+      
       // Path to the original PDF
       const templatePath = path.join(process.cwd(), "uploads/pdf/brbc.pdf");
 
-      // Check if the file exists
-      if (!fs.existsSync(templatePath)) {
-        console.error("PDF template not found at:", templatePath);
-        
-        // Try the alternative location in attached_assets
-        const altTemplatePath = path.join(process.cwd(), "attached_assets/brbc.pdf");
-        
-        if (!fs.existsSync(altTemplatePath)) {
-          console.error("PDF template not found at alternative location either:", altTemplatePath);
-          throw new Error("Form template not found");
+      // Check if the file exists and log detailed information
+      let templateStats = null;
+      try {
+        if (fs.existsSync(templatePath)) {
+          templateStats = fs.statSync(templatePath);
+          console.log(`PDF template found at: ${templatePath}`);
+          console.log(`Template size: ${templateStats.size} bytes`);
+          console.log(`Last modified: ${templateStats.mtime}`);
+        } else {
+          console.warn(`PDF template not found at: ${templatePath}`);
         }
-        
-        // If found in attached_assets, copy it to uploads/pdf
-        const uploadsDir = path.join(process.cwd(), "uploads/pdf");
-        
-        // Create directory if it doesn't exist
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        
-        // Copy the file
-        fs.copyFileSync(altTemplatePath, templatePath);
-        console.log("Copied PDF template from attached_assets to uploads/pdf");
+      } catch (fsError) {
+        console.error("Error checking template file:", fsError);
       }
 
-      // Read the template file
-      const templateBytes = fs.readFileSync(templatePath);
-      console.log(`Read PDF template, size: ${templateBytes.length} bytes`);
+      // If not found at primary location, try alternative location
+      if (!templateStats) {
+        const altTemplatePath = path.join(process.cwd(), "attached_assets/brbc.pdf");
+        
+        try {
+          if (fs.existsSync(altTemplatePath)) {
+            const altStats = fs.statSync(altTemplatePath);
+            console.log(`PDF template found at alternative location: ${altTemplatePath}`);
+            console.log(`Alternative template size: ${altStats.size} bytes`);
+            console.log(`Last modified: ${altStats.mtime}`);
+            
+            // Copy to the uploads directory
+            const uploadsDir = path.join(process.cwd(), "uploads/pdf");
+            
+            // Create directory if it doesn't exist
+            if (!fs.existsSync(uploadsDir)) {
+              fs.mkdirSync(uploadsDir, { recursive: true });
+              console.log(`Created directory: ${uploadsDir}`);
+            }
+            
+            // Copy the file
+            fs.copyFileSync(altTemplatePath, templatePath);
+            console.log(`Copied PDF template from ${altTemplatePath} to ${templatePath}`);
+            
+            // Verify the copy worked
+            if (fs.existsSync(templatePath)) {
+              templateStats = fs.statSync(templatePath);
+              console.log(`Verified copied template, size: ${templateStats.size} bytes`);
+            } else {
+              console.error("Failed to copy template - destination file doesn't exist after copy");
+            }
+          } else {
+            console.error(`PDF template not found at alternative location either: ${altTemplatePath}`);
+            
+            // Check if brbc.pdf exists anywhere else in the project
+            console.log("Searching for brbc.pdf in other locations...");
+            const searchResult = execSync('find . -name "brbc.pdf" 2>/dev/null || echo "Not found"', { encoding: 'utf8' });
+            console.log("Search results:", searchResult);
+            
+            if (searchResult !== "Not found") {
+              // Found the file somewhere else, try to copy it
+              const foundPath = searchResult.trim().split('\n')[0];
+              console.log(`Found PDF at: ${foundPath}, attempting to copy...`);
+              
+              const uploadsDir = path.join(process.cwd(), "uploads/pdf");
+              if (!fs.existsSync(uploadsDir)) {
+                fs.mkdirSync(uploadsDir, { recursive: true });
+              }
+              
+              try {
+                fs.copyFileSync(foundPath, templatePath);
+                console.log(`Copied PDF from ${foundPath} to ${templatePath}`);
+                
+                if (fs.existsSync(templatePath)) {
+                  templateStats = fs.statSync(templatePath);
+                  console.log(`Verified copied template from search, size: ${templateStats.size} bytes`);
+                }
+              } catch (copyError) {
+                console.error(`Error copying from found location: ${copyError}`);
+              }
+            } else {
+              console.log("No brbc.pdf found anywhere in the project");
+            }
+          }
+        } catch (altError) {
+          console.error("Error checking alternative template location:", altError);
+        }
+      }
 
-      // Replace the placeholder "1" with "uma"
-      const modifiedPdfBytes = await replacePlaceholderInPdf(templateBytes, "1", "uma");
-      console.log(`Generated modified PDF, size: ${modifiedPdfBytes.length} bytes`);
+      let modifiedPdfBytes;
+      
+      // If we still don't have a template, create a fallback document
+      if (!templateStats || !fs.existsSync(templatePath)) {
+        console.warn("No template found, creating fallback document");
+        
+        // Create a simple replacement document from scratch
+        modifiedPdfBytes = await createSimpleReplacementDocument("1", "uma");
+        console.log(`Created fallback PDF from scratch, size: ${modifiedPdfBytes.length} bytes`);
+      } else {
+        // Read the template file
+        const templateBytes = fs.readFileSync(templatePath);
+        console.log(`Successfully read PDF template, size: ${templateBytes.length} bytes`);
+
+        // Replace the placeholder "1" with "uma"
+        modifiedPdfBytes = await replacePlaceholderInPdf(templateBytes, "1", "uma");
+        console.log(`Generated modified PDF with text replacement, size: ${modifiedPdfBytes.length} bytes`);
+      }
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
@@ -903,12 +976,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Send the modified PDF
       res.send(modifiedPdfBytes);
+      console.log("PDF sent successfully to client");
     } catch (error) {
       console.error("PDF placeholder replacement error:", error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Failed to replace placeholder in PDF"
-      });
+      
+      // Try one last desperate fallback
+      try {
+        console.warn("Attempting emergency fallback document creation");
+        const fallbackDoc = await PDFDocument.create();
+        const page = fallbackDoc.addPage([612, 792]);
+        
+        // Add some text
+        const { width, height } = page.getSize();
+        page.drawText("Error Recovery Document - Text Replacement", {
+          x: 50,
+          y: height - 50,
+          size: 16,
+        });
+        
+        page.drawText("The original PDF could not be processed.", {
+          x: 50,
+          y: height - 80,
+          size: 12,
+        });
+        
+        page.drawText("Attempted to replace '1' with 'uma'", {
+          x: 50,
+          y: height - 110,
+          size: 12,
+        });
+        
+        const bytes = await fallbackDoc.save();
+        
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="error_recovery.pdf"');
+        res.send(Buffer.from(bytes));
+        
+        console.log("Sent emergency fallback PDF");
+      } catch (fallbackError) {
+        console.error("Even emergency fallback failed:", fallbackError);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to replace placeholder in PDF"
+        });
+      }
     }
   });
 

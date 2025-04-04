@@ -492,7 +492,10 @@ export async function replacePlaceholderInPdf(
       // Add a page if the document doesn't have any
       pdfDoc.addPage([612, 792]); // US Letter size
     }
-    const firstPage = pages[0];
+    
+    // Get pages again in case we just added one
+    const updatedPages = pdfDoc.getPages();
+    const firstPage = updatedPages[0];
     
     // Embed a standard font
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -997,7 +1000,7 @@ export async function fillAgencyDisclosureForm(
 }
 
 // Helper function to create a simple text replacement document
-async function createSimpleReplacementDocument(placeholder: string, replacement: string): Promise<Buffer> {
+export async function createSimpleReplacementDocument(placeholder: string, replacement: string): Promise<Buffer> {
   try {
     const doc = await PDFDocument.create();
     const page = doc.addPage([612, 792]); // US Letter size
@@ -1276,17 +1279,52 @@ export async function addSignatureToPdf(
     // First, try to load the PDF using standard method with ignoreEncryption
     let pdfDoc;
     try {
+      // Use ignoreEncryption to handle encrypted PDFs
       pdfDoc = await PDFDocument.load(pdfBuffer, {
         ignoreEncryption: true,
       });
     } catch (loadError) {
-      console.error("Error loading PDF with normal method:", loadError);
+      console.error("Error loading PDF for signature (primary method):", loadError);
       
-      // If the original PDF is corrupted, create a new PDF document and 
-      // simply transfer the signature to it
-      console.warn("Creating a new PDF document as fallback");
-      pdfDoc = await PDFDocument.create();
-      pdfDoc.addPage([612, 792]); // US Letter size
+      // Second attempt with different options
+      try {
+        // Try with different loading options
+        pdfDoc = await PDFDocument.load(pdfBuffer);
+      } catch (secondLoadError) {
+        console.error("Error loading PDF for signature (secondary method):", secondLoadError);
+        
+        // If the original PDF is corrupted, create a new PDF document
+        console.warn("Creating a new PDF document as fallback for signature");
+        pdfDoc = await PDFDocument.create();
+        
+        // Add a page to the new document
+        const page = pdfDoc.addPage([612, 792]); // US Letter size
+        
+        // Add title and explanation
+        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        
+        page.drawText("Agency Disclosure Form - Signature Page", {
+          x: 50, 
+          y: 750,
+          size: 18,
+          font: helveticaBold,
+        });
+        
+        page.drawText("This page contains the signature for the Agency Disclosure Form.", {
+          x: 50,
+          y: 720,
+          size: 12,
+          font: helvetica,
+        });
+        
+        page.drawText("The original PDF could not be loaded due to file format issues.", {
+          x: 50,
+          y: 700,
+          size: 12,
+          font: helvetica,
+        });
+      }
     }
 
     // Get the last page - that's where we'll add signatures
@@ -1295,59 +1333,151 @@ export async function addSignatureToPdf(
       // Add a page if the document doesn't have any
       pdfDoc.addPage([612, 792]); // US Letter size
     }
-    const signaturePage = pages[pages.length - 1];
+    
+    // Get updated pages after potentially adding a page
+    const updatedPages = pdfDoc.getPages();
+    const signaturePage = updatedPages[updatedPages.length - 1];
 
-    // Convert data URL to image bytes
-    const signatureBase64 = signatureDataUrl.split(",")[1];
-    const signatureBytes = Buffer.from(signatureBase64, "base64");
+    try {
+      // Validate signature data URL format
+      if (!signatureDataUrl || !signatureDataUrl.startsWith('data:image/')) {
+        throw new Error("Invalid signature data URL format");
+      }
+      
+      // Convert data URL to image bytes
+      const signatureBase64 = signatureDataUrl.split(",")[1];
+      if (!signatureBase64) {
+        throw new Error("Could not extract base64 data from signature");
+      }
+      
+      const signatureBytes = Buffer.from(signatureBase64, "base64");
 
-    // Embed the PNG image
-    const signatureImage = await pdfDoc.embedPng(signatureBytes);
+      // Embed the PNG image with error handling
+      let signatureImage;
+      try {
+        signatureImage = await pdfDoc.embedPng(signatureBytes);
+      } catch (embedError) {
+        console.error("Error embedding PNG signature:", embedError);
+        
+        // Draw a placeholder instead
+        const { width, height } = signaturePage.getSize();
+        signaturePage.drawText("*SIGNATURE UNAVAILABLE*", {
+          x: 50,
+          y: 240,
+          size: 14,
+          color: rgb(0.7, 0, 0),
+        });
+        
+        // Early return with the modified PDF
+        const pdfBytesWithError = await pdfDoc.save();
+        return Buffer.from(pdfBytesWithError);
+      }
 
-    // Get the dimensions of the signature
-    const imgWidth = signatureImage.width;
-    const imgHeight = signatureImage.height;
+      // Get the dimensions of the signature
+      const imgWidth = signatureImage.width;
+      const imgHeight = signatureImage.height;
 
-    // Scale down if needed
-    const maxWidth = 280;
-    const maxHeight = 90;
-    let width = imgWidth;
-    let height = imgHeight;
+      // Scale down if needed
+      const maxWidth = 280;
+      const maxHeight = 90;
+      let width = imgWidth;
+      let height = imgHeight;
 
-    if (width > maxWidth) {
-      const scaleFactor = maxWidth / width;
-      width = maxWidth;
-      height = height * scaleFactor;
+      if (width > maxWidth) {
+        const scaleFactor = maxWidth / width;
+        width = maxWidth;
+        height = height * scaleFactor;
+      }
+
+      if (height > maxHeight) {
+        const scaleFactor = maxHeight / height;
+        height = maxHeight;
+        width = width * scaleFactor;
+      }
+
+      // Determine signature position based on type
+      let x = 90; // Default - inside the signature box
+      let y = 240; // Default position in the signature area
+      
+      // Adjust position based on signature type if needed
+      switch (signatureType) {
+        case "buyer1":
+          // Use defaults
+          break;
+        case "buyer2":
+          y -= 40; // Place below buyer1
+          break;
+        case "agent":
+          y -= 80; // Place below buyers
+          break;
+        case "seller1":
+          x += 300; // Place to the right
+          break;
+        case "seller2":
+          x += 300; // Place to the right
+          y -= 40; // Place below seller1
+          break;
+      }
+
+      // Draw the signature on the page
+      signaturePage.drawImage(signatureImage, {
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+      });
+      
+      // Add a timestamp below the signature
+      const currentDate = new Date().toISOString().split('T')[0];
+      signaturePage.drawText(`Signed: ${currentDate}`, {
+        x: x,
+        y: y - 15,
+        size: 8,
+        color: rgb(0.4, 0.4, 0.4),
+      });
+    } catch (signatureError) {
+      console.error("Error processing signature:", signatureError);
+      
+      // Draw error text instead of signature
+      signaturePage.drawText("Error processing signature", {
+        x: 90,
+        y: 240,
+        size: 12,
+        color: rgb(0.7, 0, 0),
+      });
     }
 
-    if (height > maxHeight) {
-      const scaleFactor = maxHeight / height;
-      height = maxHeight;
-      width = width * scaleFactor;
+    try {
+      // Save the modified PDF
+      const modifiedPdfBytes = await pdfDoc.save();
+      return Buffer.from(modifiedPdfBytes);
+    } catch (saveError) {
+      console.error("Error saving PDF with signature:", saveError);
+      
+      // Last resort: create a completely new minimal PDF
+      const fallbackDoc = await PDFDocument.create();
+      const page = fallbackDoc.addPage([612, 792]);
+      
+      const helveticaBold = await fallbackDoc.embedFont(StandardFonts.HelveticaBold);
+      
+      page.drawText("Signature Page (Error Recovery Document)", {
+        x: 50,
+        y: 750,
+        size: 16,
+        font: helveticaBold,
+      });
+      
+      page.drawText("The original document could not be processed.", {
+        x: 50,
+        y: 720,
+        size: 12,
+      });
+      
+      const fallbackBytes = await fallbackDoc.save();
+      return Buffer.from(fallbackBytes);
     }
-
-    // Get the signature box position from our template
-    // The coordinates are hardcoded based on our template's layout
-    let x = 90; // Inside the signature box
-    let y = 240; // Position in the signature area
-
-    // Draw the signature on the page - centered in the signature box
-    signaturePage.drawImage(signatureImage, {
-      x: x,
-      y: y,
-      width: width,
-      height: height,
-    });
-
-    // Add date stamp below the signature - we already have this in our template
-    // so we don't need to add it again
-
-    // Save the modified PDF
-    const modifiedPdfBytes = await pdfDoc.save();
-
-    return Buffer.from(modifiedPdfBytes);
   } catch (error) {
-    console.error("Error adding signature to PDF:", error);
+    console.error("Critical error adding signature to PDF:", error);
     // Return a document with just the signature as a fallback
     try {
       // Create a minimal document with just the signature

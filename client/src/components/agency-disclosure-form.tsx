@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, FileText, Download, Check } from "lucide-react";
+import { Loader2, FileText, Download, Check, RefreshCw } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 
 interface AgencyDisclosureFormProps {
@@ -364,15 +364,41 @@ export function AgencyDisclosureForm({
           {/* PDF Viewer */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {pdfUrl ? (
-              <iframe
-                ref={iframeRef}
-                src={pdfUrl}
-                className="w-full h-[500px]"
-                title="Agency Disclosure Form"
-              />
+              <div className="relative w-full h-[500px]">
+                <iframe
+                  ref={iframeRef}
+                  src={pdfUrl}
+                  className="w-full h-full"
+                  title="Agency Disclosure Form"
+                  onError={(e) => {
+                    console.error("PDF iframe error:", e);
+                    // When iframe fails to load, regenerate the PDF
+                    toast({
+                      title: "PDF Loading Issue",
+                      description: "Trying to reload the PDF. Please wait...",
+                      variant: "default",
+                    });
+                    // Attempt to regenerate the PDF after a short delay
+                    setTimeout(() => {
+                      generatePdfPreview();
+                    }, 1000);
+                  }}
+                />
+                <div className="absolute bottom-2 right-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => generatePdfPreview()}
+                    className="bg-white shadow-sm"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-1" /> Reload PDF
+                  </Button>
+                </div>
+              </div>
             ) : (
-              <div className="flex items-center justify-center w-full h-[500px] bg-gray-100">
-                <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
+              <div className="flex flex-col items-center justify-center w-full h-[500px] bg-gray-100">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-500 mb-4" />
+                <p className="text-gray-600 text-sm">Loading PDF document...</p>
               </div>
             )}
           </div>
