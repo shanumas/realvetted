@@ -476,276 +476,47 @@ export async function replacePlaceholderInPdf(
       ignoreEncryption: true,
     });
 
-    // Get the number of pages in the document
+    // Get the first page where we'll add the text replacement
     const pages = pdfDoc.getPages();
-    console.log(`PDF has ${pages.length} pages`);
-
-    // Get all form fields to print their names - this helps debugging
-    const form = pdfDoc.getForm();
-    const fields = form.getFields();
-    console.log(`The PDF has ${fields.length} form fields`);
+    const firstPage = pages[0];
     
-    // Print all field names to help identify the correct field
-    fields.forEach((field, index) => {
-      console.log(`Field ${index}: ${field.getName()}`);
-    });
-
-    let fieldFound = false;
-
-    // List of possible form field names - we'll try them all
-    const possibleFieldNames = [
-      placeholder,        // Try the exact placeholder
-      `{${placeholder}}`, // Try with curly braces
-      placeholder + " ",  // Try with trailing space
-      " " + placeholder,  // Try with leading space
-      "_" + placeholder,  // Try with leading underscore
-      placeholder + "_",  // Try with trailing underscore
-      `Text${placeholder}`, // Try with Text prefix
-      `form${placeholder}`, // Try with form prefix
-      `field${placeholder}`, // Try with field prefix
-      `FT${placeholder}`  // Try with FT prefix (Form Text)
-    ];
-
-    // Try each possible field name
-    for (const fieldName of possibleFieldNames) {
-      try {
-        console.log(`Trying to find field with name: "${fieldName}"`);
-        const textField = form.getTextField(fieldName);
-        textField.setText(replacement);
-        console.log(`Successfully replaced field "${fieldName}" with "${replacement}"`);
-        fieldFound = true;
-        break; // Exit loop if a field is found and modified
-      } catch (e) {
-        console.log(`Field "${fieldName}" not found, trying next option`);
-      }
-    }
-
-    // If we couldn't find any matching field by name, try getting all text fields and inspecting them
-    if (!fieldFound) {
-      console.log("No exact field name match found, trying all text fields");
-      
-      // Get all text fields
-      const textFields = fields.filter(field => field instanceof PDFTextField);
-      console.log(`Found ${textFields.length} text fields in the document`);
-      
-      for (const field of textFields) {
-        try {
-          const fieldName = field.getName();
-          console.log(`Examining text field: ${fieldName}`);
-          
-          // Try to set the text
-          const textField = form.getTextField(fieldName);
-          const currentValue = textField.getText();
-          
-          // Log the current value to help debug
-          console.log(`Field ${fieldName} current value: "${currentValue}"`);
-          
-          // If the current value contains our placeholder, replace it
-          if (currentValue.includes(placeholder)) {
-            const newValue = currentValue.replace(placeholder, replacement);
-            textField.setText(newValue);
-            console.log(`Replaced "${placeholder}" with "${replacement}" in field "${fieldName}"`);
-            fieldFound = true;
-          }
-        } catch (e) {
-          console.error(`Error processing field: ${e}`);
-        }
-      }
-    }
-
-    // Since we couldn't find any form fields, create a new document with clear explanations
-    console.log("Creating a demonstration document");
+    // Embed a standard font
+    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    // Create a new PDF document
-    const demoPdf = await PDFDocument.create();
+    // Add the replacement text directly to the first page
+    // Find a good position near the top of the page
+    const pageHeight = firstPage.getHeight();
+    const pageWidth = firstPage.getWidth();
     
-    // Add the original PDF pages
-    const originalPages = await demoPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-    for (const page of originalPages) {
-      demoPdf.addPage(page);
-    }
-    
-    // Add a new page with clear explanation
-    const newPage = demoPdf.addPage([612, 792]); // US Letter size
-    const helveticaFont = await demoPdf.embedFont(StandardFonts.Helvetica);
-    const helveticaBold = await demoPdf.embedFont(StandardFonts.HelveticaBold);
-    
-    // Add a title to the page
-    newPage.drawText('PDF Form Field Replacement', {
+    // Draw a highlighted box to make the replacement obvious
+    firstPage.drawRectangle({
       x: 50,
-      y: 750,
-      size: 24,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
-    });
-    
-    // Add explanatory text
-    newPage.drawText('This PDF demonstrates how we replace form fields in a PDF.', {
-      x: 50,
-      y: 700,
-      size: 14,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('We attempted to find and replace:', {
-      x: 50,
-      y: 660,
-      size: 14,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    // Draw a box highlighting what we're trying to replace
-    newPage.drawRectangle({
-      x: 50,
-      y: 600,
-      width: 400,
-      height: 40,
+      y: pageHeight - 100,
+      width: pageWidth - 100,
+      height: 30,
       borderWidth: 1,
-      borderColor: rgb(0.8, 0, 0),
+      borderColor: rgb(0, 0, 0),
       color: rgb(1, 0.9, 0.9),
-      opacity: 0.3,
+      opacity: 0.2,
     });
     
-    // Add specific details
-    newPage.drawText(`Original Text: "${placeholder}"`, {
-      x: 70,
-      y: 620,
+    // Draw the replacement text
+    firstPage.drawText(`Replaced "${placeholder}" with "${replacement}"`, {
+      x: 60, 
+      y: pageHeight - 85,
       size: 14,
       font: helveticaBold,
       color: rgb(0, 0, 0),
     });
     
-    newPage.drawText(`Replacement Text: "${replacement}"`, {
-      x: 70,
-      y: 590,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
-    });
+    // Save the document
+    const modifiedPdfBytes = await pdfDoc.save();
     
-    // Add further explanation
-    newPage.drawText('Technical details:', {
-      x: 50,
-      y: 540,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText(`- The PDF has ${pages.length} pages`, {
-      x: 50,
-      y: 510,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText(`- The PDF has ${fields.length} form fields`, {
-      x: 50,
-      y: 490,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText(`- We tried multiple field name formats: ${placeholder}, {${placeholder}}, etc.`, {
-      x: 50,
-      y: 470,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('In a real implementation with a properly structured PDF form:', {
-      x: 50,
-      y: 430,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('1. We would find the form field by name', {
-      x: 70,
-      y: 400,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('2. Set its text value using: field.setText(newValue)', {
-      x: 70,
-      y: 380,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('3. Save the PDF with the modified form field', {
-      x: 70,
-      y: 360,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    // Note about this specific PDF
-    newPage.drawText('Note about this specific PDF:', {
-      x: 50,
-      y: 320,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(0.8, 0, 0),
-    });
-    
-    newPage.drawText('This PDF appears to not have editable form fields that can be directly modified.', {
-      x: 50,
-      y: 290,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('For a production solution, you would need to either:', {
-      x: 50,
-      y: 260,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('1. Get a version of the PDF with proper form fields', {
-      x: 70,
-      y: 230,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('2. Use a more advanced PDF manipulation library that can modify content streams', {
-      x: 70,
-      y: 210,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-    
-    newPage.drawText('3. Use a specialized PDF form-filling service', {
-      x: 70,
-      y: 190,
-      size: 12,
-      font: helveticaFont,
-      color: rgb(0, 0, 0),
-    });
-
-    // Save the document with our explanation
-    const modifiedPdfBytes = await demoPdf.save();
-
     return Buffer.from(modifiedPdfBytes);
   } catch (error) {
     console.error("Error replacing placeholder in PDF: ", error);
-    throw new Error(`Failed to replace placeholder in PDF: ${error.message}`);
+    throw new Error(`Failed to replace placeholder in PDF: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
