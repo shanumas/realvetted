@@ -10,144 +10,6 @@ import {
 import * as fs from "fs";
 import * as path from "path";
 
-/**
- * Creates a simple PDF document with a form field that can be used for testing
- * 
- * @param content Text content to include in the document
- * @param title Document title
- * @returns Buffer containing the PDF document data
- */
-export async function createSimpleReplacementDocument(
-  content: string,
-  title: string
-): Promise<Buffer> {
-  // Create a new PDF document
-  const pdfDoc = await PDFDocument.create();
-  
-  // Add a blank page
-  const page = pdfDoc.addPage();
-  
-  // Get the standard font
-  const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const helveticaBoldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  
-  // Get the form
-  const form = pdfDoc.getForm();
-  
-  // Add title
-  page.drawText(title, {
-    x: 50,
-    y: page.getHeight() - 50,
-    size: 20,
-    font: helveticaBoldFont,
-    color: rgb(0, 0, 0),
-  });
-  
-  // Add content
-  page.drawText(content, {
-    x: 50,
-    y: page.getHeight() - 100,
-    size: 12,
-    font: helveticaFont,
-    color: rgb(0, 0, 0),
-  });
-  
-  // Create a text field named "1"
-  const textField = form.createTextField("1");
-  textField.setText("");
-  textField.addToPage(page, {
-    x: 50,
-    y: page.getHeight() - 150,
-    width: 200,
-    height: 30,
-    borderWidth: 1,
-    borderColor: rgb(0, 0, 0),
-  });
-  
-  // Save the document
-  const pdfBytes = await pdfDoc.save();
-  
-  return Buffer.from(pdfBytes);
-}
-
-/**
- * Fills out the agency disclosure form with the provided data
- * 
- * @param formData Data to fill into the form fields
- * @returns Buffer containing the filled PDF document
- */
-export async function fillAgencyDisclosureForm(
-  formData: AgencyDisclosureFormData
-): Promise<Buffer> {
-  // Load the template PDF
-  const templatePath = path.join(process.cwd(), 'uploads', 'pdf', 'brbc.pdf');
-  let pdfBuffer;
-  
-  try {
-    pdfBuffer = fs.readFileSync(templatePath);
-  } catch (error) {
-    console.error('Error reading agency disclosure template PDF:', error);
-    throw new Error('Could not read agency disclosure template PDF');
-  }
-  
-  // Load the PDF document
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
-  
-  // Get the form from the document
-  const form = pdfDoc.getForm();
-  
-  // Helper function to set field text if it exists
-  const setFieldTextIfExists = (fieldName: string, value?: string) => {
-    if (!value) return;
-    
-    try {
-      form.getTextField(fieldName).setText(value);
-    } catch (error) {
-      console.warn(`Field '${fieldName}' doesn't exist, creating a sample field with text placeholder`);
-      console.log(`Could not find field '${fieldName}' to replace with '${value}' through form fields`);
-    }
-  };
-  
-  // Set form fields - mapping form data to the actual field names in the PDF
-  // Buyer information
-  setFieldTextIfExists('buyer_name_1', formData.buyerName1);
-  setFieldTextIfExists('buyer_name_2', formData.buyerName2);
-  setFieldTextIfExists('buyer_date_1', formData.buyerSignatureDate1);
-  setFieldTextIfExists('buyer_date_2', formData.buyerSignatureDate2);
-  
-  // Seller information
-  setFieldTextIfExists('seller_name_1', formData.sellerName1);
-  setFieldTextIfExists('seller_name_2', formData.sellerName2);
-  setFieldTextIfExists('seller_date_1', formData.sellerSignatureDate1);
-  setFieldTextIfExists('seller_date_2', formData.sellerSignatureDate2);
-  
-  // Agent information
-  setFieldTextIfExists('agent_name', formData.agentName);
-  setFieldTextIfExists('agent_brokerage', formData.agentBrokerageName);
-  setFieldTextIfExists('agent_license', formData.agentLicenseNumber);
-  setFieldTextIfExists('agent_date', formData.agentSignatureDate);
-  
-  // Property information
-  setFieldTextIfExists('property_address', formData.propertyAddress);
-  setFieldTextIfExists('property_city', formData.propertyCity);
-  setFieldTextIfExists('property_state', formData.propertyState);
-  setFieldTextIfExists('property_zip', formData.propertyZip);
-  
-  // If the form should be editable or not
-  if (formData.isEditable !== true) {
-    try {
-      form.flatten();
-    } catch (error) {
-      console.warn('Could not flatten form, it will remain editable:', error);
-    }
-  }
-  
-  // Save the document
-  const modifiedPdfBytes = await pdfDoc.save();
-  
-  return Buffer.from(modifiedPdfBytes);
-}
-
 export interface AgencyDisclosureFormData {
   buyerName1?: string;
   buyerName2?: string;
@@ -352,6 +214,7 @@ export async function replacePlaceholderInPdf(
   replacement: string,
 ): Promise<Buffer> {
   try {
+    console.log("replacePlaceholderInPdf called............");
     // Try to load the PDF document with error handling
     let pdfDoc;
     try {
@@ -368,6 +231,14 @@ export async function replacePlaceholderInPdf(
 
     // Get the form from the document
     const form = pdfDoc.getForm();
+
+    const fieldNames = form.getFields().map((f) => f.getName());
+    if (!fieldNames.includes(placeholder)) {
+      console.warn(
+        `Field ${placeholder} not found in PDF .........................................`,
+      );
+      return pdfBuffer; // Return original buffer if field not found
+    }
 
     try {
       // Try to find a text field with the placeholder ID and set its text
@@ -392,4 +263,184 @@ export async function replacePlaceholderInPdf(
     console.error("Error replacing placeholder in PDF: ", error);
     throw error;
   }
+}
+
+/**
+ * Fills out the agency disclosure form with the provided data
+ * 
+ * @param formData Data to fill into the form fields
+ * @returns Buffer containing the filled PDF document
+ */
+export async function fillAgencyDisclosureForm(
+  formData: AgencyDisclosureFormData
+): Promise<Buffer> {
+  // Load the template PDF
+  const templatePath = path.join(process.cwd(), 'uploads', 'pdf', 'brbc.pdf');
+  let pdfBuffer;
+  
+  try {
+    pdfBuffer = fs.readFileSync(templatePath);
+  } catch (error) {
+    console.error('Error reading agency disclosure template PDF:', error);
+    throw new Error('Could not read agency disclosure template PDF');
+  }
+  
+  // First, try to replace placeholder "1" with "uma" as requested
+  try {
+    pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, "1", "uma");
+    console.log('Successfully applied text replacement for placeholder "1"');
+  } catch (error: any) {
+    console.log('Text replacement for placeholder "1" failed:', error.message || 'Unknown error');
+  }
+
+  // Next, try to apply other replacements for our form fields
+  const fieldMappings = {
+    'buyer_name_1': formData.buyerName1,
+    'buyer_name_2': formData.buyerName2,
+    'buyer_date_1': formData.buyerSignatureDate1,
+    'buyer_date_2': formData.buyerSignatureDate2,
+    'seller_name_1': formData.sellerName1,
+    'seller_name_2': formData.sellerName2,
+    'seller_date_1': formData.sellerSignatureDate1,
+    'seller_date_2': formData.sellerSignatureDate2,
+    'agent_name': formData.agentName,
+    'agent_brokerage': formData.agentBrokerageName,
+    'agent_license': formData.agentLicenseNumber,
+    'agent_date': formData.agentSignatureDate,
+    'property_address': formData.propertyAddress,
+    'property_city': formData.propertyCity,
+    'property_state': formData.propertyState,
+    'property_zip': formData.propertyZip
+  };
+
+  // Try to process each field through text replacement before loading the PDF
+  for (const [field, value] of Object.entries(fieldMappings)) {
+    if (value) {
+      try {
+        pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, field, value);
+        console.log(`Successfully applied text replacement for field "${field}"`);
+      } catch (error: any) {
+        // Continue if field replacement fails, we'll try form filling next
+        console.log(`Field "${field}" not found for text replacement, will try form filling: ${error.message || 'Unknown error'}`);
+      }
+    }
+  }
+  
+  // Now load the PDF document (after all text replacements have been attempted)
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  
+  // Get the form from the document
+  const form = pdfDoc.getForm();
+  
+  // Helper function to set field text if it exists
+  const setFieldTextIfExists = (fieldName: string, value?: string) => {
+    if (!value) return;
+    
+    try {
+      form.getTextField(fieldName).setText(value);
+    } catch (error: any) {
+      console.warn(`Field '${fieldName}' doesn't exist, creating a sample field with text placeholder`);
+      console.log(`Could not find field '${fieldName}' to replace with '${value}' through form fields: ${error.message || 'Unknown error'}`);
+    }
+  };
+  
+  // Set form fields - mapping form data to the actual field names in the PDF
+  // Buyer information
+  setFieldTextIfExists('buyer_name_1', formData.buyerName1);
+  setFieldTextIfExists('buyer_name_2', formData.buyerName2);
+  setFieldTextIfExists('buyer_date_1', formData.buyerSignatureDate1);
+  setFieldTextIfExists('buyer_date_2', formData.buyerSignatureDate2);
+  
+  // Seller information
+  setFieldTextIfExists('seller_name_1', formData.sellerName1);
+  setFieldTextIfExists('seller_name_2', formData.sellerName2);
+  setFieldTextIfExists('seller_date_1', formData.sellerSignatureDate1);
+  setFieldTextIfExists('seller_date_2', formData.sellerSignatureDate2);
+  
+  // Agent information
+  setFieldTextIfExists('agent_name', formData.agentName);
+  setFieldTextIfExists('agent_brokerage', formData.agentBrokerageName);
+  setFieldTextIfExists('agent_license', formData.agentLicenseNumber);
+  setFieldTextIfExists('agent_date', formData.agentSignatureDate);
+  
+  // Property information
+  setFieldTextIfExists('property_address', formData.propertyAddress);
+  setFieldTextIfExists('property_city', formData.propertyCity);
+  setFieldTextIfExists('property_state', formData.propertyState);
+  setFieldTextIfExists('property_zip', formData.propertyZip);
+  
+  // If the form should be editable or not
+  if (formData.isEditable !== true) {
+    try {
+      form.flatten();
+    } catch (error: any) {
+      console.warn('Could not flatten form, it will remain editable:', error.message || 'Unknown error');
+    }
+  }
+  
+  // Save the document
+  const modifiedPdfBytes = await pdfDoc.save();
+  
+  return Buffer.from(modifiedPdfBytes);
+}
+
+/**
+ * Creates a simple PDF document with a text field for testing replacements
+ * 
+ * @param text The text to display in the document
+ * @param title The title of the document
+ * @returns Buffer containing the created PDF document
+ */
+export async function createSimpleReplacementDocument(
+  text: string,
+  title: string
+): Promise<Buffer> {
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  
+  // Add a blank page to the document
+  const page = pdfDoc.addPage([600, 400]);
+  
+  // Get the font
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  
+  // Add the title text
+  page.drawText(title, {
+    x: 50,
+    y: 350,
+    size: 20,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  // Add the body text
+  page.drawText(text, {
+    x: 50,
+    y: 300,
+    size: 12,
+    font,
+    color: rgb(0, 0, 0),
+  });
+  
+  // Get the form
+  const form = pdfDoc.getForm();
+  
+  // Create a text field named "1"
+  const textField = form.createTextField("1");
+  
+  // Position the text field
+  textField.addToPage(page, {
+    x: 50,
+    y: 200,
+    width: 200,
+    height: 30,
+  });
+  
+  // Set some default text in the field
+  textField.setText("This is field 1 - try to replace me");
+  
+  // Save the document
+  const pdfBytes = await pdfDoc.save();
+  
+  return Buffer.from(pdfBytes);
 }

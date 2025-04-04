@@ -31,8 +31,7 @@ import fs from "fs";
 import { 
   addSignatureToPdf, 
   replacePlaceholderInPdf, 
-  AgencyDisclosureFormData, 
-  createSimpleReplacementDocument,
+  AgencyDisclosureFormData,
   fillAgencyDisclosureForm
 } from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
