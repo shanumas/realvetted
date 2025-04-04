@@ -44,13 +44,10 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      // Add a timestamp to ensure cache-busting for critical endpoints like authentication
+      // Use the URL without timestamp to prevent excessive refreshing
       const url = queryKey[0] as string;
-      const urlWithTimestamp = url.includes('auth') 
-        ? `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}` 
-        : url;
       
-      const res = await fetch(urlWithTimestamp, {
+      const res = await fetch(url, {
         credentials: "include",
         cache: "no-cache", // Prevent caching of authentication state
         headers: {
