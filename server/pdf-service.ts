@@ -479,51 +479,19 @@ export async function replacePlaceholderInPdf(
       });
     } catch (loadError) {
       console.error("Error loading PDF for placeholder replacement:", loadError);
-      
-      // Create a new PDF as fallback
-      console.warn("Creating a new PDF document as fallback for placeholder replacement");
-      pdfDoc = await PDFDocument.create();
-      pdfDoc.addPage([612, 792]); // US Letter size
+      throw new Error("Cannot load PDF document");
     }
 
-    // Get the first page where we'll add the text replacement
-    const pages = pdfDoc.getPages();
-    if (pages.length === 0) {
-      // Add a page if the document doesn't have any
-      pdfDoc.addPage([612, 792]); // US Letter size
-    }
-    
     // Get the form from the document
     const form = pdfDoc.getForm();
     
     try {
-      // Try to find a text field with the placeholder ID
+      // Try to find a text field with the placeholder ID and set its text
       form.getTextField(placeholder).setText(replacement);
       console.log(`Successfully replaced field "${placeholder}" with "${replacement}" using form fields`);
     } catch (fieldError) {
-      console.warn(`No form field with ID "${placeholder}" found. Creating a new field.`, fieldError);
-      
-      // Get the first page
-      const firstPage = pages[0];
-      const pageHeight = firstPage.getHeight();
-      const pageWidth = firstPage.getWidth();
-      
-      // Create a new text field with the placeholder as the name
-      const textField = form.createTextField(placeholder);
-      textField.setText(replacement);
-      textField.addToPage(firstPage, {
-        x: 60,
-        y: pageHeight - 100,
-        width: pageWidth - 120,
-        height: 30,
-      });
-      
-      // Add a label above the field
-      firstPage.drawText(`Field for "${placeholder}":`, {
-        x: 60,
-        y: pageHeight - 70,
-        size: 12,
-      });
+      console.warn(`No form field with ID "${placeholder}" found. Only updating existing fields as requested.`);
+      throw new Error(`Text field "${placeholder}" does not exist in the document`);
     }
     
     // Save the document
@@ -532,49 +500,7 @@ export async function replacePlaceholderInPdf(
     return Buffer.from(modifiedPdfBytes);
   } catch (error) {
     console.error("Error replacing placeholder in PDF: ", error);
-    
-    // Create a very simple fallback document that just shows the replacement
-    try {
-      console.warn("Creating a minimal fallback document for placeholder replacement");
-      const fallbackDoc = await PDFDocument.create();
-      const page = fallbackDoc.addPage([612, 792]);
-      const form = fallbackDoc.getForm();
-      
-      // Embed fonts
-      const helveticaBold = await fallbackDoc.embedFont(StandardFonts.HelveticaBold);
-      
-      // Add a title
-      const { width, height } = page.getSize();
-      page.drawText("Text Replacement - Fallback Document", {
-        x: 50,
-        y: height - 50,
-        size: 16,
-        font: helveticaBold,
-      });
-      
-      // Create a text field for the replacement
-      const replacementField = form.createTextField(placeholder);
-      replacementField.setText(replacement);
-      replacementField.addToPage(page, {
-        x: 50,
-        y: height - 120,
-        width: width - 100,
-        height: 30,
-      });
-      
-      // Add explanatory text
-      page.drawText(`This field replaces "${placeholder}" with:`, {
-        x: 50,
-        y: height - 90,
-        size: 12,
-      });
-      
-      const fallbackBytes = await fallbackDoc.save();
-      return Buffer.from(fallbackBytes);
-    } catch (fallbackError) {
-      console.error("Even fallback document creation failed:", fallbackError);
-      throw new Error(`Failed to replace placeholder in PDF: ${error instanceof Error ? error.message : String(error)}`);
-    }
+    throw error;
   }
 }
 
