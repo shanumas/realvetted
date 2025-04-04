@@ -508,44 +508,6 @@ export async function fillAgencyDisclosureForm(
   formData: AgencyDisclosureFormData,
 ): Promise<Buffer> {
   try {
-    // Special case: If we're replacing placeholder text
-    if (process.env.REPLACE_PLACEHOLDER === "true") {
-      // Path to the original PDF
-      const templatePath = path.join(process.cwd(), "uploads/pdf/brbc.pdf");
-
-      // Check if the file exists
-      if (!fs.existsSync(templatePath)) {
-        console.error("PDF template not found at:", templatePath);
-        
-        // Try the alternative location in attached_assets
-        const altTemplatePath = path.join(process.cwd(), "attached_assets/brbc.pdf");
-        
-        if (!fs.existsSync(altTemplatePath)) {
-          console.error("PDF template not found at alternative location either:", altTemplatePath);
-          // Instead of throwing error, just create a simple replacement document
-          return await createSimpleReplacementDocument("1", "uma");
-        }
-        
-        // If found in attached_assets, copy it to uploads/pdf
-        const uploadsDir = path.join(process.cwd(), "uploads/pdf");
-        
-        // Create directory if it doesn't exist
-        if (!fs.existsSync(uploadsDir)) {
-          fs.mkdirSync(uploadsDir, { recursive: true });
-        }
-        
-        // Copy the file
-        fs.copyFileSync(altTemplatePath, templatePath);
-        console.log("Copied PDF template from attached_assets to uploads/pdf");
-      }
-
-      // Read the template file
-      const templateBytes = fs.readFileSync(templatePath);
-
-      // Replace the placeholder with "uma"
-      return await replacePlaceholderInPdf(templateBytes, "1", "uma");
-    }
-
     // If isEditable flag is true, create an editable PDF form instead of static text
     if (formData.isEditable) {
       return await createEditableAgencyDisclosureForm(formData);
