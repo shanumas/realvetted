@@ -44,14 +44,8 @@ export interface AgencyDisclosureFormData {
  */
 export async function fillAgencyDisclosureForm(formData: AgencyDisclosureFormData): Promise<Buffer> {
   try {
-    // Path to the original PDF template
-    // First check if we have a new custom agency disclosure form template
-    let templatePath = path.join(process.cwd(), 'uploads/pdf/agency_disclosure_template.pdf');
-    
-    // Check if the custom template exists, otherwise fall back to the original
-    if (!fs.existsSync(templatePath)) {
-      templatePath = path.join(process.cwd(), 'uploads/pdf/brbc.pdf');
-    }
+    // Path to the template PDF - using the decrypted version as requested
+    const templatePath = path.join(process.cwd(), 'uploads/pdf/brbc_decrypted.pdf');
     
     // Check if the file exists
     if (!fs.existsSync(templatePath)) {
