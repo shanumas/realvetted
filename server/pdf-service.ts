@@ -531,10 +531,7 @@ export async function fillAgencyDisclosureForm(
     // Special case: If we're replacing placeholder text
     if (process.env.REPLACE_PLACEHOLDER === "true") {
       // Path to the original PDF
-      const templatePath = path.join(
-        process.cwd(),
-        "assets/converted/brbc.pdf",
-      );
+      const templatePath = path.join(process.cwd(), "uploads/pdf/brbc.pdf");
 
       // Check if the file exists
       if (!fs.existsSync(templatePath)) {

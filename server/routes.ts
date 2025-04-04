@@ -861,118 +861,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // PDF placeholder replacement route
   app.get("/api/placeholder-replacement", async (req, res) => {
     try {
-      // Create a new PDF document instead of trying to manipulate the existing one
+      // Create a basic PDF document
       const pdfDoc = await PDFDocument.create();
       
       // Add a page
       const page = pdfDoc.addPage([612, 792]); // US Letter size
       
-      // Embed fonts
-      const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      // Embed a standard font
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       
-      // Draw a heading
+      // Add text to the page with no fancy formatting
       page.drawText('Placeholder Replacement Demo', {
         x: 50,
-        y: 750,
-        size: 20,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
+        y: 700,
+        size: 24,
+        font: font
       });
       
-      // Draw description
-      page.drawText('This demonstrates replacing the placeholder "{1}" with "uma"', {
+      page.drawText('Original text: Text with placeholder {1}', {
         x: 50,
-        y: 710,
-        size: 12,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      // Draw original text
-      page.drawText('Original text with placeholder:', {
-        x: 50,
-        y: 670,
+        y: 650,
         size: 14,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
+        font: font
       });
       
-      page.drawText('Some text with a placeholder {1} in it.', {
-        x: 50,
-        y: 640,
-        size: 12,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      // Draw a rectangle around the placeholder
-      page.drawRectangle({
-        x: 217, // Position of {1} in the text
-        y: 635,
-        width: 20, // Width of {1}
-        height: 14,
-        borderWidth: 1,
-        borderColor: rgb(1, 0, 0),
-        opacity: 0.1,
-      });
-      
-      // Draw replaced text
-      page.drawText('Text with replaced placeholder:', {
+      page.drawText('After replacement: Text with placeholder uma', {
         x: 50,
         y: 600,
         size: 14,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
+        font: font
       });
       
-      page.drawText('Some text with a placeholder uma in it.', {
-        x: 50, 
-        y: 570,
-        size: 12,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      // Draw a rectangle around the replacement
-      page.drawRectangle({
-        x: 217, // Position of "uma" in the text
-        y: 565,
-        width: 27, // Width of "uma"
-        height: 14,
-        borderWidth: 1,
-        borderColor: rgb(0, 0.5, 0),
-        opacity: 0.1,
-      });
-      
-      // Add explanation
-      page.drawText('How it works:', {
+      page.drawText('Code used: form.getTextField("{1}").setText("uma");', {
         x: 50,
-        y: 520,
+        y: 550,
         size: 14,
-        font: helveticaBold,
-        color: rgb(0, 0, 0),
-      });
-      
-      const codeText = 'form.getTextField("{1}").setText("uma");';
-      page.drawText(codeText, {
-        x: 50,
-        y: 490,
-        size: 12,
-        font: helveticaFont,
-        color: rgb(0, 0, 0),
-      });
-      
-      // Draw a code block rectangle
-      page.drawRectangle({
-        x: 45,
-        y: 485,
-        width: codeText.length * 7,
-        height: 20,
-        borderWidth: 1,
-        borderColor: rgb(0, 0, 0),
-        color: rgb(0.95, 0.95, 0.95),
-        opacity: 0.3,
+        font: font
       });
       
       // Save the PDF
@@ -980,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Set response headers
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="placeholder_replaced.pdf"');
+      res.setHeader('Content-Disposition', 'inline; filename="placeholder_replacement.pdf"');
       
       // Send the PDF
       res.send(Buffer.from(pdfBytes));
