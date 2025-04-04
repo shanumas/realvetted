@@ -418,6 +418,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Test route for creating and replacing a form field
+  app.get("/api/test-form-field-replacement", async (req, res) => {
+    try {
+      // First, create a simple document with a text field named "1"
+      const originalPdf = await createSimpleReplacementDocument('This is a test document with a form field named "1"', 'Form Field Test');
+      
+      // Now try to replace the field "1" with "uma"
+      let modifiedPdf;
+      try {
+        modifiedPdf = await replacePlaceholderInPdf(originalPdf, "1", "uma");
+        console.log('Successfully modified the PDF with the replacement');
+      } catch (error) {
+        console.error('Error replacing placeholder:', error);
+        return res.status(500).json({ success: false, error: 'Failed to replace field in PDF' });
+      }
+      
+      // Set appropriate headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="test_form_field_replaced.pdf"');
+      
+      // Send the modified PDF buffer
+      res.send(modifiedPdf);
+    } catch (error) {
+      console.error('Error in form field replacement test:', error);
+      res.status(500).json({ success: false, error: 'Test failed' });
+    }
+  });
+  
   // Get all agreements for a property
   app.get("/api/properties/:id/agreements", isAuthenticated, async (req, res) => {
     try {
