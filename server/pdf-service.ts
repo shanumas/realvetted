@@ -493,39 +493,38 @@ export async function replacePlaceholderInPdf(
       pdfDoc.addPage([612, 792]); // US Letter size
     }
     
-    // Get pages again in case we just added one
-    const updatedPages = pdfDoc.getPages();
-    const firstPage = updatedPages[0];
+    // Get the form from the document
+    const form = pdfDoc.getForm();
     
-    // Embed a standard font
-    const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    
-    // Add the replacement text directly to the first page
-    // Find a good position near the top of the page
-    const pageHeight = firstPage.getHeight();
-    const pageWidth = firstPage.getWidth();
-    
-    // Draw a highlighted box to make the replacement obvious
-    firstPage.drawRectangle({
-      x: 50,
-      y: pageHeight - 100,
-      width: pageWidth - 100,
-      height: 30,
-      borderWidth: 1,
-      borderColor: rgb(0, 0, 0),
-      color: rgb(1, 0.9, 0.9),
-      opacity: 0.2,
-    });
-    
-    // Draw the replacement text
-    firstPage.drawText(`Replaced "${placeholder}" with "${replacement}"`, {
-      x: 60, 
-      y: pageHeight - 85,
-      size: 14,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
-    });
+    try {
+      // Try to find a text field with the placeholder ID
+      form.getTextField(placeholder).setText(replacement);
+      console.log(`Successfully replaced field "${placeholder}" with "${replacement}" using form fields`);
+    } catch (fieldError) {
+      console.warn(`No form field with ID "${placeholder}" found. Creating a new field.`, fieldError);
+      
+      // Get the first page
+      const firstPage = pages[0];
+      const pageHeight = firstPage.getHeight();
+      const pageWidth = firstPage.getWidth();
+      
+      // Create a new text field with the placeholder as the name
+      const textField = form.createTextField(placeholder);
+      textField.setText(replacement);
+      textField.addToPage(firstPage, {
+        x: 60,
+        y: pageHeight - 100,
+        width: pageWidth - 120,
+        height: 30,
+      });
+      
+      // Add a label above the field
+      firstPage.drawText(`Field for "${placeholder}":`, {
+        x: 60,
+        y: pageHeight - 70,
+        size: 12,
+      });
+    }
     
     // Save the document
     const modifiedPdfBytes = await pdfDoc.save();
@@ -539,30 +538,35 @@ export async function replacePlaceholderInPdf(
       console.warn("Creating a minimal fallback document for placeholder replacement");
       const fallbackDoc = await PDFDocument.create();
       const page = fallbackDoc.addPage([612, 792]);
+      const form = fallbackDoc.getForm();
       
       // Embed fonts
       const helveticaBold = await fallbackDoc.embedFont(StandardFonts.HelveticaBold);
       
       // Add a title
       const { width, height } = page.getSize();
-      page.drawText("Text Replacement (Fallback Document)", {
+      page.drawText("Text Replacement - Fallback Document", {
         x: 50,
         y: height - 50,
         size: 16,
         font: helveticaBold,
       });
       
-      // Show the replacement text
-      page.drawText(`Original text: "${placeholder}"`, {
+      // Create a text field for the replacement
+      const replacementField = form.createTextField(placeholder);
+      replacementField.setText(replacement);
+      replacementField.addToPage(page, {
         x: 50,
-        y: height - 100,
-        size: 14,
+        y: height - 120,
+        width: width - 100,
+        height: 30,
       });
       
-      page.drawText(`Replaced with: "${replacement}"`, {
+      // Add explanatory text
+      page.drawText(`This field replaces "${placeholder}" with:`, {
         x: 50,
-        y: height - 130,
-        size: 14,
+        y: height - 90,
+        size: 12,
       });
       
       const fallbackBytes = await fallbackDoc.save();
