@@ -42,8 +42,8 @@ export function ProtectedRoute({
           return <Redirect to="/auth" />;
         }
 
-        // Special case: Allow agents to access buyer property pages
-        if (path.startsWith('/buyer/property/') && user.role === 'agent') {
+        // Special case: Allow agents and sellers to access buyer property pages
+        if (path.startsWith('/buyer/property/') && (user.role === 'agent' || user.role === 'seller')) {
           return <Component />;
         }
         
