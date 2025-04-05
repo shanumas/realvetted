@@ -2661,7 +2661,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         const hasAccess =
           userRole === "admin" ||
           (userRole === "buyer" && property.createdBy === userId) ||
-          (userRole === "agent" && property.agentId === userId);
+          (userRole === "agent" && property.agentId === userId) ||
+          (userRole === "seller" && property.sellerId === userId);
 
         if (!hasAccess) {
           return res.status(403).json({

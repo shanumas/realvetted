@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Save, Send } from "lucide-react";
+import { Loader2, Send, FileSignature } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,13 +23,10 @@ export function SellerAgencyDisclosureForm({
   agreementId,
   documentUrl
 }: SellerAgencyDisclosureFormProps) {
-  // Log document URL for debugging
-  console.log("Received document URL in SellerAgencyDisclosureForm:", documentUrl);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [signature, setSignature] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [viewingForm, setViewingForm] = useState<boolean>(false);
   const sigPad = useRef<SignatureCanvas | null>(null);
   const signatureDate = new Date().toLocaleDateString();
 
@@ -110,7 +107,6 @@ export function SellerAgencyDisclosureForm({
                           `/uploads/${documentUrl}`;
       console.log("Opening document URL in SellerAgencyDisclosureForm:", formattedUrl);
       window.open(formattedUrl, '_blank');
-      setViewingForm(true);
     } else {
       toast({
         title: "Document Not Available",
@@ -131,22 +127,20 @@ export function SellerAgencyDisclosureForm({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          {!viewingForm && (
-            <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
-              <p className="text-sm text-amber-800">
-                Please review the form carefully before signing. Click the button below to view the form.
-              </p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-2 w-full"
-                onClick={handleViewPdf}
-              >
-                View Form
-              </Button>
-            </div>
-          )}
+        <div className="space-y-4 py-4">
+          <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
+            <p className="text-sm text-amber-800">
+              Please review the form carefully before signing. Click the button below to view the form.
+            </p>
+            <Button 
+              variant="outline" 
+              className="mt-2 w-full"
+              onClick={handleViewPdf}
+            >
+              <FileSignature className="mr-2 h-4 w-4" />
+              View Form
+            </Button>
+          </div>
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Your Signature:</label>
@@ -172,13 +166,13 @@ export function SellerAgencyDisclosureForm({
             </div>
           </div>
           
-          <p className="text-sm text-gray-600 mt-4">
+          <p className="text-sm text-gray-600">
             By signing, you acknowledge that you have received and read the California Agency Disclosure Form, 
             which explains the different types of agency relationships in real estate transactions.
           </p>
         </div>
         
-        <DialogFooter className="flex justify-between">
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button 
             onClick={handleSubmit}
