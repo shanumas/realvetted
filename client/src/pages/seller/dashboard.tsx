@@ -66,7 +66,7 @@ export default function SellerDashboard() {
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Button
                             variant="default"
-                            onClick={() => window.location.href = `/seller/property/${property.id}`}
+                            onClick={() => window.location.href = `/buyer/property/${property.id}`}
                           >
                             View Details
                           </Button>
