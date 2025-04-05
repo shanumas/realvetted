@@ -283,42 +283,29 @@ export function AgencyDisclosureForm({
 
   const handleDownload = async () => {
     try {
-      // Don't use the cached PDF for downloads - instead make a direct API call with download=true parameter
-      if (!property?.id) return;
+      // We need to ensure the downloaded PDF has the same form data as what's displayed
+      // First, reload the preview to make sure any edits are captured
+      await generatePdfPreview();
       
-      // Generate a direct download URL with the download flag
-      const queryParams = isEditable ? '?editable=true&download=true' : '?download=true';
-      const response = await apiRequest(
-        'POST', 
-        `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`, 
-        formData
-      );
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to download PDF");
+      // Then use the same URL for download by opening it in a new window
+      // This ensures the exact same PDF that's displayed is what gets downloaded
+      if (pdfUrl) {
+        // Create a link to trigger download from the existing PDF (already processed with form data)
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        const fileNameSuffix = isEditable ? '_editable' : '';
+        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        throw new Error("PDF preview not available. Please try reloading the preview first.");
       }
-      
-      // Get the PDF as a blob
-      const blob = await response.blob();
-      
-      // Create a URL for the blob and trigger download
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const fileNameSuffix = isEditable ? '_editable' : '';
-      a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      // Clean up
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading preview:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to download PDF",
+        description: error instanceof Error ? error.message : "Failed to download preview",
         variant: "destructive",
       });
     }

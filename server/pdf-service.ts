@@ -285,37 +285,23 @@ export async function fillAgencyDisclosureForm(
     throw new Error("Could not read agency disclosure template PDF");
   }
 
+  // First, try to replace placeholder "1" with "uma" as requested
   try {
-    // First, try to replace placeholder "1" with a value (just for demonstration)
     pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, "1", "uma");
     console.log('Successfully applied text replacement for placeholder "1"');
-    
-    // Load the PDF document to apply additional modifications
-    const pdfDoc = await PDFDocument.load(pdfBuffer, { 
-      ignoreEncryption: true,
-    });
-    
-    // Apply additional processing based on form data if needed
-    // This is where you would add more field replacements
-    
-    // For PDF download compatibility, ensure it's saved with the right format
-    const modifiedPdfBytes = await pdfDoc.save({
-      addDefaultPage: false,
-      useObjectStreams: false  // This can help with PDF compatibility
-    });
-    
-    return Buffer.from(modifiedPdfBytes);
   } catch (error: any) {
-    console.error('Error processing PDF form:', error);
-    
-    // If we encountered an error, return the original PDF as fallback
-    // This ensures the download will at least contain something
-    const pdfDoc = await PDFDocument.load(pdfBuffer, { 
-      ignoreEncryption: true 
-    });
-    const modifiedPdfBytes = await pdfDoc.save();
-    return Buffer.from(modifiedPdfBytes);
+    console.log(
+      'Text replacement for placeholder "1" failed:',
+      error.message || "Unknown error",
+    );
   }
+
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+
+  // Save the document
+  const modifiedPdfBytes = await pdfDoc.save();
+
+  return Buffer.from(modifiedPdfBytes);
 }
 
 /**
