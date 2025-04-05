@@ -1954,15 +1954,14 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         });
       }
 
-      // First, check if there's a saved PDF content in the database
-      if (viewingRequestId) {
-        // Get existing agreements for this property
-        const agreements = await storage.getAgreementsByProperty(propertyId);
-        const agencyDisclosureAgreements = agreements.filter(a => 
-          a.type === 'agency_disclosure' && 
-          a.editedPdfContent !== null && 
-          a.editedPdfContent !== undefined
-        );
+      // Always check if there's a saved PDF content in the database, regardless of viewingRequestId
+      // Get existing agreements for this property
+      const agreements = await storage.getAgreementsByProperty(propertyId);
+      const agencyDisclosureAgreements = agreements.filter(a => 
+        a.type === 'agency_disclosure' && 
+        a.editedPdfContent !== null && 
+        a.editedPdfContent !== undefined
+      );
         
         // If there's an existing agreement with edited PDF content, return it
         if (agencyDisclosureAgreements.length > 0) {
@@ -2005,7 +2004,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             console.log("Agreement found but no edited PDF content in database for agreement ID:", latestAgreement.id);
           }
         }
-      }
       
       // If no saved PDF content is found, generate a new one
       console.log("No edited PDF content found in database, generating a new PDF from template");

@@ -140,6 +140,29 @@ export function AgencyDisclosureForm({
     // Add load event listener to inject the script after iframe loads
     iframe.addEventListener('load', injectFormFieldTracker);
     
+    // Save PDF when mouse leaves iframe area
+    const handleMouseLeave = async () => {
+      if (pdfUrl && property?.id) {
+        console.log("Mouse left PDF area, auto-saving current state");
+        try {
+          // Get the PDF content directly from the iframe
+          const response = await fetch(pdfUrl);
+          if (response.ok) {
+            const pdfBlob = await response.blob();
+            await saveEditedPdf(pdfBlob);
+          }
+        } catch (error) {
+          console.error("Error auto-saving PDF on mouse leave:", error);
+        }
+      }
+    };
+    
+    // Add event listener for mouse leaving the iframe area
+    const iframeContainer = iframe.parentElement;
+    if (iframeContainer) {
+      iframeContainer.addEventListener('mouseleave', handleMouseLeave);
+    }
+    
     // Clean up
     return () => {
       if ((window as any).saveTimeoutId) {
@@ -147,6 +170,9 @@ export function AgencyDisclosureForm({
       }
       window.removeEventListener('message', handleFormFieldChange);
       iframe.removeEventListener('load', injectFormFieldTracker);
+      if (iframeContainer) {
+        iframeContainer.removeEventListener('mouseleave', handleMouseLeave);
+      }
     };
   }, [iframeRef.current, pdfUrl, property?.id]);
   
