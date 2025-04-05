@@ -504,7 +504,17 @@ export default function SellerPropertyDetail() {
                                       agreement.type === "agency_disclosure"
                                     ) {
                                       // Open the signing dialog for seller
-                                      setSelectedAgreement(agreement);
+                                      // Format the agreement document URL before storing
+                                      const formattedAgreement = {
+                                        ...agreement,
+                                        documentUrl: agreement.documentUrl ? 
+                                          (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
+                                            agreement.documentUrl : 
+                                            `/uploads/${agreement.documentUrl}`) : 
+                                          null
+                                      };
+                                      
+                                      setSelectedAgreement(formattedAgreement);
                                       setIsSigningFormOpen(true);
                                     } else {
                                       // Just view the agreement document if available
