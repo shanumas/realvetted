@@ -267,218 +267,63 @@ export async function replacePlaceholderInPdf(
 
 /**
  * Fills out the agency disclosure form with the provided data
- * 
+ *
  * @param formData Data to fill into the form fields
  * @returns Buffer containing the filled PDF document
  */
 export async function fillAgencyDisclosureForm(
-  formData: AgencyDisclosureFormData
+  formData: AgencyDisclosureFormData,
 ): Promise<Buffer> {
   // Load the template PDF
-  const templatePath = path.join(process.cwd(), 'uploads', 'pdf', 'brbc.pdf');
+  const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
   let pdfBuffer;
-  
+
   try {
     pdfBuffer = fs.readFileSync(templatePath);
   } catch (error) {
-    console.error('Error reading agency disclosure template PDF:', error);
-    throw new Error('Could not read agency disclosure template PDF');
+    console.error("Error reading agency disclosure template PDF:", error);
+    throw new Error("Could not read agency disclosure template PDF");
   }
-  
+
   // First, try to replace placeholder "1" with "uma" as requested
   try {
     pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, "1", "uma");
     console.log('Successfully applied text replacement for placeholder "1"');
   } catch (error: any) {
-    console.log('Text replacement for placeholder "1" failed:', error.message || 'Unknown error');
+    console.log(
+      'Text replacement for placeholder "1" failed:',
+      error.message || "Unknown error",
+    );
   }
 
-  // Next, try to apply other replacements for our form fields
-  const fieldMappings = {
-    'buyer_name_1': formData.buyerName1,
-    'buyer_name_2': formData.buyerName2,
-    'buyer_date_1': formData.buyerSignatureDate1,
-    'buyer_date_2': formData.buyerSignatureDate2,
-    'seller_name_1': formData.sellerName1,
-    'seller_name_2': formData.sellerName2,
-    'seller_date_1': formData.sellerSignatureDate1,
-    'seller_date_2': formData.sellerSignatureDate2,
-    'agent_name': formData.agentName,
-    'agent_brokerage': formData.agentBrokerageName,
-    'agent_license': formData.agentLicenseNumber,
-    'agent_date': formData.agentSignatureDate,
-    'property_address': formData.propertyAddress,
-    'property_city': formData.propertyCity,
-    'property_state': formData.propertyState,
-    'property_zip': formData.propertyZip
-  };
-
-  // Try to process each field through text replacement before loading the PDF
-  for (const [field, value] of Object.entries(fieldMappings)) {
-    if (value) {
-      try {
-        pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, field, value);
-        console.log(`Successfully applied text replacement for field "${field}"`);
-      } catch (error: any) {
-        // Continue if field replacement fails, we'll try form filling next
-        console.log(`Field "${field}" not found for text replacement, will try form filling: ${error.message || 'Unknown error'}`);
-      }
-    }
-  }
-  
-  // Now load the PDF document (after all text replacements have been attempted)
   const pdfDoc = await PDFDocument.load(pdfBuffer);
-  
-  // Get the form from the document
-  const form = pdfDoc.getForm();
-  
-  // Helper function to set field text if it exists, or add text directly to the PDF if the field doesn't exist
-  const setFieldTextIfExists = (fieldName: string, value?: string) => {
-    if (!value) return;
-    
-    try {
-      // Try to set the field value through the form field
-      form.getTextField(fieldName).setText(value);
-    } catch (error: any) {
-      console.warn(`Field '${fieldName}' doesn't exist, adding text directly to the PDF`);
-      
-      try {
-        // If the form field doesn't exist, add the text directly to the first page
-        const pages = pdfDoc.getPages();
-        const firstPage = pages[0];
-        const { width, height } = firstPage.getSize();
-        
-        // Get font for drawing text
-        const font = pdfDoc.embedStandardFont(StandardFonts.Helvetica);
-        
-        // Set position for text based on the field name
-        let x = 100;
-        let y = 100;
-        
-        // Determine a reasonable position based on the field name
-        switch (fieldName) {
-          case 'buyer_name_1':
-            x = width * 0.2;
-            y = height * 0.7;
-            break;
-          case 'buyer_name_2':
-            x = width * 0.2;
-            y = height * 0.65;
-            break;
-          case 'agent_name':
-            x = width * 0.7;
-            y = height * 0.4;
-            break;
-          case 'agent_brokerage':
-            x = width * 0.7;
-            y = height * 0.35;
-            break;
-          case 'agent_license':
-            x = width * 0.7;
-            y = height * 0.3;
-            break;
-          case 'agent_date':
-            x = width * 0.7;
-            y = height * 0.25;
-            break;
-          case 'property_address':
-            x = width * 0.5;
-            y = height * 0.8;
-            break;
-          case 'property_city':
-            x = width * 0.3;
-            y = height * 0.75;
-            break;
-          case 'property_state':
-            x = width * 0.5;
-            y = height * 0.75;
-            break;
-          case 'property_zip':
-            x = width * 0.7;
-            y = height * 0.75;
-            break;
-          default:
-            // Default position near the top of the page
-            x = width * 0.1;
-            y = height * 0.9;
-        }
-        
-        // Draw the text directly on the page
-        firstPage.drawText(value, {
-          x,
-          y,
-          size: 12,
-          font,
-          color: rgb(0, 0, 0),
-        });
-        
-        console.log(`Added text '${value}' for field '${fieldName}' directly to PDF at position x=${x}, y=${y}`);
-      } catch (drawError: any) {
-        console.error(`Error adding text directly to PDF for field '${fieldName}': ${drawError.message || 'Unknown error'}`);
-      }
-    }
-  };
-  
-  // Set form fields - mapping form data to the actual field names in the PDF
-  // Buyer information
-  setFieldTextIfExists('buyer_name_1', formData.buyerName1);
-  setFieldTextIfExists('buyer_name_2', formData.buyerName2);
-  setFieldTextIfExists('buyer_date_1', formData.buyerSignatureDate1);
-  setFieldTextIfExists('buyer_date_2', formData.buyerSignatureDate2);
-  
-  // Seller information
-  setFieldTextIfExists('seller_name_1', formData.sellerName1);
-  setFieldTextIfExists('seller_name_2', formData.sellerName2);
-  setFieldTextIfExists('seller_date_1', formData.sellerSignatureDate1);
-  setFieldTextIfExists('seller_date_2', formData.sellerSignatureDate2);
-  
-  // Agent information
-  setFieldTextIfExists('agent_name', formData.agentName);
-  setFieldTextIfExists('agent_brokerage', formData.agentBrokerageName);
-  setFieldTextIfExists('agent_license', formData.agentLicenseNumber);
-  setFieldTextIfExists('agent_date', formData.agentSignatureDate);
-  
-  // Property information
-  setFieldTextIfExists('property_address', formData.propertyAddress);
-  setFieldTextIfExists('property_city', formData.propertyCity);
-  setFieldTextIfExists('property_state', formData.propertyState);
-  setFieldTextIfExists('property_zip', formData.propertyZip);
-  
-  // If the form should be editable or not
-  if (formData.isEditable !== true) {
-    try {
-      form.flatten();
-    } catch (error: any) {
-      console.warn('Could not flatten form, it will remain editable:', error.message || 'Unknown error');
-    }
-  }
-  
+
   // Save the document
   const modifiedPdfBytes = await pdfDoc.save();
-  
+
   return Buffer.from(modifiedPdfBytes);
 }
 
 /**
  * Creates a simple PDF document with a text field for testing replacements
- * 
+ *
  * @param text The text to display in the document
  * @param title The title of the document
  * @returns Buffer containing the created PDF document
  */
 export async function createSimpleReplacementDocument(
   text: string,
-  title: string
+  title: string,
 ): Promise<Buffer> {
   // Create a new PDF document
   const pdfDoc = await PDFDocument.create();
-  
+
   // Add a blank page to the document
   const page = pdfDoc.addPage([600, 400]);
-  
+
   // Get the font
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  
+
   // Add the title text
   page.drawText(title, {
     x: 50,
@@ -487,7 +332,7 @@ export async function createSimpleReplacementDocument(
     font,
     color: rgb(0, 0, 0),
   });
-  
+
   // Add the body text
   page.drawText(text, {
     x: 50,
@@ -496,13 +341,13 @@ export async function createSimpleReplacementDocument(
     font,
     color: rgb(0, 0, 0),
   });
-  
+
   // Get the form
   const form = pdfDoc.getForm();
-  
+
   // Create a text field named "1"
   const textField = form.createTextField("1");
-  
+
   // Position the text field
   textField.addToPage(page, {
     x: 50,
@@ -510,12 +355,12 @@ export async function createSimpleReplacementDocument(
     width: 200,
     height: 30,
   });
-  
+
   // Set some default text in the field
   textField.setText("This is field 1 - try to replace me");
-  
+
   // Save the document
   const pdfBytes = await pdfDoc.save();
-  
+
   return Buffer.from(pdfBytes);
 }
