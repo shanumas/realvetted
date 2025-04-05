@@ -36,7 +36,8 @@ export function AgencyDisclosureForm({
   );
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [isEditable, setIsEditable] = useState<boolean>(false);
+  // Always set isEditable to true by default
+  const [isEditable] = useState<boolean>(true);
   
   // Determine if current user is agent or buyer
   const isAgent = user?.role === 'agent';
@@ -55,12 +56,8 @@ export function AgencyDisclosureForm({
     }
   }, [isOpen, property?.id]);
   
-  // Update PDF when editable toggle changes
-  useEffect(() => {
-    if (isOpen && property?.id) {
-      generatePdfPreview();
-    }
-  }, [isEditable]);
+  // Initial PDF load is sufficient now, no need to watch isEditable changes
+  // since it's now a constant value
   
   // Check for existing agreement when the modal opens
   useEffect(() => {
@@ -210,12 +207,7 @@ export function AgencyDisclosureForm({
     }
   };
   
-  // Handle toggle change for editable PDF
-  const handleEditableToggle = (checked: boolean) => {
-    setIsEditable(checked);
-    // Regenerate the PDF preview whenever the editable toggle changes
-    generatePdfPreview();
-  };
+  // No longer needed since PDFs are always editable now
 
   const handleSave = async () => {
     // Use existing signature if it exists, otherwise require a new one
@@ -346,20 +338,7 @@ export function AgencyDisclosureForm({
           </div>
           
           {/* PDF Controls */}
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="editable-mode"
-                checked={isEditable}
-                onCheckedChange={handleEditableToggle}
-              />
-              <Label htmlFor="editable-mode" className="text-sm cursor-pointer">
-                Editable PDF
-              </Label>
-              <div className="text-xs text-gray-500 ml-2">
-                {isEditable ? "PDF will be editable in the browser" : "PDF will be view-only"}
-              </div>
-            </div>
+          <div className="flex items-center justify-end mb-2">
             <Button 
               variant="outline" 
               size="sm" 
