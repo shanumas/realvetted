@@ -340,9 +340,12 @@ export default function BuyerPropertyDetail() {
   };
   
   // Handle submission after the disclosure form is signed
-  const handleDisclosureFormComplete = useCallback(() => {
+  const handleDisclosureFormComplete = useCallback((shouldOverrideOrEvent: boolean | React.MouseEvent = false) => {
     // Close the disclosure form
     setIsDisclosureFormOpen(false);
+    
+    // Determine if we should override (true if boolean parameter is true)
+    const shouldOverride = typeof shouldOverrideOrEvent === 'boolean' ? shouldOverrideOrEvent : false;
     
     // Submit the viewing request if we have stored data
     if (viewingRequestData) {
@@ -351,7 +354,7 @@ export default function BuyerPropertyDetail() {
         time: viewingRequestData.time,
         endTime: viewingRequestData.endTime,
         notes: viewingRequestData.notes,
-        override: false // Always use override: false for new requests
+        override: shouldOverride // Allow override if explicitly requested
       });
       
       // Clear the stored data
@@ -410,7 +413,7 @@ export default function BuyerPropertyDetail() {
                       <Button 
                         variant="default" 
                         size="sm" 
-                        onClick={handleDisclosureFormComplete}
+                        onClick={() => handleDisclosureFormComplete(true)}
                       >
                         Continue Anyway
                       </Button>
@@ -439,7 +442,7 @@ export default function BuyerPropertyDetail() {
                     <Button 
                       variant="default" 
                       size="sm" 
-                      onClick={handleDisclosureFormComplete}
+                      onClick={() => handleDisclosureFormComplete(true)}
                     >
                       Continue Anyway
                     </Button>
@@ -466,7 +469,7 @@ export default function BuyerPropertyDetail() {
                   <Button 
                     variant="default" 
                     size="sm" 
-                    onClick={handleDisclosureFormComplete}
+                    onClick={() => handleDisclosureFormComplete(true)}
                   >
                     Continue Anyway
                   </Button>
