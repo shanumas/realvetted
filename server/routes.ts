@@ -453,10 +453,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save edited PDF content to the database
   app.post("/api/properties/:id/save-edited-pdf", isAuthenticated, async (req, res) => {
     try {
+      console.log("Received request to save edited PDF content");
       const propertyId = parseInt(req.params.id);
       const { pdfContent, viewingRequestId } = req.body;
       
+      console.log(`Save PDF request - Property ID: ${propertyId}, PDF content length: ${pdfContent ? pdfContent.length : 0}, Viewing Request ID: ${viewingRequestId || 'none'}`);
+      
       if (!propertyId || !pdfContent) {
+        console.log("Missing required parameters");
         return res.status(400).json({
           success: false,
           error: "Property ID and PDF content are required"
@@ -466,6 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const property = await storage.getProperty(propertyId);
       
       if (!property) {
+        console.log(`Property ${propertyId} not found`);
         return res.status(404).json({
           success: false,
           error: "Property not found"
@@ -1964,7 +1969,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           const latestAgreement = agencyDisclosureAgreements[agencyDisclosureAgreements.length - 1];
           
           if (latestAgreement.editedPdfContent) {
-            console.log("Using edited PDF content from database");
+            console.log("Using edited PDF content from database for agreement ID:", latestAgreement.id);
             const pdfBuffer = Buffer.from(latestAgreement.editedPdfContent, 'base64');
             
             // Set appropriate headers
@@ -1972,6 +1977,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
             
             if (isEditable) {
+              console.log("Keeping form fields editable as requested");
               res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
               res.setHeader('Pragma', 'no-cache');
               res.setHeader('Expires', '0');
@@ -1980,6 +1986,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             
             // Send the previously saved PDF directly to the client
             return res.send(pdfBuffer);
+          } else {
+            console.log("Agreement found but no edited PDF content in database for agreement ID:", latestAgreement.id);
           }
         }
       }

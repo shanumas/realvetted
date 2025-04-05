@@ -277,7 +277,7 @@ export function AgencyDisclosureForm({
               return;
             }
             
-            console.log("Saving edited PDF to database");
+            console.log("Saving edited PDF to database for property ID:", property.id);
             
             // Send the PDF content to the server
             const saveResponse = await apiRequest(
@@ -292,7 +292,8 @@ export function AgencyDisclosureForm({
             if (!saveResponse.ok) {
               console.error("Error saving PDF:", await saveResponse.text());
             } else {
-              console.log("PDF saved successfully");
+              const responseText = await saveResponse.text();
+              console.log("PDF saved successfully. Response:", responseText);
             }
             
             resolve();
