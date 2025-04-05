@@ -128,19 +128,18 @@ export function SellerAgencyDisclosureForm({
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="bg-amber-50 p-3 rounded-md border border-amber-200">
-            <p className="text-sm text-amber-800">
-              Please review the form carefully before signing. Click the button below to view the form.
-            </p>
-            <Button 
-              variant="outline" 
-              className="mt-2 w-full"
-              onClick={handleViewPdf}
-            >
-              <FileSignature className="mr-2 h-4 w-4" />
-              View Form
-            </Button>
-          </div>
+          {documentUrl && (
+            <div className="border rounded-md overflow-hidden" style={{ height: '300px' }}>
+              <iframe 
+                src={documentUrl.startsWith('/uploads') || documentUrl.startsWith('http') ? 
+                    documentUrl : `/uploads/${documentUrl}`} 
+                width="100%" 
+                height="100%" 
+                title="Agency Disclosure Form"
+                className="border-0"
+              />
+            </div>
+          )}
           
           <div className="space-y-2">
             <label className="text-sm font-medium">Your Signature:</label>
@@ -174,6 +173,14 @@ export function SellerAgencyDisclosureForm({
         
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={handleViewPdf}
+            className="ml-2"
+          >
+            <FileSignature className="mr-2 h-4 w-4" />
+            View Full Form
+          </Button>
           <Button 
             onClick={handleSubmit}
             disabled={loading || !signature}
