@@ -1849,9 +1849,22 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       // Generate the PDF with filled form data
       const pdfBuffer = await fillAgencyDisclosureForm(formDataWithEditableFlag);
       
-      // Set the appropriate headers for PDF download
+      // Set the appropriate headers for PDF display in browser or for download
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+      
+      // Check if this is a download request
+      const isDownload = req.query.download === 'true';
+      
+      if (isDownload) {
+        // Always use attachment for download
+        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+      } else if (isEditable) {
+        // Use 'inline' to display editable PDFs in browser
+        res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
+      } else {
+        // For non-editable PDFs without download flag, use attachment
+        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+      }
       
       // Send the PDF directly to the client
       res.send(pdfBuffer);

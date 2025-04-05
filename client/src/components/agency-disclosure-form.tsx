@@ -283,9 +283,25 @@ export function AgencyDisclosureForm({
 
   const handleDownload = async () => {
     try {
-      // Always generate a fresh PDF for download to ensure it has the current editable state
-      const url = await generatePdfPreview();
-      if (!url) throw new Error("Failed to generate PDF");
+      // For downloading, we need to create a new URL that will trigger a download
+      // Instead of using the existing URL (which now displays inline), we'll make a new request
+      const queryParams = isEditable ? '?editable=true&download=true' : '?download=true';
+      const response = await apiRequest(
+        'POST',
+        `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`,
+        formData
+      );
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate PDF for download");
+      }
+      
+      // Get the PDF as a blob
+      const blob = await response.blob();
+      
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
       
       // Create a link and trigger download
       const a = document.createElement('a');
@@ -297,6 +313,7 @@ export function AgencyDisclosureForm({
       
       // Clean up
       document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading preview:", error);
       toast({
@@ -341,6 +358,31 @@ export function AgencyDisclosureForm({
             </p>
           </div>
           
+          {/* PDF Controls */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="editable-mode"
+                checked={isEditable}
+                onCheckedChange={handleEditableToggle}
+              />
+              <Label htmlFor="editable-mode" className="text-sm cursor-pointer">
+                Editable PDF
+              </Label>
+              <div className="text-xs text-gray-500 ml-2">
+                {isEditable ? "PDF will be editable in the browser" : "PDF will be view-only"}
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => generatePdfPreview()}
+              className="bg-white shadow-sm"
+            >
+              <RefreshCw className="w-4 h-4 mr-1" /> Reload PDF
+            </Button>
+          </div>
+          
           {/* PDF Viewer */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {pdfUrl ? (
@@ -364,16 +406,6 @@ export function AgencyDisclosureForm({
                     }, 1000);
                   }}
                 />
-                <div className="absolute bottom-2 right-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => generatePdfPreview()}
-                    className="bg-white shadow-sm"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-1" /> Reload PDF
-                  </Button>
-                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center w-full h-[500px] bg-gray-100">
