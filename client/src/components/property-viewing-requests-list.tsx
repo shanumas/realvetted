@@ -1,483 +1,348 @@
 import { useState } from "react";
-import { format, parseISO, addDays, addHours, setHours, setMinutes } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { getQueryFn, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { ViewingRequestWithParticipants } from "@shared/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { ViewingRequestWithParticipants } from "@shared/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+  Calendar,
+  Clock,
+  Home,
+  Check,
+  X,
+  Calendar as CalendarIcon,
+  Loader2,
+  User,
+  MapPin,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type PropertyViewingRequestsListProps = {
-  viewingRequests: ViewingRequestWithParticipants[];
+  // Original props
+  viewingRequests?: ViewingRequestWithParticipants[];
   showPropertyDetails?: boolean;
   propertyName?: string;
+  
+  // New alternative props
+  propertyId?: number;
+  viewAs?: "buyer" | "seller" | "agent";
 };
 
 export function PropertyViewingRequestsList({ 
-  viewingRequests, 
+  viewingRequests: providedViewingRequests, 
   showPropertyDetails = true,
-  propertyName
+  propertyName,
+  propertyId,
+  viewAs
 }: PropertyViewingRequestsListProps) {
   const [activeTab, setActiveTab] = useState("pending");
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  // Dialog state for requesting different time
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<ViewingRequestWithParticipants | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedTime, setSelectedTime] = useState("12:00");
-  const [durationHours, setDurationHours] = useState("2");
-  const [notes, setNotes] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Calculate the minimum date for scheduling (24 hours from now)
-  const minimumDate = addDays(new Date(), 1);
-  
-  // Debugging output
-  console.log("ViewingRequests received:", viewingRequests);
-  
-  // Ensure viewingRequests is not undefined and is an array
-  const validRequests = Array.isArray(viewingRequests) ? viewingRequests : [];
-  console.log("Valid requests array:", validRequests);
-  
-  // Filter requests based on active tab
-  const filteredRequests = validRequests.filter(request => {
-    // Additional debugging to check each request and its status
-    console.log("Request being filtered:", request, "Status:", request.status, "Active tab:", activeTab);
-    
-    if (activeTab === "pending") return request.status === "pending";
-    if (activeTab === "approved") return request.status === "accepted"; // Use 'accepted' status from backend
-    if (activeTab === "rejected") return request.status === "rejected";
-    if (activeTab === "cancelled") return request.status === "cancelled";
-    if (activeTab === "completed") return request.status === "completed";
-    return true; // Show all requests on "all" tab
+  const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | null>(null);
+
+  // Only fetch if propertyId is provided and viewingRequests aren't directly provided
+  const { data: fetchedViewingRequests, isLoading } = useQuery<ViewingRequestWithParticipants[]>({
+    queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!propertyId && !providedViewingRequests,
   });
-  
-  console.log("Filtered requests for tab", activeTab, ":", filteredRequests);
-  
-  // Get counts for badges
-  const pendingCount = validRequests.filter(req => req.status === "pending").length || 0;
-  const approvedCount = validRequests.filter(req => req.status === "accepted").length || 0; // Use 'accepted' status from backend
-  const rejectedCount = validRequests.filter(req => req.status === "rejected").length || 0;
-  const completedCount = validRequests.filter(req => req.status === "completed").length || 0;
-  
-  // Open the dialog for requesting a different time
-  const openRequestDialog = (request: ViewingRequestWithParticipants) => {
-    setSelectedRequest(request);
-    
-    // Default to a date 2 days from now
-    const defaultDate = addDays(new Date(), 2);
-    setSelectedDate(defaultDate);
-    
-    // Default time to 12:00 PM
-    setSelectedTime("12:00");
-    
-    // Default duration to 2 hours
-    setDurationHours("2");
-    
-    // Clear notes
-    setNotes("");
-    
-    // Open the dialog
-    setDialogOpen(true);
-  };
-  
-  // State for delete confirmation dialog
-  const [deleteConfirmDialogOpen, setDeleteConfirmDialogOpen] = useState(false);
-  const [requestToDelete, setRequestToDelete] = useState<number | null>(null);
 
-  // Show delete confirmation dialog
-  const showDeleteConfirmation = (requestId: number) => {
-    setRequestToDelete(requestId);
-    setDeleteConfirmDialogOpen(true);
-  };
-  
-  // Handle delete request
-  const handleDeleteRequest = async () => {
-    if (!requestToDelete) return;
-    
+  // Use provided viewingRequests if available, otherwise use fetched data
+  const viewingRequests = providedViewingRequests || fetchedViewingRequests || [];
+
+  const handleViewingAction = async (requestId: number, status: string) => {
     try {
-      setIsSubmitting(true);
+      await apiRequest(`/api/viewing-requests/${requestId}`, "PATCH", { status });
       
-      // Send the delete request to the server - don't check response.ok as apiRequest already handles this
-      await apiRequest("DELETE", `/api/viewing-requests/${requestToDelete}`);
-      
-      // Show success message
-      toast({
-        title: "Request Cancelled",
-        description: "Your viewing request has been cancelled successfully.",
-        variant: "default"
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}/viewing-requests`],
       });
       
-      // Invalidate both relevant query caches so the UI updates
-      const propertyId = viewingRequests[0]?.propertyId;
-      if (propertyId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
-        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
-      } else {
-        // If we don't have a propertyId, invalidate all viewing request queries
-        queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests'] });
-      }
+      // Also invalidate buyer and agent viewing request queries
+      queryClient.invalidateQueries({
+        queryKey: ["/api/viewing-requests/buyer"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/viewing-requests/agent"],
+      });
       
-      // Also invalidate the auth user query to ensure we're still logged in
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      
-      // Close the dialog
-      setDeleteConfirmDialogOpen(false);
+      toast({
+        title: "Success",
+        description: `Viewing request ${status === "approved" ? "approved" : "rejected"}.`,
+      });
     } catch (error) {
-      console.error("Error deleting viewing request:", error);
+      console.error("Error updating viewing request:", error);
       toast({
         title: "Error",
-        description: "Failed to cancel viewing request. Please try again.",
-        variant: "destructive"
+        description: "There was a problem updating the viewing request.",
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-  
-  // Handle form submission
-  const handleSubmit = async () => {
-    if (!selectedRequest || !selectedDate || !selectedTime) {
-      toast({
-        title: "Missing Information",
-        description: "Please provide all required information",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      setIsSubmitting(true);
-      
-      // Parse the time string (format: "HH:MM")
-      const [hours, minutes] = selectedTime.split(":").map(Number);
-      
-      // Set the time on the selected date
-      let requestedDate = setHours(selectedDate, hours);
-      requestedDate = setMinutes(requestedDate, minutes);
-      
-      // Calculate the end date/time based on duration
-      const requestedEndDate = addHours(requestedDate, parseInt(durationHours));
-      
-      // Create the request payload
-      const payload = {
-        propertyId: selectedRequest.propertyId,
-        requestedDate: requestedDate.toISOString(),
-        requestedEndDate: requestedEndDate.toISOString(),
-        notes,
-        override: true // This flag indicates we're replacing an existing request
-      };
-      
-      // Send the request to the server - don't check response.ok as apiRequest already handles this
-      await apiRequest("POST", "/api/viewing-requests", payload);
-      
-      // Show success message
-      toast({
-        title: "Request Submitted",
-        description: "Your viewing request has been submitted successfully and will replace the previous request.",
-        variant: "default"
-      });
-      
-      // Close the dialog
-      setDialogOpen(false);
-      
-      // Invalidate queries to update the UI
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${selectedRequest.propertyId}/viewing-requests`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/viewing-requests/buyer'] });
-      
-      // Also invalidate the auth user query to ensure we're still logged in
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    } catch (error) {
-      console.error("Error submitting viewing request:", error);
-      toast({
-        title: "Error",
-        description: "Failed to submit viewing request. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  // Get counts for cancelled requests
-  const cancelledCount = validRequests.filter(req => req.status === "cancelled").length || 0;
+  const confirmDialog = (requestId: number, action: "approve" | "reject") => {
+    setSelectedRequestId(requestId);
+    setConfirmAction(action);
+    setIsConfirmDialogOpen(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedRequestId || !confirmAction) return;
+    
+    await handleViewingAction(
+      selectedRequestId, 
+      confirmAction === "approve" ? "approved" : "rejected"
+    );
+    
+    setIsConfirmDialogOpen(false);
+    setSelectedRequestId(null);
+    setConfirmAction(null);
+  };
+
+  const filteredViewingRequests = viewingRequests.filter((request) => {
+    if (activeTab === "pending") {
+      return request.status === "pending";
+    } else if (activeTab === "approved") {
+      return request.status === "approved";
+    } else if (activeTab === "rejected") {
+      return request.status === "rejected";
+    } else if (activeTab === "completed") {
+      return request.status === "completed";
+    }
+    return true;
+  });
 
   return (
-    <div className="space-y-4">
-      {/* Dialog for requesting a different time */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+    <div>
+      <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 mb-4">
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="approved">Approved</TabsTrigger>
+          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab}>
+          {isLoading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredViewingRequests.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+              <p>No {activeTab} viewing requests found.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredViewingRequests.map((request) => (
+                <Card key={request.id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="bg-gray-50 p-4 border-b flex justify-between items-center">
+                      <div className="flex items-center">
+                        <CalendarIcon className="mr-2 h-5 w-5 text-primary" />
+                        <div>
+                          <span className="font-medium">
+                            {request.date
+                              ? format(new Date(request.date), "PPP")
+                              : "Date not specified"}
+                          </span>
+                          {request.timeSlot && (
+                            <span className="text-sm text-gray-500 ml-2">
+                              at {request.timeSlot}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Badge
+                        variant={
+                          request.status === "pending"
+                            ? "outline"
+                            : request.status === "approved"
+                            ? "success"
+                            : request.status === "rejected"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                      </Badge>
+                    </div>
+
+                    <div className="p-4">
+                      {/* Property details if showing */}
+                      {showPropertyDetails && request.property && (
+                        <div className="mb-4 pb-4 border-b border-gray-100">
+                          <div className="flex items-start">
+                            <Home className="h-5 w-5 text-gray-400 mt-0.5 mr-2" />
+                            <div>
+                              <h4 className="font-medium">
+                                {request.property.address}
+                              </h4>
+                              <p className="text-sm text-gray-500">
+                                {request.property.city}, {request.property.state}{" "}
+                                {request.property.zip}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* If there's no property but propertyName is provided */}
+                      {showPropertyDetails && !request.property && propertyName && (
+                        <div className="mb-4 pb-4 border-b border-gray-100">
+                          <div className="flex items-start">
+                            <Home className="h-5 w-5 text-gray-400 mt-0.5 mr-2" />
+                            <div>
+                              <h4 className="font-medium">{propertyName}</h4>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Buyer information */}
+                      {request.buyer && (
+                        <div className="mb-3">
+                          <div className="flex items-center">
+                            <Avatar className="h-8 w-8 mr-2">
+                              <AvatarFallback>
+                                {request.buyer.firstName?.[0] || "B"}
+                                {request.buyer.lastName?.[0] || ""}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">
+                                {request.buyer.firstName}{" "}
+                                {request.buyer.lastName}
+                              </p>
+                              <p className="text-sm text-gray-500">Buyer</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Agent information */}
+                      {request.agent && (
+                        <div className="mb-3">
+                          <div className="flex items-center">
+                            <Avatar className="h-8 w-8 mr-2">
+                              <AvatarFallback>
+                                {request.agent.firstName?.[0] || "A"}
+                                {request.agent.lastName?.[0] || ""}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium">
+                                {request.agent.firstName}{" "}
+                                {request.agent.lastName}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Real Estate Agent
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {request.notes && (
+                        <div className="mt-3 text-sm text-gray-700">
+                          <p className="font-medium mb-1">Notes:</p>
+                          <p>{request.notes}</p>
+                        </div>
+                      )}
+
+                      {/* Feedback if completed */}
+                      {request.status === "completed" && request.feedback && (
+                        <div className="mt-3">
+                          <Alert>
+                            <AlertTitle>Feedback</AlertTitle>
+                            <AlertDescription>
+                              {request.feedback}
+                            </AlertDescription>
+                          </Alert>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action buttons for seller/agent to approve/reject viewing requests */}
+                    {(viewAs === "seller" || viewAs === "agent") && 
+                     request.status === "pending" &&
+                     (
+                      <div className="px-4 py-3 bg-gray-50 border-t flex justify-end space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => confirmDialog(request.id, "reject")}
+                        >
+                          <X className="h-4 w-4 mr-1" /> Reject
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => confirmDialog(request.id, "approve")}
+                        >
+                          <Check className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Request Different Viewing Time</DialogTitle>
+            <DialogTitle>
+              {confirmAction === "approve"
+                ? "Approve Viewing Request"
+                : "Reject Viewing Request"}
+            </DialogTitle>
             <DialogDescription>
-              Choose a new date and time to view this property. 
-              This will replace your current pending request.
+              {confirmAction === "approve"
+                ? "Are you sure you want to approve this viewing request?"
+                : "Are you sure you want to reject this viewing request?"}
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="date">Date (must be at least 24 hours from now)</Label>
-              <DatePicker 
-                date={selectedDate} 
-                setDate={setSelectedDate}
-                fromDate={minimumDate}
-                label="Select a date"
-              />
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="time">Time</Label>
-              <Select
-                value={selectedTime}
-                onValueChange={setSelectedTime}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="9:00">9:00 AM</SelectItem>
-                  <SelectItem value="9:30">9:30 AM</SelectItem>
-                  <SelectItem value="10:00">10:00 AM</SelectItem>
-                  <SelectItem value="10:30">10:30 AM</SelectItem>
-                  <SelectItem value="11:00">11:00 AM</SelectItem>
-                  <SelectItem value="11:30">11:30 AM</SelectItem>
-                  <SelectItem value="12:00">12:00 PM</SelectItem>
-                  <SelectItem value="12:30">12:30 PM</SelectItem>
-                  <SelectItem value="13:00">1:00 PM</SelectItem>
-                  <SelectItem value="13:30">1:30 PM</SelectItem>
-                  <SelectItem value="14:00">2:00 PM</SelectItem>
-                  <SelectItem value="14:30">2:30 PM</SelectItem>
-                  <SelectItem value="15:00">3:00 PM</SelectItem>
-                  <SelectItem value="15:30">3:30 PM</SelectItem>
-                  <SelectItem value="16:00">4:00 PM</SelectItem>
-                  <SelectItem value="16:30">4:30 PM</SelectItem>
-                  <SelectItem value="17:00">5:00 PM</SelectItem>
-                  <SelectItem value="17:30">5:30 PM</SelectItem>
-                  <SelectItem value="18:00">6:00 PM</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="duration">Duration (hours)</Label>
-              <Select
-                value={durationHours}
-                onValueChange={setDurationHours}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">1 hour</SelectItem>
-                  <SelectItem value="2">2 hours</SelectItem>
-                  <SelectItem value="3">3 hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="grid gap-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Textarea
-                id="notes"
-                placeholder="Add any special requests or notes here"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-            </div>
-          </div>
-          
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
-              disabled={isSubmitting}
+              onClick={() => setIsConfirmDialogOpen(false)}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={isSubmitting || !selectedDate || !selectedTime}
-            >
-              {isSubmitting ? "Submitting..." : "Submit Request"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog for delete confirmation */}
-      <Dialog open={deleteConfirmDialogOpen} onOpenChange={setDeleteConfirmDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Cancel Viewing Request</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to cancel this viewing request? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
             <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmDialogOpen(false)}
-              disabled={isSubmitting}
+              variant={confirmAction === "approve" ? "default" : "destructive"}
+              onClick={handleConfirmAction}
             >
-              Keep Request
-            </Button>
-            <Button 
-              variant="destructive"
-              onClick={handleDeleteRequest}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Cancelling..." : "Yes, Cancel Request"}
+              {confirmAction === "approve" ? "Approve" : "Reject"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="pending">
-            Pending {pendingCount > 0 && <Badge variant="outline" className="ml-1">{pendingCount}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved {approvedCount > 0 && <Badge variant="outline" className="ml-1">{approvedCount}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="rejected">
-            Rejected {rejectedCount > 0 && <Badge variant="outline" className="ml-1">{rejectedCount}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="cancelled">
-            Cancelled {cancelledCount > 0 && <Badge variant="outline" className="ml-1">{cancelledCount}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="completed">
-            Completed {completedCount > 0 && <Badge variant="outline" className="ml-1">{completedCount}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
-        </TabsList>
-
-        {["pending", "approved", "rejected", "cancelled", "completed", "all"].map(tab => (
-          <TabsContent key={tab} value={tab}>
-            {!filteredRequests || filteredRequests.length === 0 ? (
-              <div className="text-center p-8 text-gray-500">
-                <p>No {tab} viewing requests found.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredRequests.map(request => {
-                  const property = request.property;
-                  
-                  // Previously this was returning null in a specific condition which could stop all requests from showing
-                  // Now we'll just render each request
-                  
-                  return (
-                    <Card key={request.id} className="border border-gray-200">
-                      <CardHeader className="bg-gray-50 pb-2">
-                        <div className="flex justify-between items-center">
-                          <CardTitle className="text-lg">
-                            Viewing Request #{request.id}
-                          </CardTitle>
-                          <Badge 
-                            variant={
-                              request.status === 'pending' ? 'outline' : 
-                              request.status === 'accepted' ? 'success' : // Use 'accepted' status from backend
-                              request.status === 'rejected' ? 'destructive' : 'default'
-                            }
-                          >
-                            {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      
-                      <CardContent className="p-4">
-                        {showPropertyDetails && property && (
-                          <div className="mb-4">
-                            <h3 className="font-semibold text-gray-700 mb-1">{property.address}</h3>
-                            <p className="text-sm text-gray-500">
-                              {property.city}, {property.state} {property.zip}
-                            </p>
-                          </div>
-                        )}
-                        
-                        {!showPropertyDetails && propertyName && (
-                          <div className="mb-4">
-                            <h3 className="font-semibold text-gray-700 mb-1">{propertyName}</h3>
-                          </div>
-                        )}
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                            <span className="text-sm">
-                              {format(parseISO(request.requestedDate.toString()), "MMMM d, yyyy")}
-                            </span>
-                          </div>
-                          
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2 text-gray-500" />
-                            <span className="text-sm">
-                              {format(parseISO(request.requestedDate.toString()), "h:mm a")}
-                            </span>
-                          </div>
-                        </div>
-                        
-                        {request.notes && (
-                          <div className="mb-4">
-                            <h4 className="text-sm font-medium mb-1">Notes:</h4>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                              {request.notes}
-                            </p>
-                          </div>
-                        )}
-                      </CardContent>
-                      
-                      {/* Add buttons for request management */}
-                      {request.status === "pending" && user?.role === "buyer" && (
-                        <CardFooter className="bg-gray-50 pt-2 pb-3 px-4 flex justify-end gap-2">
-                          <Button 
-                            variant="outline"
-                            onClick={() => openRequestDialog(request)}
-                            className="text-sm"
-                          >
-                            Request Different Time
-                          </Button>
-                          <Button 
-                            variant="destructive"
-                            onClick={() => showDeleteConfirmation(request.id)}
-                            className="text-sm"
-                          >
-                            Cancel Request
-                          </Button>
-                        </CardFooter>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-        ))}
-      </Tabs>
     </div>
   );
 }

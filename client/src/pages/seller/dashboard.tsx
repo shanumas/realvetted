@@ -69,8 +69,8 @@ export default function SellerDashboard() {
                           <Button
                             variant="default"
                             onClick={() => {
-                              console.log(`Navigating to /buyer/property/${property.id}`);
-                              setLocation(`/buyer/property/${property.id}`);
+                              console.log(`Navigating to /seller/property-view/${property.id}`);
+                              setLocation(`/seller/property-view/${property.id}`);
                             }}
                           >
                             View Details

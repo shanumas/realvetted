@@ -14,6 +14,7 @@ import AgentDashboard from "@/pages/agent/dashboard";
 import AgentPropertyDetail from "@/pages/agent/property-detail";
 import SellerDashboard from "@/pages/seller/dashboard";
 import SellerPropertyDetail from "@/pages/seller/property-detail";
+import SellerPropertyView from "@/pages/seller/property-view";
 import AdminDashboard from "@/pages/admin/dashboard";
 import { Loader2 } from "lucide-react";
 
@@ -35,6 +36,7 @@ function Router() {
       {/* Seller Routes */}
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} allowedRoles={["seller"]} />
       <ProtectedRoute path="/seller/property/:id" component={SellerPropertyDetail} allowedRoles={["seller"]} />
+      <ProtectedRoute path="/seller/property-view/:id" component={SellerPropertyView} allowedRoles={["seller"]} />
       
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
