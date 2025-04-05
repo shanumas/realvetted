@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getQueryFn } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { PropertyWithParticipants } from "@shared/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
@@ -41,6 +42,7 @@ export default function SellerPropertyDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isSigningFormOpen, setIsSigningFormOpen] = useState<boolean>(false);
   const [selectedAgreement, setSelectedAgreement] = useState<any>(null);
+  const { toast } = useToast();
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -505,11 +507,16 @@ export default function SellerPropertyDetail() {
                                       setSelectedAgreement(agreement);
                                       setIsSigningFormOpen(true);
                                     } else {
-                                      // Just view the agreement
-                                      window.open(
-                                        `/api/agreements/${agreement.id}/preview`,
-                                        "_blank",
-                                      );
+                                      // Just view the agreement document if available
+                                      if (agreement.documentUrl) {
+                                        window.open(agreement.documentUrl, "_blank");
+                                      } else {
+                                        toast({
+                                          title: "Document Not Available",
+                                          description: "The document is not available for preview at this time.",
+                                          variant: "destructive",
+                                        });
+                                      }
                                     }
                                   }}
                                 >

@@ -103,7 +103,12 @@ export function SellerAgencyDisclosureForm({
     if (documentUrl) {
       window.open(documentUrl, '_blank');
     } else {
-      window.open(`/api/agreements/${agreementId}/preview`, '_blank');
+      toast({
+        title: "Document Not Available",
+        description: "The document is not available for preview at this time.",
+        variant: "destructive",
+      });
+      return;
     }
     setViewingForm(true);
   };
