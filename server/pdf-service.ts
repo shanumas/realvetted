@@ -53,10 +53,8 @@ export async function addSignatureToPdf(
   signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent",
 ): Promise<Buffer> {
   try {
-    // Load the PDF document with ignoreEncryption option to handle encrypted PDFs
-    const pdfDoc = await PDFDocument.load(pdfBuffer, {
-      ignoreEncryption: true
-    });
+    // Load the PDF document
+    const pdfDoc = await PDFDocument.load(pdfBuffer);
 
     // Remove the data URL prefix if present
     let imageData = signatureData;
@@ -329,10 +327,7 @@ export async function fillAgencyDisclosureForm(
   }
   
   // Now load the PDF document (after all text replacements have been attempted)
-  // Add ignoreEncryption option to handle encrypted PDFs
-  const pdfDoc = await PDFDocument.load(pdfBuffer, {
-    ignoreEncryption: true
-  });
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
   
   // Get the form from the document
   const form = pdfDoc.getForm();
