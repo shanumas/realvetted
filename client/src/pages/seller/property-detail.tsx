@@ -509,7 +509,13 @@ export default function SellerPropertyDetail() {
                                     } else {
                                       // Just view the agreement document if available
                                       if (agreement.documentUrl) {
-                                        window.open(agreement.documentUrl, "_blank");
+                                        // Make sure the URL is properly formed with the /uploads prefix if needed
+                                        const documentUrl = agreement.documentUrl.startsWith('/uploads') || 
+                                                            agreement.documentUrl.startsWith('http') ? 
+                                                            agreement.documentUrl : 
+                                                            `/uploads/${agreement.documentUrl}`;
+                                        console.log("Opening document URL:", documentUrl);
+                                        window.open(documentUrl, "_blank");
                                       } else {
                                         toast({
                                           title: "Document Not Available",

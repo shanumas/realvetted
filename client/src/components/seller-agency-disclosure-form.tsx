@@ -23,6 +23,8 @@ export function SellerAgencyDisclosureForm({
   agreementId,
   documentUrl
 }: SellerAgencyDisclosureFormProps) {
+  // Log document URL for debugging
+  console.log("Received document URL in SellerAgencyDisclosureForm:", documentUrl);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [signature, setSignature] = useState<string>('');
@@ -101,7 +103,14 @@ export function SellerAgencyDisclosureForm({
 
   const handleViewPdf = () => {
     if (documentUrl) {
-      window.open(documentUrl, '_blank');
+      // Make sure the URL is properly formed with the /uploads prefix if needed
+      const formattedUrl = documentUrl.startsWith('/uploads') || 
+                          documentUrl.startsWith('http') ? 
+                          documentUrl : 
+                          `/uploads/${documentUrl}`;
+      console.log("Opening document URL in SellerAgencyDisclosureForm:", formattedUrl);
+      window.open(formattedUrl, '_blank');
+      setViewingForm(true);
     } else {
       toast({
         title: "Document Not Available",
@@ -110,7 +119,6 @@ export function SellerAgencyDisclosureForm({
       });
       return;
     }
-    setViewingForm(true);
   };
 
   return (
