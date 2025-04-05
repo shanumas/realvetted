@@ -450,6 +450,114 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Save edited PDF content to the database
+  app.post("/api/properties/:id/save-edited-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const propertyId = parseInt(req.params.id);
+      const { pdfContent, viewingRequestId } = req.body;
+      
+      if (!propertyId || !pdfContent) {
+        return res.status(400).json({
+          success: false,
+          error: "Property ID and PDF content are required"
+        });
+      }
+      
+      const property = await storage.getProperty(propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+      
+      // Check if user has permission to access the property
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      
+      const hasAccess = 
+        (userRole === "admin") ||
+        (userRole === "buyer" && property.createdBy === userId) ||
+        (userRole === "agent" && property.agentId === userId) ||
+        (userRole === "seller" && property.sellerId === userId);
+      
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to edit agreements for this property"
+        });
+      }
+      
+      // Get or create an agreement to store the edited PDF content
+      const existingAgreements = await storage.getAgreementsByProperty(propertyId);
+      const agencyDisclosureAgreements = existingAgreements.filter(a => 
+        a.type === 'agency_disclosure'
+      );
+      
+      let agreement;
+      
+      if (agencyDisclosureAgreements.length > 0) {
+        // Update the most recent agreement
+        const mostRecentAgreement = agencyDisclosureAgreements[agencyDisclosureAgreements.length - 1];
+        agreement = await storage.updateAgreement(mostRecentAgreement.id, {
+          editedPdfContent: pdfContent
+        });
+        console.log(`Updated existing agreement ${mostRecentAgreement.id} with edited PDF content`);
+      } else {
+        // Create a new agreement if none exists
+        let agentId = property.agentId;
+        
+        // If no agent ID is set, try to get one from the viewing request or use default
+        if (!agentId && viewingRequestId) {
+          const viewingRequest = await storage.getViewingRequest(parseInt(viewingRequestId));
+          if (viewingRequest && viewingRequest.buyerAgentId) {
+            agentId = viewingRequest.buyerAgentId;
+          }
+        }
+        
+        // If still no agent ID, get the first available agent
+        if (!agentId) {
+          const agents = await storage.getUsersByRole('agent');
+          if (agents.length > 0) {
+            agentId = agents[0].id;
+          } else {
+            // Use a system agent (admin) if no agents found
+            const admin = await storage.getUserByEmail('admin@realestateapp.com');
+            if (!admin) {
+              return res.status(500).json({ error: 'No agent or admin found in the system' });
+            }
+            agentId = admin.id;
+          }
+        }
+        
+        agreement = await storage.createAgreement({
+          propertyId,
+          type: 'agency_disclosure',
+          agreementText: `California Agency Disclosure Form for property ${property.address}`,
+          buyerId: userId, // Use the current user as buyer for now
+          agentId: agentId,
+          editedPdfContent: pdfContent,
+          date: new Date(),
+          status: 'pending'
+        });
+        console.log(`Created new agreement ${agreement.id} with edited PDF content`);
+      }
+      
+      res.json({
+        success: true,
+        data: agreement
+      });
+      
+    } catch (error) {
+      console.error('Error saving edited PDF content:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to save edited PDF content'
+      });
+    }
+  });
+
   // Get all agreements for a property
   app.get("/api/properties/:id/agreements", isAuthenticated, async (req, res) => {
     try {
@@ -1823,6 +1931,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       const propertyId = parseInt(req.params.id);
       const formData = req.body;
       const isEditable = req.query.editable === 'true'; // Check for editable flag in query params
+      const viewingRequestId = req.query.viewingRequestId ? parseInt(req.query.viewingRequestId as string) : undefined;
       
       if (!propertyId) {
         return res.status(400).json({
@@ -1839,6 +1948,43 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           error: 'Property not found'
         });
       }
+
+      // First, check if there's a saved PDF content in the database
+      if (viewingRequestId) {
+        // Get existing agreements for this property
+        const agreements = await storage.getAgreementsByProperty(propertyId);
+        const agencyDisclosureAgreements = agreements.filter(a => 
+          a.type === 'agency_disclosure' && 
+          a.editedPdfContent !== null && 
+          a.editedPdfContent !== undefined
+        );
+        
+        // If there's an existing agreement with edited PDF content, return it
+        if (agencyDisclosureAgreements.length > 0) {
+          const latestAgreement = agencyDisclosureAgreements[agencyDisclosureAgreements.length - 1];
+          
+          if (latestAgreement.editedPdfContent) {
+            console.log("Using edited PDF content from database");
+            const pdfBuffer = Buffer.from(latestAgreement.editedPdfContent, 'base64');
+            
+            // Set appropriate headers
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
+            
+            if (isEditable) {
+              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+              res.setHeader('Pragma', 'no-cache');
+              res.setHeader('Expires', '0');
+              res.setHeader('X-PDF-Editable', 'true');
+            }
+            
+            // Send the previously saved PDF directly to the client
+            return res.send(pdfBuffer);
+          }
+        }
+      }
+      
+      // If no saved PDF content is found, generate a new one
       
       // Add editable flag to form data
       const formDataWithEditableFlag = {

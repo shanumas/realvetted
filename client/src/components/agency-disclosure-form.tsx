@@ -45,6 +45,9 @@ export function AgencyDisclosureForm({
   // State to store existing agreements
   const [existingSignature, setExistingSignature] = useState<string | null>(null);
   
+  // State to keep track of form field values that user enters in PDF
+  const [formFieldValues, setFormFieldValues] = useState<Record<string, string>>({});
+  
   // Reference to the iframe for PDF viewing
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
@@ -55,6 +58,97 @@ export function AgencyDisclosureForm({
       generatePdfPreview();
     }
   }, [isOpen, property?.id]);
+  
+  // Add listener for PDF form field changes
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    
+    // Listen for messages from the iframe (PDF viewer)
+    const handleFormFieldChange = (event: MessageEvent) => {
+      // Check if the message is from our PDF viewer
+      if (event.data && event.data.type === 'pdf_form_field_change') {
+        // Update form field values
+        setFormFieldValues(prev => ({
+          ...prev,
+          [event.data.fieldName]: event.data.value
+        }));
+        
+        console.log(`Form field ${event.data.fieldName} changed to: ${event.data.value}`);
+        
+        // Trigger save with a debounce (after field changes stop for a bit)
+        // Fetch the current PDF content from the iframe and save it
+        if (pdfUrl && property?.id) {
+          // Set a timeout to get and save the PDF after user has stopped typing
+          const debounceTime = 1000; // 1 second
+          
+          if ((window as any).saveTimeoutId) {
+            clearTimeout((window as any).saveTimeoutId);
+          }
+          
+          (window as any).saveTimeoutId = setTimeout(async () => {
+            try {
+              console.log("Auto-saving PDF after field change");
+              // Get the PDF content directly from the iframe
+              const response = await fetch(pdfUrl);
+              if (response.ok) {
+                const pdfBlob = await response.blob();
+                await saveEditedPdf(pdfBlob);
+              }
+            } catch (error) {
+              console.error("Error auto-saving PDF:", error);
+            }
+          }, debounceTime);
+        }
+      }
+    };
+    
+    window.addEventListener('message', handleFormFieldChange);
+    
+    // Inject script into iframe to capture form field changes
+    const injectFormFieldTracker = () => {
+      try {
+        if (iframe.contentDocument && iframe.contentWindow) {
+          // Create a script element
+          const script = iframe.contentDocument.createElement('script');
+          script.textContent = `
+            // Watch for input events on form fields
+            document.addEventListener('input', function(event) {
+              // Check if the target is a form field (input, textarea, select)
+              if (event.target.tagName === 'INPUT' || 
+                  event.target.tagName === 'TEXTAREA' || 
+                  event.target.tagName === 'SELECT') {
+                
+                // Send message to parent window with field name and value
+                window.parent.postMessage({
+                  type: 'pdf_form_field_change',
+                  fieldName: event.target.name || event.target.id,
+                  value: event.target.value
+                }, '*');
+              }
+            });
+          `;
+          
+          // Add the script to the iframe's document
+          iframe.contentDocument.head.appendChild(script);
+        }
+      } catch (error) {
+        console.error('Error injecting form field tracker script:', error);
+      }
+    };
+    
+    // Add load event listener to inject the script after iframe loads
+    iframe.addEventListener('load', injectFormFieldTracker);
+    
+    // Clean up
+    return () => {
+      if ((window as any).saveTimeoutId) {
+        clearTimeout((window as any).saveTimeoutId);
+      }
+      window.removeEventListener('message', handleFormFieldChange);
+      iframe.removeEventListener('load', injectFormFieldTracker);
+    };
+  }, [iframeRef.current, pdfUrl, property?.id]);
   
   // Initial PDF load is sufficient now, no need to watch isEditable changes
   // since it's now a constant value
@@ -165,6 +259,60 @@ export function AgencyDisclosureForm({
     }
   };
 
+  // Function to handle auto-saving edited PDF
+  const saveEditedPdf = async (pdfBlob: Blob) => {
+    try {
+      if (!property?.id) return;
+      
+      // Convert PDF blob to base64
+      const reader = new FileReader();
+      return new Promise<void>((resolve, reject) => {
+        reader.onloadend = async () => {
+          try {
+            const base64data = reader.result?.toString().split(',')[1]; // Remove data URL prefix
+            
+            if (!base64data) {
+              console.error("Could not convert PDF to base64");
+              resolve();
+              return;
+            }
+            
+            console.log("Saving edited PDF to database");
+            
+            // Send the PDF content to the server
+            const saveResponse = await apiRequest(
+              'POST',
+              `/api/properties/${property.id}/save-edited-pdf`,
+              {
+                pdfContent: base64data,
+                viewingRequestId: viewingRequestId
+              }
+            );
+            
+            if (!saveResponse.ok) {
+              console.error("Error saving PDF:", await saveResponse.text());
+            } else {
+              console.log("PDF saved successfully");
+            }
+            
+            resolve();
+          } catch (err) {
+            console.error("Error in save operation:", err);
+            reject(err);
+          }
+        };
+        
+        reader.onerror = () => {
+          reject(new Error("Error reading PDF file"));
+        };
+        
+        reader.readAsDataURL(pdfBlob);
+      });
+    } catch (error) {
+      console.error("Error saving edited PDF:", error);
+    }
+  };
+
   const generatePdfPreview = async () => {
     try {
       if (!property?.id) return;
@@ -176,7 +324,7 @@ export function AgencyDisclosureForm({
       }
       
       // Generate a preview of the form, adding the editable query parameter if needed
-      const queryParams = isEditable ? '?editable=true' : '';
+      const queryParams = isEditable ? `?editable=true${viewingRequestId ? `&viewingRequestId=${viewingRequestId}` : ''}` : '';
       const response = await apiRequest(
         'POST', 
         `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`, 
