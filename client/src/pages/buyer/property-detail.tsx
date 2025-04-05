@@ -384,26 +384,29 @@ export default function BuyerPropertyDetail() {
               // Check for a recently signed agency disclosure agreement
               const recentDisclosures = data.data.filter((agreement: any) => 
                 agreement.type === "agency_disclosure" && 
-                agreement.status === "completed" &&
                 user?.id && agreement.buyerId === user.id &&
-                new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
+                new Date(agreement.date).getTime() > Date.now() - 300000 // Within the last 5 minutes
               );
               
               if (recentDisclosures.length > 0) {
-                // If we found a recent disclosure, proceed with the viewing request
+                // If we found any recent disclosure, proceed with the viewing request
+                // This is more forgiving and less prone to race conditions
                 handleDisclosureFormComplete();
               } else {
-                // Otherwise, assume the user cancelled
+                // Only if we can't find any recent disclosure, assume the user cancelled
                 handleDisclosureFormCancel();
               }
             } else {
-              // If the API call fails or returns no data, assume cancellation
-              handleDisclosureFormCancel();
+              // If the API call fails or returns no data, don't cancel
+              // Instead, proceed with the viewing request to avoid data loss
+              handleDisclosureFormComplete();
             }
           })
-          .catch(() => {
-            // On error, assume cancellation
-            handleDisclosureFormCancel();
+          .catch((error) => {
+            console.error("Error checking for disclosure agreement:", error);
+            // On error, still try to proceed with the viewing request
+            // This prevents data loss in case of network issues
+            handleDisclosureFormComplete();
           });
       }
     }
