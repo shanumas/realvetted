@@ -14,12 +14,15 @@ import {
   Activity, FileSignature, File
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
+import { SellerAgencyDisclosureForm } from "@/components/seller-agency-disclosure-form";
 
 export default function SellerPropertyDetail() {
   const [, params] = useRoute("/seller/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
+  const [isSigningFormOpen, setIsSigningFormOpen] = useState<boolean>(false);
+  const [selectedAgreement, setSelectedAgreement] = useState<any>(null);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
@@ -329,7 +332,7 @@ export default function SellerPropertyDetail() {
                       
                       {/* Agreements List */}
                       {(() => {
-                        const { data, isLoading: loadingAgreements } = useQuery({
+                        const { data, isLoading: loadingAgreements } = useQuery<{success: boolean; data: any[]}>({
                           queryKey: [`/api/properties/${propertyId}/agreements`],
                           queryFn: getQueryFn({ on401: "throw" }),
                         });
@@ -399,13 +402,21 @@ export default function SellerPropertyDetail() {
                                 
                                 <Button 
                                   size="sm" 
-                                  variant="outline"
+                                  variant={agreement.status === "signed_by_buyer" ? "default" : "outline"}
                                   onClick={() => {
-                                    // Open a preview of the agreement
-                                    window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                    if (agreement.status === "signed_by_buyer" && agreement.type === "agency_disclosure") {
+                                      // Open the signing dialog for seller
+                                      setSelectedAgreement(agreement);
+                                      setIsSigningFormOpen(true);
+                                    } else {
+                                      // Just view the agreement
+                                      window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                    }
                                   }}
                                 >
-                                  View
+                                  {agreement.status === "signed_by_buyer" && agreement.type === "agency_disclosure"
+                                    ? "Sign" 
+                                    : "View"}
                                 </Button>
                               </div>
                             ))}
@@ -435,6 +446,17 @@ export default function SellerPropertyDetail() {
           </div>
         </div>
       </main>
+      
+      {/* Seller Agency Disclosure Form Modal */}
+      {property && selectedAgreement && (
+        <SellerAgencyDisclosureForm
+          isOpen={isSigningFormOpen}
+          onClose={() => setIsSigningFormOpen(false)}
+          property={property}
+          agreementId={selectedAgreement.id}
+          documentUrl={selectedAgreement.documentUrl}
+        />
+      )}
     </div>
   );
 }
