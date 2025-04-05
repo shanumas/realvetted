@@ -1857,13 +1857,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       
       if (isDownload) {
         // Always use attachment for download
-        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+        const propertyAddressPart = property.address ? property.address.replace(/\s+/g, '_') : 'Property';
+        const fileName = `Agency_Disclosure_${propertyAddressPart}${isEditable ? '_editable' : ''}.pdf`;
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       } else if (isEditable) {
         // Use 'inline' to display editable PDFs in browser
         res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
       } else {
-        // For non-editable PDFs without download flag, use attachment
-        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+        // For non-editable PDFs, also use inline for viewing in iframe
+        res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
       }
       
       // Send the PDF directly to the client
