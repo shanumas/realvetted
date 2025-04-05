@@ -1855,15 +1855,20 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       // Check if this is a download request
       const isDownload = req.query.download === 'true';
       
-      if (isDownload) {
-        // Always use attachment for download
-        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
-      } else if (isEditable) {
-        // Use 'inline' to display editable PDFs in browser
-        res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
-      } else {
-        // For non-editable PDFs without download flag, use attachment
-        res.setHeader('Content-Disposition', `attachment; filename="Agency_Disclosure_Preview.pdf"`);
+      // Always use 'inline' for browser display to allow the PDF viewer to work properly
+      // This enables both the native browser PDF viewer and editable functionality
+      res.setHeader('Content-Disposition', `inline; filename="Agency_Disclosure_Preview.pdf"`);
+      
+      // Add additional headers to help with PDF browser compatibility
+      // These headers hint to the browser not to cache the PDF which can help with editable PDFs
+      if (isEditable) {
+        // For editable PDFs, set cache control headers to prevent caching issues
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        
+        // Set custom header to indicate this is editable
+        res.setHeader('X-PDF-Editable', 'true');
       }
       
       // Send the PDF directly to the client

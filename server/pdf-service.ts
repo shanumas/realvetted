@@ -6,6 +6,8 @@ import {
   PDFCheckBox,
   PDFTextField,
   PDFButton,
+  PDFName,
+  PDFNumber,
 } from "pdf-lib";
 import * as fs from "fs";
 import * as path from "path";
@@ -296,10 +298,28 @@ export async function fillAgencyDisclosureForm(
     );
   }
 
+  // Load the PDF document
   const pdfDoc = await PDFDocument.load(pdfBuffer);
+  const form = pdfDoc.getForm();
+  
+  // Handle the editable flag
+  if (formData.isEditable === true) {
+    console.log('Keeping form fields editable as requested');
+    // For editable PDFs, we keep the form fields as is (not flattened)
+  } else {
+    // For non-editable PDFs, flatten the form fields
+    try {
+      form.flatten();
+      console.log('Flattened form fields (non-editable PDF)');
+    } catch (error) {
+      console.warn('Could not flatten form fields:', error);
+    }
+  }
 
-  // Save the document
-  const modifiedPdfBytes = await pdfDoc.save();
+  // Save the document with appropriate options
+  const modifiedPdfBytes = await pdfDoc.save({
+    updateFieldAppearances: true // This updates the visual appearance of form fields
+  });
 
   return Buffer.from(modifiedPdfBytes);
 }
