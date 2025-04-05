@@ -1970,7 +1970,22 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           
           if (latestAgreement.editedPdfContent) {
             console.log("Using edited PDF content from database for agreement ID:", latestAgreement.id);
-            const pdfBuffer = Buffer.from(latestAgreement.editedPdfContent, 'base64');
+            
+            let pdfBuffer = Buffer.from(latestAgreement.editedPdfContent, 'base64');
+            
+            // If the form should be editable, make sure to process the PDF to keep fields editable
+            if (isEditable) {
+              console.log("Processing edited PDF to ensure fields remain editable");
+              
+              // We need to use the existing PDF content but still apply form data
+              const formDataWithEditableFlag = {
+                ...formData,
+                isEditable: true
+              };
+              
+              // Pass the existing PDF buffer to fillAgencyDisclosureForm
+              pdfBuffer = await fillAgencyDisclosureForm(formDataWithEditableFlag, pdfBuffer);
+            }
             
             // Set appropriate headers
             res.setHeader('Content-Type', 'application/pdf');
@@ -1993,6 +2008,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       }
       
       // If no saved PDF content is found, generate a new one
+      console.log("No edited PDF content found in database, generating a new PDF from template");
       
       // Add editable flag to form data
       const formDataWithEditableFlag = {

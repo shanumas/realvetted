@@ -275,16 +275,25 @@ export async function replacePlaceholderInPdf(
  */
 export async function fillAgencyDisclosureForm(
   formData: AgencyDisclosureFormData,
+  existingPdfBuffer?: Buffer, // Add parameter for existing PDF content
 ): Promise<Buffer> {
-  // Load the template PDF
-  const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
   let pdfBuffer;
 
-  try {
-    pdfBuffer = fs.readFileSync(templatePath);
-  } catch (error) {
-    console.error("Error reading agency disclosure template PDF:", error);
-    throw new Error("Could not read agency disclosure template PDF");
+  // If existing PDF buffer is provided, use it instead of loading the template
+  if (existingPdfBuffer) {
+    console.log("Using existing PDF buffer from database");
+    pdfBuffer = existingPdfBuffer;
+  } else {
+    // Load the template PDF
+    console.log("Loading template PDF from file system");
+    const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
+    
+    try {
+      pdfBuffer = fs.readFileSync(templatePath);
+    } catch (error) {
+      console.error("Error reading agency disclosure template PDF:", error);
+      throw new Error("Could not read agency disclosure template PDF");
+    }
   }
 
   // First, try to replace placeholder "1" with "uma" as requested
