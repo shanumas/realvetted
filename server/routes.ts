@@ -1705,9 +1705,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // If buyer has already signed, mark as completed
+        // If buyer has already signed, keep as pending for seller review
+        // instead of marking as completed
         if (agreement.buyerSignature) {
-          updateData.status = "completed";
+          updateData.status = "pending"; // Keep as pending for seller review
         } else {
           updateData.status = "pending_buyer";
         }
@@ -1735,7 +1736,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // If both buyer and agent have signed, mark as completed
           if (agreement.buyerSignature && agreement.agentSignature) {
-            updateData.status = "completed";
+            // Check if there's an associated viewing request that should stay in pending
+            const agreements = await storage.getAgreementsByProperty(agreement.propertyId);
+            const viewingRequests = await storage.getViewingRequestsByProperty(agreement.propertyId);
+            
+            // If there's a pending viewing request, keep status as "signed_by_seller" instead of "completed"
+            const hasPendingViewingRequest = viewingRequests.some(vr => vr.status === 'pending');
+            
+            if (hasPendingViewingRequest) {
+              // Don't mark as completed if there's a pending viewing request
+              updateData.status = "signed_by_seller";
+            } else {
+              updateData.status = "completed";
+            }
           }
         } else {
           updateData.status = "completed";
