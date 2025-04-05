@@ -201,15 +201,28 @@ export function AgencyDisclosureForm({
         // Continue with generating a new preview if we can't get existing agreements
       }
       
+      // Always use editable PDFs
       // If we have an existing agreement document, use that
       if (existingAgreementUrl) {
-        // Add editable flag and timestamp to prevent caching
-        const timestamp = Date.now();
-        const documentUrl = `${existingAgreementUrl}?editable=true&t=${timestamp}`;
-        
         try {
-          // Fetch the existing document
+          // Convert standard URL path to our editable PDF endpoint
+          // For example: /uploads/agreements/file.pdf -> /editable-pdf/agreements/file.pdf
+          let editablePdfUrl = existingAgreementUrl;
+          
+          if (existingAgreementUrl.startsWith('/uploads/')) {
+            // Extract the path after /uploads/
+            const pathAfterUploads = existingAgreementUrl.substring('/uploads/'.length);
+            // Create the editable PDF URL
+            editablePdfUrl = `/editable-pdf/${pathAfterUploads}`;
+          }
+          
+          // Add timestamp to prevent caching
+          const timestamp = Date.now();
+          const documentUrl = `${editablePdfUrl}?t=${timestamp}`;
+          
+          // Use standard fetch to get the document
           const docResponse = await fetch(documentUrl);
+          
           if (!docResponse.ok) {
             throw new Error("Failed to fetch existing document");
           }
@@ -221,6 +234,7 @@ export function AgencyDisclosureForm({
           const url = window.URL.createObjectURL(blob);
           setPdfUrl(url);
           
+          console.log("Successfully loaded existing editable PDF agreement");
           return url;
         } catch (fetchError) {
           console.error("Error fetching existing document:", fetchError);
@@ -229,10 +243,10 @@ export function AgencyDisclosureForm({
       }
       
       // If no existing document or fetch failed, generate a new preview
-      const queryParams = isEditable ? '?editable=true' : '';
+      // Always use editable=true
       const response = await apiRequest(
         'POST', 
-        `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`, 
+        `/api/properties/${property.id}/preview-agency-disclosure?editable=true`, 
         formData
       );
       
