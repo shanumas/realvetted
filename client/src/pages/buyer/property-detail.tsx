@@ -393,21 +393,90 @@ export default function BuyerPropertyDetail() {
                 // If we found a recent disclosure, proceed with the viewing request
                 handleDisclosureFormComplete();
               } else {
-                // Otherwise, assume the user cancelled
-                handleDisclosureFormCancel();
+                // Instead of auto-canceling, ask the user what they want to do
+                toast({
+                  title: "Disclosure Form Not Signed",
+                  description: "Do you want to proceed with your viewing request anyway? You'll need to sign the disclosure form later.",
+                  duration: 8000,
+                  action: (
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleDisclosureFormCancel}
+                      >
+                        Cancel Request
+                      </Button>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={handleDisclosureFormComplete}
+                      >
+                        Continue Anyway
+                      </Button>
+                    </div>
+                  ),
+                });
+                
+                // Don't automatically cancel, let the user decide
+                // Don't run handleDisclosureFormCancel() here
               }
             } else {
-              // If the API call fails or returns no data, assume cancellation
-              handleDisclosureFormCancel();
+              // If the API call fails or returns no data, show a toast with options instead of auto-cancelling
+              toast({
+                title: "Unable to verify form signature",
+                description: "Do you want to proceed with your viewing request anyway?",
+                duration: 8000,
+                action: (
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleDisclosureFormCancel}
+                    >
+                      Cancel Request
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={handleDisclosureFormComplete}
+                    >
+                      Continue Anyway
+                    </Button>
+                  </div>
+                ),
+              });
             }
           })
           .catch(() => {
-            // On error, assume cancellation
-            handleDisclosureFormCancel();
+            // On error, show a toast with options instead of auto-cancelling
+            toast({
+              title: "Error verifying form signature",
+              description: "Do you want to proceed with your viewing request anyway?",
+              duration: 8000,
+              action: (
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleDisclosureFormCancel}
+                  >
+                    Cancel Request
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleDisclosureFormComplete}
+                  >
+                    Continue Anyway
+                  </Button>
+                </div>
+              ),
+            });
           });
       }
     }
-  }, [isDisclosureFormOpen, viewingRequestData, propertyId, user?.id, handleDisclosureFormComplete, handleDisclosureFormCancel]);
+  }, [isDisclosureFormOpen, viewingRequestData, propertyId, user?.id, handleDisclosureFormComplete, handleDisclosureFormCancel, toast]);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
