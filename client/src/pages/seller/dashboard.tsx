@@ -10,9 +10,11 @@ import { Property } from "@shared/schema";
 import { Loader2, MessageSquare } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ChatWindow } from "@/components/chat/chat-window";
+import { Link, useLocation } from "wouter";
 
 export default function SellerDashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [selectedPropertyForChat, setSelectedPropertyForChat] = useState<{ id: number; buyerId: number; buyerName: string } | null>(null);
 
   const { data: properties, isLoading } = useQuery<Property[]>({
@@ -66,7 +68,10 @@ export default function SellerDashboard() {
                         <div className="flex flex-col sm:flex-row gap-2">
                           <Button
                             variant="default"
-                            onClick={() => window.location.href = `/buyer/property/${property.id}`}
+                            onClick={() => {
+                              console.log(`Navigating to /buyer/property/${property.id}`);
+                              setLocation(`/buyer/property/${property.id}`);
+                            }}
                           >
                             View Details
                           </Button>

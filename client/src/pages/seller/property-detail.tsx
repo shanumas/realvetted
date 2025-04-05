@@ -35,7 +35,7 @@ import { PropertyActivityLog } from "@/components/property-activity-log";
 import { SellerAgencyDisclosureForm } from "@/components/seller-agency-disclosure-form";
 
 export default function SellerPropertyDetail() {
-  const [, params] = useRoute("/buyer/property/:id");
+  const [, params] = useRoute("/seller/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
