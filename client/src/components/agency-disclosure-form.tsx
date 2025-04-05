@@ -283,37 +283,24 @@ export function AgencyDisclosureForm({
 
   const handleDownload = async () => {
     try {
-      // For downloading, we need to create a new URL that will trigger a download
-      // Instead of using the existing URL (which now displays inline), we'll make a new request
-      const queryParams = isEditable ? '?editable=true&download=true' : '?download=true';
-      const response = await apiRequest(
-        'POST',
-        `/api/properties/${property.id}/preview-agency-disclosure${queryParams}`,
-        formData
-      );
+      // We need to ensure the downloaded PDF has the same form data as what's displayed
+      // First, reload the preview to make sure any edits are captured
+      await generatePdfPreview();
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate PDF for download");
+      // Then use the same URL for download by opening it in a new window
+      // This ensures the exact same PDF that's displayed is what gets downloaded
+      if (pdfUrl) {
+        // Create a link to trigger download from the existing PDF (already processed with form data)
+        const a = document.createElement('a');
+        a.href = pdfUrl;
+        const fileNameSuffix = isEditable ? '_editable' : '';
+        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } else {
+        throw new Error("PDF preview not available. Please try reloading the preview first.");
       }
-      
-      // Get the PDF as a blob
-      const blob = await response.blob();
-      
-      // Create a temporary URL for the blob
-      const url = window.URL.createObjectURL(blob);
-      
-      // Create a link and trigger download
-      const a = document.createElement('a');
-      a.href = url;
-      const fileNameSuffix = isEditable ? '_editable' : '';
-      a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      
-      // Clean up
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Error downloading preview:", error);
       toast({

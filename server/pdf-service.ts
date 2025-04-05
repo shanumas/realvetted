@@ -332,15 +332,90 @@ export async function fillAgencyDisclosureForm(
   // Get the form from the document
   const form = pdfDoc.getForm();
   
-  // Helper function to set field text if it exists
+  // Helper function to set field text if it exists, or add text directly to the PDF if the field doesn't exist
   const setFieldTextIfExists = (fieldName: string, value?: string) => {
     if (!value) return;
     
     try {
+      // Try to set the field value through the form field
       form.getTextField(fieldName).setText(value);
     } catch (error: any) {
-      console.warn(`Field '${fieldName}' doesn't exist, creating a sample field with text placeholder`);
-      console.log(`Could not find field '${fieldName}' to replace with '${value}' through form fields: ${error.message || 'Unknown error'}`);
+      console.warn(`Field '${fieldName}' doesn't exist, adding text directly to the PDF`);
+      
+      try {
+        // If the form field doesn't exist, add the text directly to the first page
+        const pages = pdfDoc.getPages();
+        const firstPage = pages[0];
+        const { width, height } = firstPage.getSize();
+        
+        // Get font for drawing text
+        const font = pdfDoc.embedStandardFont(StandardFonts.Helvetica);
+        
+        // Set position for text based on the field name
+        let x = 100;
+        let y = 100;
+        
+        // Determine a reasonable position based on the field name
+        switch (fieldName) {
+          case 'buyer_name_1':
+            x = width * 0.2;
+            y = height * 0.7;
+            break;
+          case 'buyer_name_2':
+            x = width * 0.2;
+            y = height * 0.65;
+            break;
+          case 'agent_name':
+            x = width * 0.7;
+            y = height * 0.4;
+            break;
+          case 'agent_brokerage':
+            x = width * 0.7;
+            y = height * 0.35;
+            break;
+          case 'agent_license':
+            x = width * 0.7;
+            y = height * 0.3;
+            break;
+          case 'agent_date':
+            x = width * 0.7;
+            y = height * 0.25;
+            break;
+          case 'property_address':
+            x = width * 0.5;
+            y = height * 0.8;
+            break;
+          case 'property_city':
+            x = width * 0.3;
+            y = height * 0.75;
+            break;
+          case 'property_state':
+            x = width * 0.5;
+            y = height * 0.75;
+            break;
+          case 'property_zip':
+            x = width * 0.7;
+            y = height * 0.75;
+            break;
+          default:
+            // Default position near the top of the page
+            x = width * 0.1;
+            y = height * 0.9;
+        }
+        
+        // Draw the text directly on the page
+        firstPage.drawText(value, {
+          x,
+          y,
+          size: 12,
+          font,
+          color: rgb(0, 0, 0),
+        });
+        
+        console.log(`Added text '${value}' for field '${fieldName}' directly to PDF at position x=${x}, y=${y}`);
+      } catch (drawError: any) {
+        console.error(`Error adding text directly to PDF for field '${fieldName}': ${drawError.message || 'Unknown error'}`);
+      }
     }
   };
   
