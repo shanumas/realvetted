@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, FileText, Download, Check, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Check, RefreshCw } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 
 interface AgencyDisclosureFormProps {
@@ -273,35 +273,7 @@ export function AgencyDisclosureForm({
     }
   };
 
-  const handleDownload = async () => {
-    try {
-      // We need to ensure the downloaded PDF has the same form data as what's displayed
-      // First, reload the preview to make sure any edits are captured
-      await generatePdfPreview();
-      
-      // Then use the same URL for download by opening it in a new window
-      // This ensures the exact same PDF that's displayed is what gets downloaded
-      if (pdfUrl) {
-        // Create a link to trigger download from the existing PDF (already processed with form data)
-        const a = document.createElement('a');
-        a.href = pdfUrl;
-        const fileNameSuffix = isEditable ? '_editable' : '';
-        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } else {
-        throw new Error("PDF preview not available. Please try reloading the preview first.");
-      }
-    } catch (error) {
-      console.error("Error downloading preview:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to download preview",
-        variant: "destructive",
-      });
-    }
-  };
+
   
   // Clean up URLs when component unmounts
   useEffect(() => {
@@ -438,31 +410,23 @@ export function AgencyDisclosureForm({
           </div>
         </div>
 
-        <DialogFooter className="flex justify-between space-x-2">
-          <div className="flex space-x-2">
-            <Button variant="outline" type="button" onClick={handleDownload}>
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </Button>
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Sign & Submit
-                </>
-              )}
-            </Button>
-          </div>
+        <DialogFooter className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Sign & Submit
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
