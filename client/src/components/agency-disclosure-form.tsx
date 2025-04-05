@@ -174,8 +174,61 @@ export function AgencyDisclosureForm({
         window.URL.revokeObjectURL(pdfUrl);
         setPdfUrl(null);
       }
+
+      // First, try to get existing agreements for this property
+      let existingAgreementUrl = null;
       
-      // Generate a preview of the form, adding the editable query parameter if needed
+      try {
+        const agreementsResponse = await apiRequest('GET', `/api/properties/${property.id}/agreements`);
+        const agreementsData = await agreementsResponse.json();
+        
+        if (agreementsData.success && agreementsData.data && agreementsData.data.length > 0) {
+          // Find agency disclosure agreements
+          const agencyAgreements = agreementsData.data.filter(
+            (agreement: any) => agreement.type === 'agency_disclosure'
+          );
+          
+          // Get the most recent agreement with a document URL
+          if (agencyAgreements.length > 0) {
+            const latestAgreement = agencyAgreements[agencyAgreements.length - 1];
+            if (latestAgreement.documentUrl) {
+              existingAgreementUrl = latestAgreement.documentUrl;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching agreements for preview:", error);
+        // Continue with generating a new preview if we can't get existing agreements
+      }
+      
+      // If we have an existing agreement document, use that
+      if (existingAgreementUrl) {
+        // Add editable flag and timestamp to prevent caching
+        const timestamp = Date.now();
+        const documentUrl = `${existingAgreementUrl}?editable=true&t=${timestamp}`;
+        
+        try {
+          // Fetch the existing document
+          const docResponse = await fetch(documentUrl);
+          if (!docResponse.ok) {
+            throw new Error("Failed to fetch existing document");
+          }
+          
+          // Get the PDF as a blob
+          const blob = await docResponse.blob();
+          
+          // Create a temporary URL for the blob
+          const url = window.URL.createObjectURL(blob);
+          setPdfUrl(url);
+          
+          return url;
+        } catch (fetchError) {
+          console.error("Error fetching existing document:", fetchError);
+          // Fall back to generating a new preview if we can't fetch the existing document
+        }
+      }
+      
+      // If no existing document or fetch failed, generate a new preview
       const queryParams = isEditable ? '?editable=true' : '';
       const response = await apiRequest(
         'POST', 
