@@ -77,37 +77,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const websocketServer = setupWebSocketServer(httpServer);
   
   // Set up static file serving for uploads
-  // Standard static file serving
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
   app.use('/attached_assets', express.static(path.join(process.cwd(), 'attached_assets')));
-  
-  // Special endpoint for editable PDFs
-  app.get('/editable-pdf/*', (req, res) => {
-    // Extract the real path from the URL
-    const pdfPath = req.params[0];
-    if (!pdfPath || !pdfPath.endsWith('.pdf')) {
-      return res.status(400).send('Invalid PDF path');
-    }
-    
-    // Construct the full file path
-    const fullPath = path.join(process.cwd(), 'uploads', pdfPath);
-    
-    // Check if file exists
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).send('PDF not found');
-    }
-    
-    // Set appropriate headers for editable PDFs
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline');
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-PDF-Editable', 'true');
-    
-    // Send the file
-    res.sendFile(fullPath);
-  });
   
   // Configure multer for file uploads
   const upload = multer({
