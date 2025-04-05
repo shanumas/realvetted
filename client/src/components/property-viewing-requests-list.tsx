@@ -161,15 +161,24 @@ export function PropertyViewingRequestsList({
                         <CalendarIcon className="mr-2 h-5 w-5 text-primary" />
                         <div>
                           <span className="font-medium">
-                            {request.date
+                            {request.date 
                               ? format(new Date(request.date), "PPP")
-                              : "Date not specified"}
+                              : request.requestedDate 
+                                ? format(new Date(request.requestedDate), "PPP") 
+                                : "Date not specified"}
                           </span>
-                          {request.timeSlot && (
-                            <span className="text-sm text-gray-500 ml-2">
-                              at {request.timeSlot}
-                            </span>
-                          )}
+                          {request.timeSlot 
+                            ? (
+                              <span className="text-sm text-gray-500 ml-2">
+                                at {request.timeSlot}
+                              </span>
+                            )
+                            : (request.requestedDate && request.requestedEndDate) && (
+                              <span className="text-sm text-gray-500 ml-2">
+                                at {format(new Date(request.requestedDate), "h:mm a")} - {format(new Date(request.requestedEndDate), "h:mm a")}
+                              </span>
+                            )
+                          }
                         </div>
                       </div>
                       <Badge
@@ -270,17 +279,17 @@ export function PropertyViewingRequestsList({
                         </div>
                       )}
 
-                      {/* Feedback if completed */}
-                      {request.status === "completed" && request.feedback && (
+                      {/* Feedback if completed or response message exists */}
+                      {(request.status === "completed" && request.feedback) || request.responseMessage ? (
                         <div className="mt-3">
                           <Alert>
-                            <AlertTitle>Feedback</AlertTitle>
+                            <AlertTitle>{request.status === "completed" ? "Feedback" : "Response"}</AlertTitle>
                             <AlertDescription>
-                              {request.feedback}
+                              {request.feedback || request.responseMessage}
                             </AlertDescription>
                           </Alert>
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* Action buttons for seller/agent to approve/reject viewing requests */}

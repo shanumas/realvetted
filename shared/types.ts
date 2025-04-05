@@ -87,4 +87,9 @@ export interface ViewingRequestWithParticipants extends ViewingRequest {
   property?: Property;
   buyer?: User;
   agent?: User;
+  
+  // Additional fields for UI display
+  date?: string | Date; // Alias for requestedDate for display purposes
+  timeSlot?: string;    // Derived from requestedDate/requestedEndDate
+  feedback?: string;    // Additional feedback for completed viewings
 }

@@ -42,8 +42,14 @@ export function ProtectedRoute({
           return <Redirect to="/auth" />;
         }
 
-        // Special case: Allow agents and sellers to access buyer property pages
+        // Special case: Allow cross-role access to certain property pages
+        // Allow agents and sellers to access buyer property pages
         if (path.startsWith('/buyer/property/') && (user.role === 'agent' || user.role === 'seller')) {
+          return <Component />;
+        }
+        
+        // Allow buyers and agents to view seller property pages
+        if (path.startsWith('/seller/property-view/') && (user.role === 'agent' || user.role === 'buyer')) {
           return <Component />;
         }
         
