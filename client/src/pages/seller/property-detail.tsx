@@ -8,16 +8,34 @@ import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
-  Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, FileSignature, File
+import {
+  Loader2,
+  Home,
+  Bed,
+  Bath,
+  Square,
+  Tag,
+  Calendar,
+  Building,
+  Phone,
+  Mail,
+  Briefcase,
+  Award,
+  Link,
+  FileText,
+  ListTodo,
+  ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  FileSignature,
+  File,
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { SellerAgencyDisclosureForm } from "@/components/seller-agency-disclosure-form";
 
 export default function SellerPropertyDetail() {
-  const [, params] = useRoute("/seller/property/:id");
+  const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [activeTab, setActiveTab] = useState<string>("buyer");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
@@ -43,8 +61,13 @@ export default function SellerPropertyDetail() {
         <SiteHeader />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900">Property not found</h3>
-            <p className="mt-1 text-gray-500">The property you're looking for doesn't exist or you don't have access to it.</p>
+            <h3 className="text-lg font-medium text-gray-900">
+              Property not found
+            </h3>
+            <p className="mt-1 text-gray-500">
+              The property you're looking for doesn't exist or you don't have
+              access to it.
+            </p>
           </div>
         </main>
       </div>
@@ -54,7 +77,7 @@ export default function SellerPropertyDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader />
-      
+
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="lg:grid lg:grid-cols-3 lg:gap-8">
           {/* Property Details Section */}
@@ -72,35 +95,38 @@ export default function SellerPropertyDetail() {
                   </div>
                   <div>
                     <span className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                      {property.status === "active" ? "Active" : property.status}
+                      {property.status === "active"
+                        ? "Active"
+                        : property.status}
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Property Images */}
                 <div className="px-4 py-5 sm:px-6">
                   {property.imageUrls && property.imageUrls.length > 0 ? (
                     <div className="relative">
                       {/* Image Carousel */}
                       <div className="relative overflow-x-hidden">
-                        <div 
-                          className="flex transition-transform duration-300 ease-in-out" 
-                          style={{ 
+                        <div
+                          className="flex transition-transform duration-300 ease-in-out"
+                          style={{
                             transform: `translateX(-${currentImageIndex * 100}%)`,
-                            width: `${property.imageUrls.length * 100}%` 
+                            width: `${property.imageUrls.length * 100}%`,
                           }}
                         >
                           {property.imageUrls.map((url, index) => (
                             <div key={index} className="w-full flex-shrink-0">
                               <div className="h-64 mx-auto rounded-lg overflow-hidden">
-                                <img 
-                                  src={url} 
-                                  alt={`Property image ${index + 1}`} 
+                                <img
+                                  src={url}
+                                  alt={`Property image ${index + 1}`}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
                                     // If image fails to load, show placeholder
                                     const target = e.target as HTMLImageElement;
-                                    target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+                                    target.src =
+                                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
                                     target.onerror = null; // Prevent infinite error loop
                                   }}
                                 />
@@ -109,27 +135,39 @@ export default function SellerPropertyDetail() {
                           ))}
                         </div>
                       </div>
-                      
+
                       {/* Navigation Arrows */}
                       {property.imageUrls.length > 1 && (
                         <>
-                          <button 
+                          <button
                             className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-r-md hover:bg-black/70 transition-colors"
-                            onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : property.imageUrls!.length - 1))}
+                            onClick={() =>
+                              setCurrentImageIndex((prev) =>
+                                prev > 0
+                                  ? prev - 1
+                                  : property.imageUrls!.length - 1,
+                              )
+                            }
                             aria-label="Previous image"
                           >
                             <ChevronLeft className="h-6 w-6" />
                           </button>
-                          <button 
+                          <button
                             className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-l-md hover:bg-black/70 transition-colors"
-                            onClick={() => setCurrentImageIndex(prev => (prev < property.imageUrls!.length - 1 ? prev + 1 : 0))}
+                            onClick={() =>
+                              setCurrentImageIndex((prev) =>
+                                prev < property.imageUrls!.length - 1
+                                  ? prev + 1
+                                  : 0,
+                              )
+                            }
                             aria-label="Next image"
                           >
                             <ChevronRight className="h-6 w-6" />
                           </button>
                         </>
                       )}
-                      
+
                       {/* Image Indicators */}
                       {property.imageUrls.length > 1 && (
                         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
@@ -137,7 +175,9 @@ export default function SellerPropertyDetail() {
                             <button
                               key={index}
                               className={`h-2 w-2 rounded-full transition-colors ${
-                                currentImageIndex === index ? 'bg-white' : 'bg-white/50'
+                                currentImageIndex === index
+                                  ? "bg-white"
+                                  : "bg-white/50"
                               }`}
                               onClick={() => setCurrentImageIndex(index)}
                               aria-label={`Go to image ${index + 1}`}
@@ -154,11 +194,13 @@ export default function SellerPropertyDetail() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Property Details */}
                 <div className="border-t border-gray-200">
                   <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Property Details</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Property Details
+                    </h3>
                   </div>
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -174,7 +216,9 @@ export default function SellerPropertyDetail() {
                         <Tag className="mr-2 h-4 w-4" /> Price
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.price ? `$${property.price.toLocaleString()}` : "Not specified"}
+                        {property.price
+                          ? `$${property.price.toLocaleString()}`
+                          : "Not specified"}
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -198,7 +242,9 @@ export default function SellerPropertyDetail() {
                         <Square className="mr-2 h-4 w-4" /> Square footage
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.squareFeet ? `${property.squareFeet.toLocaleString()} sqft` : "Not specified"}
+                        {property.squareFeet
+                          ? `${property.squareFeet.toLocaleString()} sqft`
+                          : "Not specified"}
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -239,9 +285,9 @@ export default function SellerPropertyDetail() {
                           <Link className="mr-2 h-4 w-4" /> Original listing
                         </dt>
                         <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                          <a 
-                            href={property.propertyUrl} 
-                            target="_blank" 
+                          <a
+                            href={property.propertyUrl}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
                           >
@@ -255,39 +301,51 @@ export default function SellerPropertyDetail() {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Communication Section */}
           <div className="lg:col-span-1">
             <Card>
               <CardContent className="p-0">
-                <Tabs 
-                  value={activeTab} 
-                  onValueChange={setActiveTab} 
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
                     <TabsList className="w-full grid grid-cols-4">
-                      <TabsTrigger value="buyer" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="buyer"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         Buyer Chat
                       </TabsTrigger>
-                      <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="agent"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         Agent Chat
                       </TabsTrigger>
-                      <TabsTrigger value="documents" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="documents"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         <span className="flex items-center">
-                          <FileSignature className="mr-1 h-4 w-4" /> 
+                          <FileSignature className="mr-1 h-4 w-4" />
                           Documents
                         </span>
                       </TabsTrigger>
-                      <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="activity"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         <span className="flex items-center">
-                          <Activity className="mr-1 h-4 w-4" /> 
+                          <Activity className="mr-1 h-4 w-4" />
                           Activity
                         </span>
                       </TabsTrigger>
                     </TabsList>
                   </div>
-                  
+
                   <TabsContent value="buyer">
                     {property.createdBy ? (
                       <ChatWindow
@@ -298,11 +356,14 @@ export default function SellerPropertyDetail() {
                     ) : (
                       <div className="p-4 text-center text-gray-500">
                         <p>The buyer hasn't joined the platform yet.</p>
-                        <p className="text-sm mt-1">Once they sign up, you'll be able to chat with them here.</p>
+                        <p className="text-sm mt-1">
+                          Once they sign up, you'll be able to chat with them
+                          here.
+                        </p>
                       </div>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="agent">
                     {property.agentId ? (
                       <ChatWindow
@@ -313,11 +374,14 @@ export default function SellerPropertyDetail() {
                     ) : (
                       <div className="p-4 text-center text-gray-500">
                         <p>No agent has been assigned yet.</p>
-                        <p className="text-sm mt-1">Once an agent claims this property, you'll be able to chat with them here.</p>
+                        <p className="text-sm mt-1">
+                          Once an agent claims this property, you'll be able to
+                          chat with them here.
+                        </p>
                       </div>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="documents">
                     <div className="p-4">
                       <div className="mb-4">
@@ -329,93 +393,129 @@ export default function SellerPropertyDetail() {
                           Review and sign documents related to this property
                         </p>
                       </div>
-                      
+
                       {/* Agreements List */}
                       {(() => {
-                        const { data, isLoading: loadingAgreements } = useQuery<{success: boolean; data: any[]}>({
-                          queryKey: [`/api/properties/${propertyId}/agreements`],
-                          queryFn: getQueryFn({ on401: "throw" }),
-                        });
-                        
+                        const { data, isLoading: loadingAgreements } =
+                          useQuery<{ success: boolean; data: any[] }>({
+                            queryKey: [
+                              `/api/properties/${propertyId}/agreements`,
+                            ],
+                            queryFn: getQueryFn({ on401: "throw" }),
+                          });
+
                         // Debug output
                         console.log("Property ID:", propertyId);
                         console.log("Agreements data:", data);
-                        
+
                         if (loadingAgreements) {
                           return (
                             <div className="flex items-center justify-center p-4">
                               <Loader2 className="h-5 w-5 animate-spin text-primary/70" />
-                              <span className="ml-2 text-sm text-gray-500">Loading documents...</span>
+                              <span className="ml-2 text-sm text-gray-500">
+                                Loading documents...
+                              </span>
                             </div>
                           );
                         }
-                        
+
                         const agreements = data?.data || [];
-                        
+
                         if (!agreements || agreements.length === 0) {
                           return (
                             <div className="text-center p-6 border border-dashed rounded-md">
                               <File className="mx-auto h-10 w-10 text-gray-400" />
-                              <p className="mt-2 text-gray-500">No documents available yet</p>
-                              <p className="text-sm mt-1 text-gray-400">Documents will appear here when the agent creates them</p>
+                              <p className="mt-2 text-gray-500">
+                                No documents available yet
+                              </p>
+                              <p className="text-sm mt-1 text-gray-400">
+                                Documents will appear here when the agent
+                                creates them
+                              </p>
                             </div>
                           );
                         }
-                        
+
                         return (
                           <div className="divide-y">
                             {agreements.map((agreement: any) => (
-                              <div key={agreement.id} className="py-3 flex justify-between items-center">
+                              <div
+                                key={agreement.id}
+                                className="py-3 flex justify-between items-center"
+                              >
                                 <div>
                                   <h5 className="font-medium">
-                                    {agreement.type === "standard" ? "Buyer Representation Agreement" : "Agency Disclosure Form"}
+                                    {agreement.type === "standard"
+                                      ? "Buyer Representation Agreement"
+                                      : "Agency Disclosure Form"}
                                   </h5>
                                   <div className="text-sm text-gray-500 mt-1">
-                                    <span className="block">Created: {new Date(agreement.date).toLocaleDateString()}</span>
+                                    <span className="block">
+                                      Created:{" "}
+                                      {new Date(
+                                        agreement.date,
+                                      ).toLocaleDateString()}
+                                    </span>
                                     <div className="flex items-center mt-1">
-                                      <span 
+                                      <span
                                         className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
-                                          agreement.status === "draft" 
-                                            ? "bg-gray-100 text-gray-800" 
-                                            : agreement.status === "pending_buyer"
-                                            ? "bg-blue-100 text-blue-800"
-                                            : agreement.status === "signed_by_buyer" 
-                                            ? "bg-green-100 text-green-800"
-                                            : agreement.status === "pending_seller"
-                                            ? "bg-orange-100 text-orange-800"
-                                            : "bg-gray-100 text-gray-800"
+                                          agreement.status === "draft"
+                                            ? "bg-gray-100 text-gray-800"
+                                            : agreement.status ===
+                                                "pending_buyer"
+                                              ? "bg-blue-100 text-blue-800"
+                                              : agreement.status ===
+                                                  "signed_by_buyer"
+                                                ? "bg-green-100 text-green-800"
+                                                : agreement.status ===
+                                                    "pending_seller"
+                                                  ? "bg-orange-100 text-orange-800"
+                                                  : "bg-gray-100 text-gray-800"
                                         }`}
                                       >
-                                        {agreement.status === "draft" 
-                                          ? "Draft" 
+                                        {agreement.status === "draft"
+                                          ? "Draft"
                                           : agreement.status === "pending_buyer"
-                                          ? "Awaiting Buyer"
-                                          : agreement.status === "signed_by_buyer" 
-                                          ? "Signed by Buyer" 
-                                          : agreement.status === "pending_seller"
-                                          ? "Awaiting Your Signature"
-                                          : agreement.status}
+                                            ? "Awaiting Buyer"
+                                            : agreement.status ===
+                                                "signed_by_buyer"
+                                              ? "Signed by Buyer"
+                                              : agreement.status ===
+                                                  "pending_seller"
+                                                ? "Awaiting Your Signature"
+                                                : agreement.status}
                                       </span>
                                     </div>
                                   </div>
                                 </div>
-                                
-                                <Button 
-                                  size="sm" 
-                                  variant={agreement.status === "signed_by_buyer" ? "default" : "outline"}
+
+                                <Button
+                                  size="sm"
+                                  variant={
+                                    agreement.status === "signed_by_buyer"
+                                      ? "default"
+                                      : "outline"
+                                  }
                                   onClick={() => {
-                                    if (agreement.status === "signed_by_buyer" && agreement.type === "agency_disclosure") {
+                                    if (
+                                      agreement.status === "signed_by_buyer" &&
+                                      agreement.type === "agency_disclosure"
+                                    ) {
                                       // Open the signing dialog for seller
                                       setSelectedAgreement(agreement);
                                       setIsSigningFormOpen(true);
                                     } else {
                                       // Just view the agreement
-                                      window.open(`/api/agreements/${agreement.id}/preview`, '_blank');
+                                      window.open(
+                                        `/api/agreements/${agreement.id}/preview`,
+                                        "_blank",
+                                      );
                                     }
                                   }}
                                 >
-                                  {agreement.status === "signed_by_buyer" && agreement.type === "agency_disclosure"
-                                    ? "Sign" 
+                                  {agreement.status === "signed_by_buyer" &&
+                                  agreement.type === "agency_disclosure"
+                                    ? "Sign"
                                     : "View"}
                                 </Button>
                               </div>
@@ -425,7 +525,7 @@ export default function SellerPropertyDetail() {
                       })()}
                     </div>
                   </TabsContent>
-                  
+
                   <TabsContent value="activity">
                     <div className="p-4">
                       <div className="mb-4">
@@ -446,7 +546,7 @@ export default function SellerPropertyDetail() {
           </div>
         </div>
       </main>
-      
+
       {/* Seller Agency Disclosure Form Modal */}
       {property && selectedAgreement && (
         <SellerAgencyDisclosureForm
