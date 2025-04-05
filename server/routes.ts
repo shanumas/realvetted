@@ -2244,12 +2244,19 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         console.log(`Created new agreement ${agreement.id} with signatures`);
       }
       
-      // If this is associated with a viewing request, update activity but don't change the status
-      // This allows viewing requests to remain in their current state (completed, pending, etc.)
+      // If this is associated with a viewing request, update activity but keep it in pending status
+      // so it can be sent to the seller after the agent signs
       if (viewingRequestId) {
         const viewingRequestId_num = parseInt(viewingRequestId);
         const viewingRequest = await storage.getViewingRequest(viewingRequestId_num);
         if (viewingRequest) {
+          // Make sure the viewing request status stays as 'pending' if it was being auto-completed
+          if (viewingRequest.status === 'completed') {
+            await storage.updateViewingRequest(viewingRequestId_num, {
+              status: 'pending'
+            });
+          }
+          
           // Add activity log to indicate the agent has signed
           await storage.createPropertyActivityLog({
             propertyId,
