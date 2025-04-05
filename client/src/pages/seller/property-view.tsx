@@ -51,11 +51,14 @@ export default function SellerPropertyView() {
     queryFn: getQueryFn({ on401: "throw" }),
   });
 
-  const { data: agreements = [], isLoading: isLoadingAgreements } = useQuery<any[]>({
+  const { data: agreementsResponse, isLoading: isLoadingAgreements } = useQuery<{success: boolean, data: any[]}>({
     queryKey: [`/api/properties/${propertyId}/agreements`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!propertyId,
   });
+  
+  // Extract the agreements array from the response
+  const agreements = agreementsResponse?.success && agreementsResponse?.data ? agreementsResponse.data : [];
 
   if (isLoading) {
     return (
