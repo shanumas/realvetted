@@ -424,56 +424,35 @@ export default function SellerPropertyView() {
                                   agreement.type === "agency_disclosure"
                                 ) {
                                   // Open the signing dialog for seller
-                                  // Format the agreement document URL before storing
-                                  // Add debug logging for agreement document URL
-                                  console.log("Original agreement:", agreement);
-                                  console.log("Document URL before formatting:", agreement.documentUrl);
+                                  // Log agreement details for debugging
+                                  console.log("Opening agreement for signing:", agreement);
                                   
-                                  // Try to get the latest document for this agreement from the API
-                                  const getLatestDocument = async () => {
-                                    try {
-                                      const response = await fetch(`/api/agreements/${agreement.id}/document`);
-                                      if (response.ok) {
-                                        const data = await response.json();
-                                        if (data.success && data.data && data.data.documentUrl) {
-                                          console.log("Found document URL from API:", data.data.documentUrl);
-                                          return data.data.documentUrl;
-                                        }
-                                      }
-                                    } catch (error) {
-                                      console.error("Error fetching document:", error);
-                                    }
-                                    return agreement.documentUrl;
-                                  };
+                                  // Direct property access for better debugging
+                                  if (agreement.documentUrl) {
+                                    console.log("Agreement has document URL:", agreement.documentUrl);
+                                  } else {
+                                    console.log("Agreement missing document URL");
+                                  }
                                   
-                                  // Use the existing document URL for now
-                                  const formattedUrl = agreement.documentUrl ? 
-                                    (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
-                                      agreement.documentUrl : 
-                                      `/uploads/${agreement.documentUrl}`) : 
-                                    null;
-                                    
-                                  console.log("Formatted document URL:", formattedUrl);
+                                  // Try to get the latest document URL from agreements list
+                                  let finalDocumentUrl = null;
                                   
+                                  // First check if agreement already has a document URL
+                                  if (agreement.documentUrl) {
+                                    finalDocumentUrl = agreement.documentUrl.startsWith('/uploads') || 
+                                                      agreement.documentUrl.startsWith('http') ? 
+                                                      agreement.documentUrl : 
+                                                      `/uploads/${agreement.documentUrl}`;
+                                    console.log("Using existing document URL:", finalDocumentUrl);
+                                  }
+                                  
+                                  // Store the agreement with the best URL we have right now
                                   const formattedAgreement = {
                                     ...agreement,
-                                    documentUrl: formattedUrl
+                                    documentUrl: finalDocumentUrl
                                   };
                                   
-                                  // Try to get the latest document in the background
-                                  getLatestDocument().then(latestUrl => {
-                                    if (latestUrl && (!formattedUrl || latestUrl !== agreement.documentUrl)) {
-                                      const finalUrl = latestUrl.startsWith('/uploads') || latestUrl.startsWith('http') 
-                                        ? latestUrl 
-                                        : `/uploads/${latestUrl}`;
-                                      console.log("Updated document URL from API:", finalUrl);
-                                      setSelectedAgreement({
-                                        ...agreement,
-                                        documentUrl: finalUrl
-                                      });
-                                    }
-                                  });
-                                  
+                                  console.log("Setting selected agreement:", formattedAgreement);
                                   setSelectedAgreement(formattedAgreement);
                                   setIsSigningFormOpen(true);
                                 } else {

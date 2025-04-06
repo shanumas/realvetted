@@ -40,23 +40,76 @@ export function SellerAgencyDisclosureForm({
       ? documentUrl 
       : `/uploads/${documentUrl}`));
   
-  // Fetch the latest agreement document on mount
+  // Handle documentUrl prop directly when it changes
   useEffect(() => {
-    fetchLatestDocumentUrl();
-  }, [agreementId]);
+    console.log("Document URL prop changed:", documentUrl);
+    if (documentUrl) {
+      const formatted = documentUrl.startsWith('/uploads') || documentUrl.startsWith('http')
+        ? documentUrl
+        : `/uploads/${documentUrl}`;
+      console.log("Setting document URL from prop:", formatted);
+      setCurrentDocumentUrl(formatted);
+      setIframeError(false);
+      setIframeLoading(true);
+    }
+  }, [documentUrl]);
+  
+  // Fetch the latest agreement document on mount if no document URL provided
+  useEffect(() => {
+    if (!documentUrl) {
+      console.log("No document URL prop, fetching from API...");
+      fetchLatestDocumentUrl();
+    }
+  }, [agreementId, documentUrl]);
   
   const fetchLatestDocumentUrl = async () => {
-    if (!agreementId) return;
+    if (!agreementId) {
+      console.log("No agreement ID provided, cannot fetch document");
+      return;
+    }
     
     setFetchingDocument(true);
     try {
+      // First, try to get the agreement directly from the agreements list
+      console.log("Trying to fetch agreements list first");
+      const agreementsResponse = await apiRequest('GET', `/api/properties/${property.id}/agreements`);
+      const agreementsResult = await agreementsResponse.json();
+      
+      if (agreementsResult.success && agreementsResult.data) {
+        console.log("Agreements data:", agreementsResult.data);
+        
+        // Find our specific agreement
+        const targetAgreement = agreementsResult.data.find((a: any) => a.id === agreementId);
+        if (targetAgreement && targetAgreement.documentUrl) {
+          console.log("Found agreement in list with document URL:", targetAgreement.documentUrl);
+          
+          // Format the URL with /uploads prefix if needed
+          const formattedUrl = targetAgreement.documentUrl.startsWith('/uploads') || targetAgreement.documentUrl.startsWith('http')
+            ? targetAgreement.documentUrl
+            : `/uploads/${targetAgreement.documentUrl}`;
+            
+          console.log("Formatted document URL from agreements list:", formattedUrl);
+          setCurrentDocumentUrl(formattedUrl);
+          setIframeError(false);
+          setIframeLoading(true);
+          setFetchingDocument(false);
+          return;
+        } else {
+          console.log("Agreement found but no document URL:", targetAgreement);
+        }
+      }
+      
+      // If we got here, we couldn't find the agreement in the list or it had no document URL
+      // Try the specific API endpoint
       console.log(`Fetching document for agreement ID: ${agreementId}`);
       const response = await apiRequest('GET', `/api/agreements/${agreementId}/document`);
       const result = await response.json();
       
+      console.log("Document API response:", result);
+      
       if (result.success && result.data && result.data.documentUrl) {
         const fetchedUrl = result.data.documentUrl;
-        console.log("Fetched document URL:", fetchedUrl);
+        console.log("Fetched document URL from API:", fetchedUrl);
         
         // Format the URL with /uploads prefix if needed
         const formattedUrl = fetchedUrl.startsWith('/uploads') || fetchedUrl.startsWith('http')
@@ -69,6 +122,31 @@ export function SellerAgencyDisclosureForm({
         setIframeLoading(true);
       } else {
         console.log("Document not available in API response:", result);
+        
+        // One last attempt - try to find any agency disclosure agreement that might have a document
+        console.log("Looking for any agency disclosure agreement with a document...");
+        if (agreementsResult.success && agreementsResult.data) {
+          const agencyAgreements = agreementsResult.data.filter((a: any) => 
+            a.type === 'agency_disclosure' && a.documentUrl);
+          
+          if (agencyAgreements.length > 0) {
+            const latestAgreement = agencyAgreements[agencyAgreements.length - 1];
+            console.log("Found an alternative agreement with document:", latestAgreement);
+            
+            const formattedUrl = latestAgreement.documentUrl.startsWith('/uploads') || 
+                                latestAgreement.documentUrl.startsWith('http')
+              ? latestAgreement.documentUrl
+              : `/uploads/${latestAgreement.documentUrl}`;
+              
+            console.log("Using alternative document URL:", formattedUrl);
+            setCurrentDocumentUrl(formattedUrl);
+            setIframeError(false);
+            setIframeLoading(true);
+            setFetchingDocument(false);
+            return;
+          }
+        }
+        
         setIframeError(true);
       }
     } catch (error) {
