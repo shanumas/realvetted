@@ -168,14 +168,35 @@ export default function BuyerPropertyDetail() {
       notes: string, 
       override?: boolean 
     }) => {
-      const res = await apiRequest("POST", `/api/viewing-requests`, {
+      console.log("Requesting property viewing with data:", {
+        propertyId,
+        date: data.date,
+        time: data.time,
+        endTime: data.endTime,
+        notes: data.notes,
+        override: data.override
+      });
+      
+      // Create request payload with proper date formatting
+      const payload = {
         propertyId: propertyId,
         requestedDate: `${data.date}T${data.time}:00`,
         requestedEndDate: data.endTime ? `${data.date}T${data.endTime}:00` : undefined,
         notes: data.notes,
         override: data.override || false
-      });
-      return await res.json();
+      };
+      
+      console.log("Sending viewing request payload:", payload);
+      
+      try {
+        const res = await apiRequest("POST", `/api/viewing-requests`, payload);
+        const responseData = await res.json();
+        console.log("Viewing request response:", responseData);
+        return responseData;
+      } catch (error) {
+        console.error("Error requesting viewing:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       toast({
@@ -206,11 +227,23 @@ export default function BuyerPropertyDetail() {
       }, 500);
     },
     onError: (error: any) => {
+      console.error("Viewing request error:", error);
+      
+      // Detailed error logging for debugging
+      console.log("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        response: error.response,
+        data: error.response?.data,
+        status: error.response?.status,
+      });
+      
       // Check if this is a duplicate viewing request error
       if (error.message?.includes("already exists")) {
         try {
           // Try to parse the error response to get details about the existing request
           const errorData = error.response?.data;
+          console.log("Error data for duplicate request:", errorData);
           
           if (errorData && errorData.existingRequestId) {
             // Store the existing request info
@@ -253,6 +286,8 @@ export default function BuyerPropertyDetail() {
             }, 500);
           }
         } catch (e) {
+          console.error("Error parsing duplicate request data:", e);
+          
           // If there's an error parsing the response, fall back to the simple message
           toast({
             title: "Viewing request already exists",
@@ -275,10 +310,30 @@ export default function BuyerPropertyDetail() {
             document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
           }, 500);
         }
+      } else if (error.response?.status === 403) {
+        // Specific handling for permission errors
+        toast({
+          title: "Permission Error",
+          description: error.message || "You don't have permission to request a viewing for this property.",
+          variant: "destructive",
+        });
+        
+        console.log("Property status:", property?.status);
+        console.log("Current user role:", user?.role);
+        
+        // Check property status
+        if (property?.status !== 'active' && property?.status !== 'pending') {
+          toast({
+            title: "Property Not Available",
+            description: `This property is currently ${property?.status} and not available for viewing requests.`,
+            variant: "destructive",
+          });
+        }
       } else {
+        // Generic error handler with more details
         toast({
           title: "Could not request viewing",
-          description: error.message,
+          description: `Error: ${error.message || "Unknown error"}${error.response?.status ? ` (Status: ${error.response.status})` : ''}`,
           variant: "destructive",
         });
       }

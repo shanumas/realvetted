@@ -3233,12 +3233,44 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     hasRole(["buyer"]),
     async (req, res) => {
       try {
-        const requestData = viewingRequestSchema.parse({
+        console.log("Viewing request payload:", req.body);
+        
+        // Add buyer ID explicitly
+        const mergedData = {
           ...req.body,
           buyerId: req.user!.id,
-        });
+        };
+        
+        console.log("Merged request data before validation:", mergedData);
+        
+        // We'll validate the data more manually to better handle errors
+        if (!mergedData.propertyId) {
+          return res.status(400).json({
+            success: false,
+            error: "Property ID is required",
+          });
+        }
+        
+        if (!mergedData.requestedDate || !mergedData.requestedEndDate) {
+          return res.status(400).json({
+            success: false,
+            error: "Requested viewing dates are required",
+          });
+        }
+        
+        // Convert string dates to Date objects
+        const requestData = {
+          ...mergedData,
+          requestedDate: new Date(mergedData.requestedDate),
+          requestedEndDate: new Date(mergedData.requestedEndDate),
+        };
+        
+        console.log("Processed request data:", requestData);
 
+        // Get the property
         const property = await storage.getProperty(requestData.propertyId);
+        console.log("Found property:", property);
+        
         if (!property) {
           return res.status(404).json({
             success: false,
