@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import SignatureCanvas from "react-signature-canvas";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Send, FileSignature, FileText } from "lucide-react";
+import { Loader2, Send, FileSignature, FileText, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -29,14 +29,55 @@ export function SellerAgencyDisclosureForm({
   const [loading, setLoading] = useState<boolean>(false);
   const [iframeLoading, setIframeLoading] = useState<boolean>(true);
   const [iframeError, setIframeError] = useState<boolean>(false);
+  const [currentDocumentUrl, setCurrentDocumentUrl] = useState<string | null>(null);
+  const [fetchingDocument, setFetchingDocument] = useState<boolean>(false);
   const sigPad = useRef<SignatureCanvas | null>(null);
   const signatureDate = new Date().toLocaleDateString();
   
-  // Format the document URL correctly 
-  const formattedDocumentUrl = documentUrl && 
+  // Format the document URL correctly if provided
+  const formattedDocumentUrl = currentDocumentUrl || (documentUrl && 
     (documentUrl.startsWith('/uploads') || documentUrl.startsWith('http') 
       ? documentUrl 
-      : `/uploads/${documentUrl}`);
+      : `/uploads/${documentUrl}`));
+  
+  // Fetch the latest agreement document on mount
+  useEffect(() => {
+    fetchLatestDocumentUrl();
+  }, [agreementId]);
+  
+  const fetchLatestDocumentUrl = async () => {
+    if (!agreementId) return;
+    
+    setFetchingDocument(true);
+    try {
+      console.log(`Fetching document for agreement ID: ${agreementId}`);
+      const response = await apiRequest('GET', `/api/agreements/${agreementId}/document`);
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.documentUrl) {
+        const fetchedUrl = result.data.documentUrl;
+        console.log("Fetched document URL:", fetchedUrl);
+        
+        // Format the URL with /uploads prefix if needed
+        const formattedUrl = fetchedUrl.startsWith('/uploads') || fetchedUrl.startsWith('http')
+          ? fetchedUrl
+          : `/uploads/${fetchedUrl}`;
+          
+        console.log("Formatted document URL:", formattedUrl);
+        setCurrentDocumentUrl(formattedUrl);
+        setIframeError(false);
+        setIframeLoading(true);
+      } else {
+        console.log("Document not available in API response:", result);
+        setIframeError(true);
+      }
+    } catch (error) {
+      console.error("Error fetching document URL:", error);
+      setIframeError(true);
+    } finally {
+      setFetchingDocument(false);
+    }
+  };
 
   const clearSignature = () => {
     if (sigPad.current) {
@@ -106,43 +147,23 @@ export function SellerAgencyDisclosureForm({
     }
   };
 
-  const handleViewPdf = () => {
+  const handleViewPdf = async () => {
     if (formattedDocumentUrl) {
       window.open(formattedDocumentUrl, '_blank');
     } else {
-      // Attempt to fetch the latest agreement if no document URL was provided
-      apiRequest('GET', `/api/properties/${property.id}/agreements`)
-        .then(async (response) => {
-          const data = await response.json();
-          if (data.success && data.data && data.data.length > 0) {
-            const agencyDisclosures = data.data.filter((a: any) => a.type === 'agency_disclosure');
-            if (agencyDisclosures.length > 0) {
-              // Get the most recent agreement
-              const latestAgreement = agencyDisclosures[agencyDisclosures.length - 1];
-              if (latestAgreement.documentUrl) {
-                const docUrl = latestAgreement.documentUrl.startsWith('/uploads') || 
-                                  latestAgreement.documentUrl.startsWith('http') ? 
-                                  latestAgreement.documentUrl : 
-                                  `/uploads/${latestAgreement.documentUrl}`;
-                window.open(docUrl, '_blank');
-                return;
-              }
-            }
-          }
-          toast({
-            title: "Document Not Available",
-            description: "The document is not available for preview at this time.",
-            variant: "destructive",
-          });
-        })
-        .catch(error => {
-          console.error("Error fetching agreements:", error);
-          toast({
-            title: "Error",
-            description: "Failed to load the document. Please try again later.",
-            variant: "destructive",
-          });
+      // Try to fetch the latest document using our specific document endpoint
+      await fetchLatestDocumentUrl();
+      
+      // If we now have a URL, open it
+      if (currentDocumentUrl) {
+        window.open(currentDocumentUrl, '_blank');
+      } else {
+        toast({
+          title: "Document Not Available",
+          description: "The document is not available for preview at this time.",
+          variant: "destructive",
         });
+      }
     }
   };
 
@@ -166,36 +187,83 @@ export function SellerAgencyDisclosureForm({
         </DialogHeader>
         
         <div className="space-y-4 py-4">
-          <div className="border rounded-md overflow-hidden" style={{ height: '300px' }}>
+          <div className="border rounded-md overflow-hidden relative" style={{ height: '300px' }}>
+            {/* Add Refresh button at the top right */}
+            {formattedDocumentUrl && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-2 right-2 z-10 bg-white/80 hover:bg-white"
+                onClick={fetchLatestDocumentUrl}
+                disabled={fetchingDocument}
+              >
+                <RefreshCw className={`h-4 w-4 ${fetchingDocument ? 'animate-spin' : ''}`} />
+              </Button>
+            )}
+            
             {formattedDocumentUrl ? (
               <>
-                {iframeLoading && (
-                  <div className="flex items-center justify-center h-full">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                {(iframeLoading || fetchingDocument) && (
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                    <p className="text-sm text-gray-500">
+                      {fetchingDocument ? 'Fetching document...' : 'Loading document...'}
+                    </p>
                   </div>
                 )}
-                <iframe 
-                  src={formattedDocumentUrl}
-                  width="100%" 
-                  height="100%" 
-                  title="Agency Disclosure Form"
-                  className={`border-0 ${iframeLoading ? 'opacity-0' : 'opacity-100'}`}
-                  onLoad={handleIframeLoad}
-                  onError={handleIframeError}
-                />
+                
+                {/* Only show the iframe when we're not in a loading state */}
+                {!fetchingDocument && (
+                  <iframe 
+                    src={formattedDocumentUrl}
+                    width="100%" 
+                    height="100%" 
+                    title="Agency Disclosure Form"
+                    className={`border-0 ${iframeLoading ? 'opacity-0' : 'opacity-100'}`}
+                    onLoad={handleIframeLoad}
+                    onError={handleIframeError}
+                  />
+                )}
+                
+                {/* Show error UI if iframe fails to load */}
+                {iframeError && !iframeLoading && !fetchingDocument && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white">
+                    <FileText className="h-12 w-12 mb-2 text-red-300" />
+                    <p className="text-sm text-gray-600 mb-2">Failed to load document preview</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={fetchLatestDocumentUrl}
+                      disabled={fetchingDocument}
+                    >
+                      <RefreshCw className={`mr-2 h-4 w-4 ${fetchingDocument ? 'animate-spin' : ''}`} />
+                      Retry
+                    </Button>
+                  </div>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
                 <FileText className="h-12 w-12 mb-2 text-gray-300" />
-                <p>Document preview not available</p>
+                <p className="mb-1">Document preview not available</p>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   className="mt-2"
-                  onClick={handleViewPdf}
+                  onClick={fetchLatestDocumentUrl}
+                  disabled={fetchingDocument}
                 >
-                  <FileSignature className="mr-2 h-4 w-4" />
-                  Load Document
+                  {fetchingDocument ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <FileSignature className="mr-2 h-4 w-4" />
+                      Load Document
+                    </>
+                  )}
                 </Button>
               </div>
             )}

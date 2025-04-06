@@ -1718,6 +1718,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get a specific agreement document
+  app.get("/api/agreements/:id/document", isAuthenticated, async (req, res) => {
+    try {
+      const agreementId = parseInt(req.params.id);
+      const agreement = await storage.getAgreement(agreementId);
+      
+      if (!agreement) {
+        return res.status(404).json({
+          success: false,
+          error: "Agreement not found",
+        });
+      }
+      
+      // Get the property to check permissions
+      const property = await storage.getPropertyWithParticipants(agreement.propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found",
+        });
+      }
+      
+      // Verify user has permission to access this agreement
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      
+      const hasAccess =
+        userRole === "admin" ||
+        (userRole === "buyer" && property.buyerId === userId) ||
+        (userRole === "agent" && property.agentId === userId) ||
+        (userRole === "seller" && property.sellerId === userId);
+        
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to access this agreement",
+        });
+      }
+      
+      // Return the agreement with its document URL
+      res.json({
+        success: true,
+        data: {
+          id: agreement.id,
+          type: agreement.type,
+          status: agreement.status,
+          documentUrl: agreement.documentUrl,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching agreement document:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get agreement document",
+      });
+    }
+  });
+
   app.post(
     "/api/properties/:id/agreements",
     isAuthenticated,

@@ -425,14 +425,54 @@ export default function SellerPropertyView() {
                                 ) {
                                   // Open the signing dialog for seller
                                   // Format the agreement document URL before storing
+                                  // Add debug logging for agreement document URL
+                                  console.log("Original agreement:", agreement);
+                                  console.log("Document URL before formatting:", agreement.documentUrl);
+                                  
+                                  // Try to get the latest document for this agreement from the API
+                                  const getLatestDocument = async () => {
+                                    try {
+                                      const response = await fetch(`/api/agreements/${agreement.id}/document`);
+                                      if (response.ok) {
+                                        const data = await response.json();
+                                        if (data.success && data.data && data.data.documentUrl) {
+                                          console.log("Found document URL from API:", data.data.documentUrl);
+                                          return data.data.documentUrl;
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error("Error fetching document:", error);
+                                    }
+                                    return agreement.documentUrl;
+                                  };
+                                  
+                                  // Use the existing document URL for now
+                                  const formattedUrl = agreement.documentUrl ? 
+                                    (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
+                                      agreement.documentUrl : 
+                                      `/uploads/${agreement.documentUrl}`) : 
+                                    null;
+                                    
+                                  console.log("Formatted document URL:", formattedUrl);
+                                  
                                   const formattedAgreement = {
                                     ...agreement,
-                                    documentUrl: agreement.documentUrl ? 
-                                      (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
-                                        agreement.documentUrl : 
-                                        `/uploads/${agreement.documentUrl}`) : 
-                                      null
+                                    documentUrl: formattedUrl
                                   };
+                                  
+                                  // Try to get the latest document in the background
+                                  getLatestDocument().then(latestUrl => {
+                                    if (latestUrl && (!formattedUrl || latestUrl !== agreement.documentUrl)) {
+                                      const finalUrl = latestUrl.startsWith('/uploads') || latestUrl.startsWith('http') 
+                                        ? latestUrl 
+                                        : `/uploads/${latestUrl}`;
+                                      console.log("Updated document URL from API:", finalUrl);
+                                      setSelectedAgreement({
+                                        ...agreement,
+                                        documentUrl: finalUrl
+                                      });
+                                    }
+                                  });
                                   
                                   setSelectedAgreement(formattedAgreement);
                                   setIsSigningFormOpen(true);
