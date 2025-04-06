@@ -11,6 +11,7 @@ import {
   extractIDData,
   extractPropertyFromUrl,
 } from "./openai";
+import { lookupCaliforniaLicense } from "./license-lookup";
 import {
   propertySchema,
   agentLeadSchema,
@@ -98,6 +99,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // -------- API Routes --------
 
   // User routes
+  
+  // Look up agent license
+  app.get("/api/agent/license-lookup", async (req, res) => {
+    try {
+      const { licenseNumber } = req.query;
+      
+      if (!licenseNumber || typeof licenseNumber !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: "License number is required"
+        });
+      }
+      
+      const licenseData = await lookupCaliforniaLicense(licenseNumber);
+      
+      res.json({
+        success: true,
+        data: licenseData
+      });
+    } catch (error) {
+      console.error("License lookup error:", error);
+      res.status(500).json({
+        success: false, 
+        error: "Failed to look up license information"
+      });
+    }
+  });
+  
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
     try {
       const data = kycUpdateSchema.parse(req.body);

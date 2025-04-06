@@ -49,6 +49,7 @@ const registerSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   profilePhotoUrl: z.string().optional(),
+  licenseNumber: z.string().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -62,6 +63,7 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [previewImage, setPreviewImage] = useState<string>("");
+  const [lookingUpLicense, setLookingUpLicense] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Redirect if user is already logged in
@@ -99,6 +101,8 @@ export default function AuthPage() {
       password: "",
       firstName: "",
       lastName: "",
+      profilePhotoUrl: "",
+      licenseNumber: "",
     },
   });
 
@@ -167,6 +171,58 @@ export default function AuthPage() {
     }
   };
 
+  // Handle license lookup
+  const handleLicenseLookup = async (licenseNumber: string) => {
+    try {
+      setLookingUpLicense(true);
+      
+      const response = await fetch(`/api/agent/license-lookup?licenseNumber=${encodeURIComponent(licenseNumber)}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to look up license');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to find license information');
+      }
+      
+      // Populate the form with the agent's details from the license lookup
+      if (data.data) {
+        const { name, address, city, state, zip } = data.data;
+        
+        // Parse the full name into first and last name
+        if (name) {
+          const nameParts = name.split(' ');
+          if (nameParts.length >= 2) {
+            const firstName = nameParts[0];
+            const lastName = nameParts.slice(1).join(' ');
+            registerForm.setValue('firstName', firstName);
+            registerForm.setValue('lastName', lastName);
+          } else {
+            registerForm.setValue('firstName', name);
+          }
+        }
+        
+        toast({
+          title: "License Information Found",
+          description: "Your name has been filled based on your license information.",
+        });
+      }
+      
+    } catch (error) {
+      console.error('License lookup error:', error);
+      toast({
+        title: 'License Lookup Failed',
+        description: error instanceof Error ? error.message : 'Failed to look up license information',
+        variant: 'destructive'
+      });
+    } finally {
+      setLookingUpLicense(false);
+    }
+  };
+
   // Handle file selection
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -201,12 +257,23 @@ export default function AuthPage() {
       return;
     }
     
+    // Validate that agents have a license number
+    if (roleTab === "agent" && !values.licenseNumber) {
+      toast({
+        title: "License Number Required",
+        description: "Agents must provide their real estate license number to register",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     registerMutation.mutate({
       email: values.email,
       password: values.password,
       firstName: values.firstName,
       lastName: values.lastName,
       profilePhotoUrl: values.profilePhotoUrl,
+      licenseNumber: values.licenseNumber,
       role: roleTab as any,
     });
   };
@@ -437,6 +504,40 @@ export default function AuthPage() {
                     />
                     
                     {roleTab === "agent" && (
+                      <>
+                      <FormField
+                        control={registerForm.control}
+                        name="licenseNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>
+                              License Number <span className="text-red-500">*</span>
+                            </FormLabel>
+                            <FormDescription>
+                              Enter your real estate license number
+                            </FormDescription>
+                            <div className="flex space-x-2">
+                              <FormControl>
+                                <Input 
+                                  placeholder="e.g. 01234567" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <Button 
+                                type="button" 
+                                variant="outline"
+                                onClick={() => field.value && handleLicenseLookup(field.value)}
+                                disabled={lookingUpLicense || !field.value}
+                              >
+                                {lookingUpLicense ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Lookup
+                              </Button>
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
                       <FormField
                         control={registerForm.control}
                         name="profilePhotoUrl"
@@ -502,6 +603,7 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+                      </>
                     )}
                     
                     <Button

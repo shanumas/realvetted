@@ -1,5 +1,5 @@
 import axios from 'axios';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 /**
  * Fetch agent details from the California DRE website by license number
@@ -38,7 +38,7 @@ export async function lookupCaliforniaLicense(licenseNumber: string): Promise<{
     
     // Find the name field, usually in a table row or specific element
     // This is an example selector, will need to be adjusted based on the actual page structure
-    $('table tr').each((i, elem) => {
+    $('table tr').each((i: number, elem: any) => {
       const rowText = $(elem).text().trim();
       if (rowText.includes('Name:')) {
         fullName = rowText.replace('Name:', '').trim();
@@ -57,7 +57,7 @@ export async function lookupCaliforniaLicense(licenseNumber: string): Promise<{
     let expirationDate = '';
     let status = '';
 
-    $('table tr').each((i, elem) => {
+    $('table tr').each((i: number, elem: any) => {
       const rowText = $(elem).text().trim();
       if (rowText.includes('License Type:')) {
         licenseType = rowText.replace('License Type:', '').trim();

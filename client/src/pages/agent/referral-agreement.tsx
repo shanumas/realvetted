@@ -53,8 +53,12 @@ export default function AgentReferralAgreement() {
           // Set form data from user profile
           if (user) {
             setAgentName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email);
-            // License number is not in the user type, so we'll leave it blank for the agent to fill in
-            setLicenseNumber('');
+            // Set the license number from the user profile if available
+            if (user.licenseNumber) {
+              setLicenseNumber(user.licenseNumber);
+            } else {
+              setLicenseNumber('');
+            }
             setAddress(user.addressLine1 || '');
             setCity(user.city || '');
             setState(user.state || '');

@@ -35,6 +35,7 @@ type RegisterData = {
   firstName?: string;
   lastName?: string;
   profilePhotoUrl?: string;
+  licenseNumber?: string;
 };
 
 type AuthContextType = {
@@ -155,7 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (user.role === "buyer") {
         setLocation("/buyer/kyc");
       } else if (user.role === "agent") {
-        setLocation("/agent/kyc");
+        // For agents, redirect to referral agreement page immediately after signup
+        setLocation("/agent/referral-agreement");
       } else if (user.role === "seller") {
         setLocation("/seller/dashboard");
       } else if (user.role === "admin") {

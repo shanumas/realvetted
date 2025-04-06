@@ -151,7 +151,14 @@ export function setupAuth(app: Express) {
         if (err) return next(err);
         // Return user without password
         const { password, ...userWithoutPassword } = user;
-        res.status(201).json(userWithoutPassword);
+        
+        // For agents, add a redirect to the referral agreement page
+        const redirectUrl = user.role === 'agent' ? '/agent/referral-agreement' : null;
+        
+        res.status(201).json({
+          ...userWithoutPassword,
+          redirectUrl
+        });
       });
     } catch (error) {
       console.error("Registration error:", error);

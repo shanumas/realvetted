@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   idFrontUrl: text("id_front_url"),
   idBackUrl: text("id_back_url"),
   profilePhotoUrl: text("profile_photo_url"), // URL to the user's profile photo
+  licenseNumber: text("license_number"), // Real estate license number for agents
   isBlocked: boolean("is_blocked").default(false),
 });
 
@@ -142,6 +143,7 @@ export const registerUserSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   profilePhotoUrl: z.string().optional(),
+  licenseNumber: z.string().optional(),
 })
 .superRefine((data, ctx) => {
   // Require profile photo for agents
@@ -150,6 +152,15 @@ export const registerUserSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "Profile photo is required for agents",
       path: ["profilePhotoUrl"]
+    });
+  }
+  
+  // Require license number for agents
+  if (data.role === "agent" && !data.licenseNumber) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "License number is required for agents",
+      path: ["licenseNumber"]
     });
   }
 });
