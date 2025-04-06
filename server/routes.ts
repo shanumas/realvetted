@@ -3246,12 +3246,20 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           });
         }
 
-        // Check if user has access to this property (only buyer who created the property can request a viewing)
-        if (property.createdBy !== req.user!.id) {
+        // Buyer should be able to view any listed property, so we don't need to check if they created it
+        // Just ensure the property is in a status that allows viewing requests
+        if (property.status !== 'active' && property.status !== 'pending') {
           return res.status(403).json({
             success: false,
-            error:
-              "You don't have permission to request a viewing for this property",
+            error: "This property is not available for viewing requests",
+          });
+        }
+        
+        // Make sure the property has a seller and/or agent to review the request
+        if (!property.sellerId && !property.agentId) {
+          return res.status(403).json({
+            success: false,
+            error: "This property doesn't have a seller or agent assigned yet",
           });
         }
 
@@ -3415,7 +3423,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
         const hasAccess =
           role === "admin" ||
-          (role === "buyer" && property.createdBy === userId) ||
+          role === "buyer" || // Any buyer can see viewing requests for a property
           (role === "seller" && property.sellerId === userId) ||
           (role === "agent" && property.agentId === userId);
 
