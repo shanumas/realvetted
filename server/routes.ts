@@ -109,6 +109,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If ID documents are provided, verify with AI
       if (data.idFrontUrl && data.idBackUrl) {
         try {
+          // First, try to extract data from the ID documents
+          let idFrontBase64 = '';
+          let idBackBase64 = '';
+          
+          try {
+            // Convert the image URLs to base64 for AI processing
+            // In a real implementation, we would fetch these from storage
+            // For now we'll use a mock implementation
+            const fetchImage = async (url: string): Promise<string> => {
+              // Remove the URL part and just use the data if it's already a data URL
+              if (url.startsWith('data:')) {
+                return url.split(',')[1];
+              }
+              
+              // In a real app we'd fetch the image from URL
+              // For now return empty string as mock
+              return '';
+            };
+            
+            idFrontBase64 = await fetchImage(data.idFrontUrl);
+            idBackBase64 = await fetchImage(data.idBackUrl);
+            
+            // Extract ID data if we have base64 content
+            if (idFrontBase64 && idBackBase64) {
+              const idData = await extractIDData(idFrontBase64, idBackBase64);
+              
+              // Save extracted ID data to user profile
+              if (idData && Object.keys(idData).length > 0) {
+                await storage.updateUser(req.user.id, {
+                  firstName: idData.firstName || req.user.firstName,
+                  lastName: idData.lastName || req.user.lastName,
+                  dateOfBirth: idData.dateOfBirth ? new Date(idData.dateOfBirth) : req.user.dateOfBirth,
+                  addressLine1: idData.addressLine1 || req.user.addressLine1,
+                  addressLine2: idData.addressLine2 || req.user.addressLine2,
+                  city: idData.city || req.user.city,
+                  state: idData.state || req.user.state,
+                  zip: idData.zip || req.user.zip,
+                });
+                
+                console.log("Updated user profile with extracted ID data:", idData);
+              }
+            }
+          } catch (extractError) {
+            console.error("Error extracting data from ID documents:", extractError);
+            // Continue with verification even if extraction fails
+          }
+          
+          // Now verify the ID documents
           const verificationResult = await verifyKYCDocuments(
             req.user.id,
             data.idFrontUrl,
@@ -130,6 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If this is an agent, create leads for existing properties
             if (req.user.role === "agent") {
               try {
+                
                 // Create leads for this agent for appropriate properties
                 const properties = await storage.getAllProperties();
                 const agent = await storage.getUser(req.user.id);
@@ -192,9 +241,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const redirectUrl = req.user && req.user.role === 'agent' && updatedUser.profileStatus === 'verified' 
+        ? '/agent/referral-agreement' 
+        : null;
+        
       res.json({
         success: true,
         data: updatedUser,
+        redirectUrl: redirectUrl,
       });
     } catch (error) {
       console.error("KYC update error:", error);

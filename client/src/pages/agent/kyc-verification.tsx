@@ -165,14 +165,22 @@ export default function AgentKYC() {
       if (!response.ok) {
         throw new Error("Failed to submit KYC information");
       }
+      
+      const responseData = await response.json();
 
       toast({
         title: "KYC Submitted",
         description: "Your agent verification has been submitted and is being processed.",
       });
 
-      // Redirect to dashboard
-      navigate("/agent/dashboard");
+      // Check if there's a redirect URL in the response
+      if (responseData.redirectUrl) {
+        // If we need to redirect to the referral agreement page
+        navigate(responseData.redirectUrl);
+      } else {
+        // Default redirect to dashboard
+        navigate("/agent/dashboard");
+      }
     } catch (error) {
       console.error("KYC submission error:", error);
       toast({
