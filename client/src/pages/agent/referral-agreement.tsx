@@ -1,334 +1,565 @@
-import { useEffect, useState, useRef } from 'react';
-import { useAuth } from '../../hooks/use-auth';
-import SignatureCanvas from 'react-signature-canvas';
-import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
-import { Label } from '../../components/ui/label';
-import { Input } from '../../components/ui/input';
-import { useToast } from '../../hooks/use-toast';
-import { useLocation } from 'wouter';
-import { Spinner } from '../../components/ui/spinner';
+import { useState, useRef, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useAuth } from "@/hooks/use-auth";
+import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import SignatureCanvas from "react-signature-canvas";
+import { Loader2, RefreshCw, Check } from "lucide-react";
 
-interface Agreement {
-  id: number;
-  status: string;
-  documentUrl: string;
-  date: string;
-}
+// Schema for the referral agreement form
+const referralAgreementSchema = z.object({
+  agentName: z.string().min(1, "Full name is required"),
+  licenseNumber: z.string().min(1, "License number is required"),
+  address: z.string().min(1, "Address is required"),
+  city: z.string().min(1, "City is required"),
+  state: z.string().min(1, "State is required"),
+  zip: z.string().min(1, "ZIP code is required"),
+  agreeToTerms: z.literal(true, {
+    errorMap: () => ({ message: "You must agree to the terms" }),
+  }),
+});
 
-export default function AgentReferralAgreement() {
-  const { user } = useAuth();
-  const [, setLocation] = useLocation();
+type ReferralAgreementValues = z.infer<typeof referralAgreementSchema>;
+
+export default function ReferralAgreementPage() {
+  const { user, isLoading: isLoadingAuth } = useAuth();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
-  
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [agreement, setAgreement] = useState<Agreement | null>(null);
-  
-  // Form data
-  const [agentName, setAgentName] = useState('');
-  const [licenseNumber, setLicenseNumber] = useState('');
-  const [address, setAddress] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zip, setZip] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  
-  // Signature pad reference
+  const [signature, setSignature] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [lookingUpLicense, setLookingUpLicense] = useState(false);
   const signatureRef = useRef<SignatureCanvas>(null);
-  
-  // Check if agreement already exists
+
+  // Query to check if user has already signed the agreement
+  const { data: existingAgreement, isLoading: isLoadingAgreement } = useQuery({
+    queryKey: ["/api/agreements/agent-referral"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/agreements/agent-referral");
+      return res.json();
+    },
+    enabled: !!user,
+    retry: false,
+  });
+
+  // Redirect if not logged in or not an agent
   useEffect(() => {
-    const checkAgreement = async () => {
-      try {
-        const response = await fetch('/api/agent/referral-agreement');
-        const data = await response.json();
-        
-        if (data.success) {
-          if (data.data) {
-            // Agreement exists
-            setAgreement(data.data);
-          }
-          
-          // Set form data from user profile
-          if (user) {
-            setAgentName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email);
-            // Set the license number from the user profile if available
-            if (user.licenseNumber) {
-              setLicenseNumber(user.licenseNumber);
-            } else {
-              setLicenseNumber('');
-            }
-            setAddress(user.addressLine1 || '');
-            setCity(user.city || '');
-            setState(user.state || '');
-            setZip(user.zip || '');
-          }
-          
-          setLoading(false);
-        } else {
-          throw new Error(data.error || 'Failed to fetch agreement');
-        }
-      } catch (error) {
-        console.error('Error checking referral agreement', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to check if you have an existing agreement. Please try again.',
-          variant: 'destructive',
-        });
-        setLoading(false);
-      }
-    };
+    if (!isLoadingAuth && !user) {
+      navigate("/auth");
+      return;
+    }
+
+    if (!isLoadingAuth && user && user.role !== "agent") {
+      navigate("/");
+      return;
+    }
+
+    // If agent has already signed the agreement and has completed KYC, redirect to dashboard
+    if (!isLoadingAgreement && existingAgreement?.hasSigned && user?.profileStatus === "verified") {
+      navigate("/agent/dashboard");
+    }
     
-    checkAgreement();
-  }, [user, toast]);
-  
-  // Submit the agreement
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!signatureRef.current) {
+    // If agent has already signed the agreement but hasn't completed KYC, redirect to KYC page
+    if (!isLoadingAgreement && existingAgreement?.hasSigned && user?.profileStatus !== "verified") {
+      navigate("/agent/kyc");
+    }
+  }, [user, isLoadingAuth, isLoadingAgreement, existingAgreement, navigate]);
+
+  const form = useForm<ReferralAgreementValues>({
+    resolver: zodResolver(referralAgreementSchema),
+    defaultValues: {
+      agentName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "",
+      licenseNumber: user?.licenseNumber || "",
+      address: user?.addressLine1 || "",
+      city: user?.city || "",
+      state: user?.state || "",
+      zip: user?.zip || "",
+      agreeToTerms: false as unknown as true, // This cast is necessary for the form to work with the z.literal(true) schema
+    },
+  });
+
+  // Update form when user data loads
+  useEffect(() => {
+    if (user) {
+      form.reset({
+        agentName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        licenseNumber: user.licenseNumber || "",
+        address: user.addressLine1 || "",
+        city: user.city || "",
+        state: user.state || "",
+        zip: user.zip || "",
+        agreeToTerms: false as unknown as true, // This cast is necessary for the form to work with the z.literal(true) schema
+      });
+    }
+  }, [user, form]);
+
+  // Handle license lookup
+  const handleLicenseLookup = async () => {
+    const licenseNumber = form.getValues("licenseNumber");
+    if (!licenseNumber) {
       toast({
-        title: 'Signature Required',
-        description: 'Please sign the agreement before submitting',
-        variant: 'destructive',
+        title: "License Number Required",
+        description: "Please enter your license number to look up your information.",
+        variant: "destructive",
       });
       return;
     }
-    
-    if (signatureRef.current.isEmpty()) {
-      toast({
-        title: 'Signature Required',
-        description: 'Please sign the agreement before submitting',
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    setSaving(true);
-    
+
     try {
-      // Get signature as data URL
-      const signatureData = signatureRef.current.toDataURL();
+      setLookingUpLicense(true);
       
-      const response = await fetch('/api/agent/referral-agreement', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agentName,
-          licenseNumber,
-          address,
-          city,
-          state,
-          zip,
-          agentSignature: signatureData,
-          date,
-        }),
-      });
+      const response = await fetch(`/api/agent/license-lookup?licenseNumber=${encodeURIComponent(licenseNumber)}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to look up license');
+      }
       
       const data = await response.json();
       
-      if (data.success) {
-        setAgreement(data.data);
-        toast({
-          title: 'Agreement Signed',
-          description: 'Your referral agreement has been signed and submitted successfully.',
-        });
-        
-        // Redirect to dashboard
-        setTimeout(() => {
-          setLocation('/agent/dashboard');
-        }, 2000);
-      } else {
-        throw new Error(data.error || 'Failed to submit agreement');
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to find license information');
       }
+      
+      // Populate the form with the agent's details from the license lookup
+      if (data.data) {
+        const { name, address, city, state, zip } = data.data;
+        
+        // Update the form fields
+        if (name) {
+          form.setValue('agentName', name);
+        }
+        
+        if (address) {
+          form.setValue('address', address);
+        }
+        
+        if (city) {
+          form.setValue('city', city);
+        }
+        
+        if (state) {
+          form.setValue('state', state);
+        }
+        
+        if (zip) {
+          form.setValue('zip', zip);
+        }
+        
+        toast({
+          title: "License Information Found",
+          description: "Your information has been filled based on your license details.",
+        });
+      }
+      
     } catch (error) {
-      console.error('Error submitting referral agreement', error);
+      console.error('License lookup error:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to submit your agreement. Please try again.',
-        variant: 'destructive',
+        title: 'License Lookup Failed',
+        description: error instanceof Error ? error.message : 'Failed to look up license information',
+        variant: 'destructive'
       });
     } finally {
-      setSaving(false);
+      setLookingUpLicense(false);
     }
   };
-  
+
   // Clear signature
   const clearSignature = () => {
     if (signatureRef.current) {
       signatureRef.current.clear();
+      setSignature(null);
     }
   };
-  
-  if (loading) {
+
+  // Preview the agreement
+  const previewAgreement = async () => {
+    const values = form.getValues();
+    
+    if (!signature) {
+      toast({
+        title: "Signature Required",
+        description: "Please sign the agreement before previewing",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/agreements/agent-referral/preview", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          signature,
+          date: new Date().toISOString().split("T")[0], // Current date in YYYY-MM-DD format
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to generate preview");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+      setIsPreviewOpen(true);
+    } catch (error) {
+      console.error("Preview error:", error);
+      toast({
+        title: "Preview Failed",
+        description: error instanceof Error ? error.message : "Failed to generate preview",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Submit the agreement
+  const submitAgreement = async (values: ReferralAgreementValues) => {
+    if (!signature) {
+      toast({
+        title: "Signature Required",
+        description: "Please sign the agreement",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      
+      const response = await fetch("/api/agreements/agent-referral", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          signature,
+          date: new Date().toISOString().split("T")[0], // Current date in YYYY-MM-DD format
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to submit agreement");
+      }
+
+      const data = await response.json();
+      
+      toast({
+        title: "Agreement Submitted",
+        description: "Your referral agreement has been submitted successfully",
+      });
+
+      // Invalidate the query to refetch the agreement status
+      queryClient.invalidateQueries({queryKey: ["/api/agreements/agent-referral"]});
+      
+      // Redirect to KYC verification page
+      navigate("/agent/kyc");
+      
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast({
+        title: "Submission Failed",
+        description: error instanceof Error ? error.message : "Failed to submit agreement",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoadingAuth || isLoadingAgreement) {
     return (
-      <div className="container max-w-3xl mx-auto py-8 px-4">
-        <div className="flex flex-col items-center justify-center min-h-[50vh]">
-          <Spinner size="lg" className="text-primary" />
-          <p className="mt-4 text-gray-600">Loading your agreement...</p>
-        </div>
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-  
-  // If agreement already exists and is completed, show it
-  if (agreement && agreement.status === 'completed') {
-    return (
-      <div className="container max-w-3xl mx-auto py-8 px-4">
-        <Card className="p-6">
-          <h1 className="text-2xl font-bold mb-6">Referral Agreement</h1>
-          <p className="mb-4">
-            You have already signed the Agent Referral Fee Agreement. You can view your agreement below.
-          </p>
-          <div className="mb-6">
-            <a 
-              href={agreement.documentUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary hover:underline"
-            >
-              View Signed Agreement
-            </a>
-          </div>
-          <Button onClick={() => setLocation('/agent/dashboard')}>
-            Go to Dashboard
-          </Button>
-        </Card>
-      </div>
-    );
-  }
-  
-  // Otherwise show the form to sign
+
   return (
-    <div className="container max-w-3xl mx-auto py-8 px-4">
-      <Card className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Agent Referral Fee Agreement</h1>
-        
-        <div className="mb-6">
-          <p className="mb-4">
-            This agreement establishes that you, as a real estate agent, agree to pay a <strong>25% referral fee</strong> to <strong>Randy Brummett</strong> for any sales that occur through leads provided by this platform.
-          </p>
-          <p className="mb-4">
-            By signing this agreement, you acknowledge and agree to the terms and conditions of our referral program.
-          </p>
-          <p className="mb-2">Key terms:</p>
-          <ul className="list-disc pl-6 mb-4">
-            <li>25% of your commission will be paid as a referral fee</li>
-            <li>The fee applies only to completed transactions from platform-generated leads</li>
-            <li>Payment is due within 5 business days of closing</li>
-            <li>This agreement remains in effect for all future transactions from platform leads</li>
-          </ul>
-        </div>
-        
-        <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <Label htmlFor="agentName">Agent Name</Label>
-              <Input 
-                id="agentName"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="licenseNumber">License Number</Label>
-              <Input 
-                id="licenseNumber"
-                value={licenseNumber}
-                onChange={(e) => setLicenseNumber(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="address">Address</Label>
-              <Input 
-                id="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input 
-                id="city"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="state">State</Label>
-              <Input 
-                id="state"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="zip">ZIP Code</Label>
-              <Input 
-                id="zip"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="date">Date</Label>
-              <Input 
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-          
-          <div className="mb-6">
-            <Label htmlFor="signature">Signature</Label>
-            <div className="border border-gray-300 rounded-md p-2 bg-white">
-              <SignatureCanvas
-                ref={signatureRef}
-                canvasProps={{
-                  width: 500,
-                  height: 200,
-                  className: 'signature-canvas w-full h-[200px]'
-                }}
-                backgroundColor="white"
-              />
-            </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="sm" 
-              className="mt-2"
-              onClick={clearSignature}
+    <div className="container max-w-3xl py-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>Agent Referral Agreement</CardTitle>
+          <CardDescription>
+            As an agent using our platform, you agree to pay a 25% referral fee to 
+            Randy Brummett for any transactions that result from leads provided 
+            through this service.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(submitAgreement)}
+              className="space-y-6"
             >
-              Clear
-            </Button>
-          </div>
-          
-          <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-2">
-            <Button type="submit" disabled={saving} className="flex-1">
-              {saving ? (
-                <>
-                  <Spinner size="sm" className="mr-2" />
-                  Submitting...
-                </>
-              ) : (
-                'Sign & Submit Agreement'
-              )}
-            </Button>
-          </div>
-        </form>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="agentName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="licenseNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>License Number</FormLabel>
+                      <div className="flex space-x-2">
+                        <FormControl>
+                          <Input {...field} />
+                        </FormControl>
+                        <Button 
+                          type="button" 
+                          variant="outline"
+                          onClick={handleLicenseLookup}
+                          disabled={lookingUpLicense || !field.value}
+                        >
+                          {lookingUpLicense ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                          )}
+                          Look Up
+                        </Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="zip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ZIP Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium mb-2">Agreement Terms</h3>
+                  <div className="bg-gray-50 p-4 rounded-md text-sm">
+                    <p className="mb-3">
+                      I, <span className="font-bold">{form.watch("agentName") || "[Your Name]"}</span>, 
+                      a licensed real estate agent with license number <span className="font-bold">{form.watch("licenseNumber") || "[License Number]"}</span>, 
+                      hereby agree to pay a referral fee of 25% of any commission earned 
+                      from transactions with clients referred to me through the PropertyMatch platform.
+                    </p>
+                    <p className="mb-3">
+                      This referral fee shall be paid to Randy Brummett within 5 business days 
+                      of my receipt of commission from the closing of any transaction with a 
+                      referred client.
+                    </p>
+                    <p className="mb-3">
+                      I understand that this is a legally binding agreement that applies to any 
+                      and all clients I am introduced to through the PropertyMatch platform, 
+                      regardless of when the transaction closes.
+                    </p>
+                    <p>
+                      By signing below, I acknowledge that I have read, understood, and agree 
+                      to abide by these terms.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Signature
+                  </label>
+                  <div className="border border-gray-300 rounded-md overflow-hidden mb-2">
+                    <SignatureCanvas
+                      ref={signatureRef}
+                      canvasProps={{
+                        className: "w-full h-40 bg-white",
+                      }}
+                      onEnd={() => {
+                        if (signatureRef.current) {
+                          setSignature(
+                            signatureRef.current.toDataURL("image/png")
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearSignature}
+                  >
+                    Clear Signature
+                  </Button>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="agreeToTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          I agree to the terms of this referral agreement
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="flex justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={previewAgreement}
+                  disabled={!signature || isSubmitting}
+                >
+                  Preview Agreement
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={!signature || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="mr-2 h-4 w-4" />
+                  )}
+                  Submit Agreement
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
       </Card>
+
+      {/* Preview Dialog */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Agreement Preview</DialogTitle>
+            <DialogDescription>
+              Review your agreement before submitting
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-full h-[70vh]">
+            {previewUrl && (
+              <iframe
+                src={previewUrl}
+                className="w-full h-full border-0"
+                title="Agreement Preview"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsPreviewOpen(false)}>
+              Close Preview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

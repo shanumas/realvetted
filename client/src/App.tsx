@@ -84,7 +84,7 @@ function HomePage() {
           // Check if agent has signed the referral agreement
           const checkReferralAgreement = async () => {
             try {
-              const response = await fetch('/api/agent/referral-agreement');
+              const response = await fetch('/api/agreements/agent-referral');
               const data = await response.json();
               
               if (!data.data) {

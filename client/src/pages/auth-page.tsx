@@ -247,25 +247,7 @@ export default function AuthPage() {
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
     
-    // Validate that agents have a profile photo
-    if (roleTab === "agent" && !values.profilePhotoUrl) {
-      toast({
-        title: "Profile Photo Required",
-        description: "Agents must upload a profile photo to register",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    // Validate that agents have a license number
-    if (roleTab === "agent" && !values.licenseNumber) {
-      toast({
-        title: "License Number Required",
-        description: "Agents must provide their real estate license number to register",
-        variant: "destructive"
-      });
-      return;
-    }
+    // Agent profile photo and license number are now collected after signup
     
     registerMutation.mutate({
       email: values.email,
@@ -505,104 +487,10 @@ export default function AuthPage() {
                     
                     {roleTab === "agent" && (
                       <>
-                      <FormField
-                        control={registerForm.control}
-                        name="licenseNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              License Number <span className="text-red-500">*</span>
-                            </FormLabel>
-                            <FormDescription>
-                              Enter your real estate license number
-                            </FormDescription>
-                            <div className="flex space-x-2">
-                              <FormControl>
-                                <Input 
-                                  placeholder="e.g. 01234567" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <Button 
-                                type="button" 
-                                variant="outline"
-                                onClick={() => field.value && handleLicenseLookup(field.value)}
-                                disabled={lookingUpLicense || !field.value}
-                              >
-                                {lookingUpLicense ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Lookup
-                              </Button>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={registerForm.control}
-                        name="profilePhotoUrl"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>
-                              Profile Photo <span className="text-red-500">*</span>
-                            </FormLabel>
-                            <FormDescription>
-                              Agents must upload a professional profile photo
-                            </FormDescription>
-                            <div className="flex flex-col items-center space-y-4">
-                              {previewImage ? (
-                                <div className="relative w-32 h-32 rounded-full overflow-hidden border-2 border-primary">
-                                  <img
-                                    src={previewImage}
-                                    alt="Profile preview"
-                                    className="w-full h-full object-cover"
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="destructive"
-                                    size="sm"
-                                    className="absolute bottom-0 right-0"
-                                    onClick={() => {
-                                      setPreviewImage("");
-                                      field.onChange("");
-                                    }}
-                                  >
-                                    ✕
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className="w-32 h-32 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300">
-                                  <ImageIcon className="h-12 w-12 text-gray-400" />
-                                </div>
-                              )}
-                              
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                              />
-                              
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={uploadingPhoto}
-                                className="flex items-center"
-                              >
-                                {uploadingPhoto ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Upload className="mr-2 h-4 w-4" />
-                                )}
-                                {field.value ? "Change Photo" : "Upload Photo"}
-                              </Button>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                        {/* Additional agent fields will be collected after signup */}
+                        <FormDescription className="text-center mt-2 mb-2">
+                          You will be asked to provide your license number and profile photo after creating your account.
+                        </FormDescription>
                       </>
                     )}
                     

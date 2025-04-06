@@ -4011,7 +4011,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
   // Agent Referral Agreement routes
   // Get agent referral agreement
-  app.get("/api/agent/referral-agreement", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+  app.get("/api/agreements/agent-referral", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
       // Find if the agent already has a referral agreement
       const existingAgreements = await storage.getAgreementsByAgent(req.user.id);
@@ -4048,8 +4048,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
   
-  // Submit agent referral agreement
-  app.post("/api/agent/referral-agreement", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+  // Preview agent referral agreement
+  app.post("/api/agreements/agent-referral/preview", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
       const {
         agentName,
@@ -4058,7 +4058,69 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         city,
         state,
         zip,
+        signature: agentSignature,
+        date
+      } = req.body;
+
+      if (!agentSignature) {
+        return res.status(400).json({
+          success: false,
+          error: "Agent signature is required"
+        });
+      }
+      
+      // Get the current agent for fallback values
+      const agent = await storage.getUser(req.user!.id);
+      
+      // Prepare the PDF document with form data
+      const formData = {
+        agentName: agentName || `${agent!.firstName || ''} ${agent!.lastName || ''}`.trim() || agent!.email,
+        licenseNumber: licenseNumber || agent?.licenseNumber || '',
+        address: address || agent?.addressLine1 || '',
+        city: city || agent?.city || '',
+        state: state || agent?.state || '',
+        zip: zip || agent?.zip || '',
         agentSignature,
+        date: date || new Date().toISOString().split('T')[0],
+        isEditable: false
+      };
+      
+      // Generate the PDF with agent data
+      const pdfBuffer = await fillAgentReferralForm(formData);
+      
+      // Add signature to PDF
+      const signedPdfBuffer = await addSignatureToPdf(
+        pdfBuffer,
+        agentSignature,
+        "agent"
+      );
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="agent_referral_agreement_preview.pdf"');
+      
+      // Send PDF as response
+      res.send(signedPdfBuffer);
+    } catch (error) {
+      console.error("Error generating preview for agent referral agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate preview for agent referral agreement"
+      });
+    }
+  });
+
+  // Submit agent referral agreement
+  app.post("/api/agreements/agent-referral", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+    try {
+      const {
+        agentName,
+        licenseNumber,
+        address,
+        city,
+        state,
+        zip,
+        signature: agentSignature,
         date
       } = req.body;
       

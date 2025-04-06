@@ -146,23 +146,7 @@ export const registerUserSchema = z.object({
   licenseNumber: z.string().optional(),
 })
 .superRefine((data, ctx) => {
-  // Require profile photo for agents
-  if (data.role === "agent" && !data.profilePhotoUrl) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Profile photo is required for agents",
-      path: ["profilePhotoUrl"]
-    });
-  }
-  
-  // Require license number for agents
-  if (data.role === "agent" && !data.licenseNumber) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "License number is required for agents",
-      path: ["licenseNumber"]
-    });
-  }
+  // Profile photo and license number for agents are now collected after registration
 });
 
 export const kycUpdateSchema = z.object({
