@@ -1414,6 +1414,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Get all agent referral agreements for admin
+  app.get(
+    "/api/admin/agent-referral-agreements",
+    isAuthenticated,
+    hasRole(["admin"]),
+    async (req, res) => {
+      try {
+        // Query all agreements of type "agent_referral"
+        const allAgreements = await storage.getAgreementsByType("agent_referral");
+        
+        // Get the agent details for each agreement
+        const agreementsWithDetails = await Promise.all(
+          allAgreements.map(async (agreement) => {
+            const agent = await storage.getUser(agreement.agentId);
+            return {
+              ...agreement,
+              agent: agent ? {
+                id: agent.id,
+                name: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
+                email: agent.email,
+                licenseNumber: agent.licenseNumber
+              } : null
+            };
+          })
+        );
+        
+        res.json({
+          success: true,
+          data: agreementsWithDetails
+        });
+      } catch (error) {
+        console.error("Error fetching agent referral agreements:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch agent referral agreements"
+        });
+      }
+    }
+  );
+
   app.get(
     "/api/admin/agents",
     isAuthenticated,
@@ -4207,18 +4247,26 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       // Create a URL for the document
       const documentUrl = `/uploads/agreements/${filename}`;
       
-      // Find the first property for the agent (or create a placeholder)
-      let propertyId = 1; // Default to 1 if no properties found
-      const agentProperties = await storage.getPropertiesByAgent(req.user.id);
-      if (agentProperties.length > 0) {
-        propertyId = agentProperties[0].id;
+      // Use property ID 0 to indicate this is not associated with a specific property
+      // This will ensure any "NaN" errors are avoided
+      const propertyId = 0;
+      
+      // Look for a placeholder buyer for system agreements
+      let buyerId = 0;
+      try {
+        const adminUsers = await storage.getUsersByRole("admin");
+        if (adminUsers.length > 0) {
+          buyerId = adminUsers[0].id;
+        }
+      } catch (error) {
+        console.warn("Could not find admin user, using 0 as buyerId placeholder");
       }
       
       // Create an agreement record
       const agreement = await storage.createAgreement({
         propertyId,
         agentId: req.user.id,
-        buyerId: 1, // Use a placeholder buyer ID
+        buyerId, // Use admin or 0 as placeholder
         type: "agent_referral",
         agreementText: "Agent Referral Fee Agreement (25% to Randy Brummett)",
         agentSignature,

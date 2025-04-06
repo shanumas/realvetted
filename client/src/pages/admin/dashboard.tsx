@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { User, Property } from "@shared/schema";
 import { 
-  Loader2, UserX, UserCheck, Shield, RefreshCw, Settings, Mail, Home, Users, UserCog
+  Loader2, UserX, UserCheck, Shield, RefreshCw, Settings, Mail, Home, Users, UserCog,
+  FileText, Download, Eye
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -235,6 +236,9 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="properties" className="flex items-center">
               <Home className="mr-2 h-4 w-4" /> Properties
+            </TabsTrigger>
+            <TabsTrigger value="agreements" className="flex items-center">
+              <FileText className="mr-2 h-4 w-4" /> Agreements
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center">
               <Settings className="mr-2 h-4 w-4" /> Settings
@@ -494,6 +498,93 @@ export default function AdminDashboard() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Agreements Tab */}
+          <TabsContent value="agreements">
+            <Card>
+              <CardHeader>
+                <CardTitle>Agent Referral Agreements</CardTitle>
+                <CardDescription>
+                  View signed agent referral agreements
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {/* Fetch agent referral agreements */}
+                {(() => {
+                  const { data: agreements, isLoading } = useQuery({
+                    queryKey: ["/api/admin/agent-referral-agreements"],
+                    queryFn: getQueryFn({ on401: "throw" }),
+                    enabled: activeTab === "agreements"
+                  });
+
+                  return (
+                    <>
+                      {isLoading ? (
+                        <div className="flex justify-center p-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      ) : !agreements?.data || agreements.data.length === 0 ? (
+                        <div className="text-center p-8 text-gray-500">
+                          <p>No agent referral agreements found.</p>
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Agent</TableHead>
+                              <TableHead>License #</TableHead>
+                              <TableHead>Signed Date</TableHead>
+                              <TableHead>Document</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {agreements.data.map((agreement) => (
+                              <TableRow key={agreement.id}>
+                                <TableCell>
+                                  {agreement.agent ? agreement.agent.name : 'Unknown Agent'}
+                                </TableCell>
+                                <TableCell>
+                                  {agreement.agent?.licenseNumber || 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                  {new Date(agreement.date).toLocaleDateString()}
+                                </TableCell>
+                                <TableCell>
+                                  {agreement.documentUrl ? (
+                                    <div className="flex gap-2">
+                                      <a 
+                                        href={agreement.documentUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                                      >
+                                        <Eye className="h-4 w-4 mr-1" />
+                                        View
+                                      </a>
+                                      <a 
+                                        href={agreement.documentUrl} 
+                                        download
+                                        className="inline-flex items-center text-green-600 hover:text-green-800 ml-2"
+                                      >
+                                        <Download className="h-4 w-4 mr-1" />
+                                        Download
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-400">No document</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
