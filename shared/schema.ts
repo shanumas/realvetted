@@ -92,7 +92,7 @@ export const agreements = pgTable("agreements", {
   propertyId: integer("property_id").notNull(),
   agentId: integer("agent_id").notNull(),
   buyerId: integer("buyer_id").notNull(),
-  type: text("type").notNull().default("standard"), // standard, agency_disclosure
+  type: text("type").notNull().default("standard"), // standard, agency_disclosure, agent_referral
   agreementText: text("agreement_text").notNull(),
   agentSignature: text("agent_signature"),
   buyerSignature: text("buyer_signature"),

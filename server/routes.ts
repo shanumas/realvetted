@@ -36,7 +36,9 @@ import {
   addSignatureToPdf,
   replacePlaceholderInPdf,
   AgencyDisclosureFormData,
+  AgentReferralFormData,
   fillAgencyDisclosureForm,
+  fillAgentReferralForm,
 } from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -3920,6 +3922,180 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           error instanceof Error
             ? error.message
             : "Failed to delete viewing request",
+      });
+    }
+  });
+
+  // Agent Referral Agreement routes
+  // Get agent referral agreement
+  app.get("/api/agent/referral-agreement", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+    try {
+      // Find if the agent already has a referral agreement
+      const existingAgreements = await storage.getAgreementsByAgent(req.user.id);
+      const referralAgreements = existingAgreements.filter(
+        (a) => a.type === "agent_referral"
+      );
+      
+      if (referralAgreements.length > 0) {
+        // Return the most recent agreement
+        const latestAgreement = referralAgreements[referralAgreements.length - 1];
+        
+        return res.json({
+          success: true,
+          data: {
+            id: latestAgreement.id,
+            status: latestAgreement.status,
+            documentUrl: latestAgreement.documentUrl,
+            date: latestAgreement.date,
+          }
+        });
+      }
+      
+      // No agreement found
+      return res.json({
+        success: true,
+        data: null
+      });
+    } catch (error) {
+      console.error("Error fetching agent referral agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve agent referral agreement"
+      });
+    }
+  });
+  
+  // Submit agent referral agreement
+  app.post("/api/agent/referral-agreement", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+    try {
+      const {
+        agentName,
+        licenseNumber,
+        address,
+        city,
+        state,
+        zip,
+        agentSignature,
+        date
+      } = req.body;
+      
+      if (!agentSignature) {
+        return res.status(400).json({
+          success: false,
+          error: "Agent signature is required"
+        });
+      }
+      
+      // Get the current agent
+      const agent = await storage.getUser(req.user.id);
+      
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: "Agent not found"
+        });
+      }
+      
+      // Find if the agent already has a referral agreement
+      const existingAgreements = await storage.getAgreementsByAgent(req.user.id);
+      const referralAgreements = existingAgreements.filter(
+        (a) => a.type === "agent_referral"
+      );
+      
+      // If agreement exists, just update it
+      if (referralAgreements.length > 0) {
+        const latestAgreement = referralAgreements[referralAgreements.length - 1];
+        return res.json({
+          success: true,
+          data: {
+            id: latestAgreement.id,
+            status: latestAgreement.status,
+            documentUrl: latestAgreement.documentUrl,
+            date: latestAgreement.date,
+          }
+        });
+      }
+      
+      // Create a new agreement
+      // First, prepare the PDF document
+      const formData = {
+        agentName: agentName || `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
+        licenseNumber: licenseNumber || '',
+        address: address || agent.addressLine1 || '',
+        city: city || agent.city || '',
+        state: state || agent.state || '',
+        zip: zip || agent.zip || '',
+        agentSignature,
+        date: date || new Date().toISOString().split('T')[0],
+        isEditable: false
+      };
+      
+      // Generate the PDF with agent data
+      const pdfBuffer = await fillAgentReferralForm(formData);
+      
+      // Add signature to PDF
+      const signedPdfBuffer = await addSignatureToPdf(
+        pdfBuffer,
+        agentSignature,
+        "agent"
+      );
+      
+      // Save PDF to disk
+      const uniqueId = Date.now();
+      const filename = `agent_referral_${req.user.id}_${uniqueId}.pdf`;
+      
+      // Create directory if it doesn't exist
+      await fs.promises.mkdir(
+        path.join(process.cwd(), "uploads", "agreements"),
+        { recursive: true }
+      );
+      
+      const filePath = path.join(
+        process.cwd(),
+        "uploads",
+        "agreements",
+        filename
+      );
+      
+      await fs.promises.writeFile(filePath, signedPdfBuffer);
+      
+      // Create a URL for the document
+      const documentUrl = `/uploads/agreements/${filename}`;
+      
+      // Find the first property for the agent (or create a placeholder)
+      let propertyId = 1; // Default to 1 if no properties found
+      const agentProperties = await storage.getPropertiesByAgent(req.user.id);
+      if (agentProperties.length > 0) {
+        propertyId = agentProperties[0].id;
+      }
+      
+      // Create an agreement record
+      const agreement = await storage.createAgreement({
+        propertyId,
+        agentId: req.user.id,
+        buyerId: 1, // Use a placeholder buyer ID
+        type: "agent_referral",
+        agreementText: "Agent Referral Fee Agreement (25% to Randy Brummett)",
+        agentSignature,
+        date: new Date(),
+        status: "completed",
+        documentUrl,
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          id: agreement.id,
+          status: agreement.status,
+          documentUrl,
+          date: agreement.date,
+        }
+      });
+    } catch (error) {
+      console.error("Error creating agent referral agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create agent referral agreement"
       });
     }
   });

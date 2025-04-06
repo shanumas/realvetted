@@ -12,6 +12,7 @@ import BuyerPropertyDetail from "@/pages/buyer/property-detail";
 import AgentKYC from "@/pages/agent/kyc-verification";
 import AgentDashboard from "@/pages/agent/dashboard";
 import AgentPropertyDetail from "@/pages/agent/property-detail";
+import AgentReferralAgreement from "@/pages/agent/referral-agreement";
 import SellerDashboard from "@/pages/seller/dashboard";
 import SellerPropertyDetail from "@/pages/seller/property-detail";
 import SellerPropertyView from "@/pages/seller/property-view";
@@ -30,6 +31,7 @@ function Router() {
       
       {/* Agent Routes */}
       <ProtectedRoute path="/agent/kyc" component={AgentKYC} allowedRoles={["agent"]} />
+      <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/dashboard" component={AgentDashboard} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/property/:id" component={AgentPropertyDetail} allowedRoles={["agent"]} />
       
@@ -78,12 +80,32 @@ function HomePage() {
           setLocation("/buyer/kyc");
         } else if (user.role === "agent" && user.profileStatus !== "verified") {
           setLocation("/agent/kyc");
+        } else if (user.role === "agent" && user.profileStatus === "verified") {
+          // Check if agent has signed the referral agreement
+          const checkReferralAgreement = async () => {
+            try {
+              const response = await fetch('/api/agent/referral-agreement');
+              const data = await response.json();
+              
+              if (!data.data) {
+                // No referral agreement found, redirect to sign
+                setLocation("/agent/referral-agreement");
+              } else {
+                // Agreement exists, go to dashboard
+                setLocation("/agent/dashboard");
+              }
+            } catch (error) {
+              console.error("Error checking referral agreement:", error);
+              // Default to dashboard
+              setLocation("/agent/dashboard");
+            }
+          };
+          
+          checkReferralAgreement();
         } else if (user.role === "buyer") {
           setLocation("/buyer/dashboard");
         } else if (user.role === "seller") {
           setLocation("/seller/dashboard");
-        } else if (user.role === "agent") {
-          setLocation("/agent/dashboard");
         } else if (user.role === "admin") {
           setLocation("/admin/dashboard");
         }

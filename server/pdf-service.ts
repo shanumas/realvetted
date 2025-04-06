@@ -41,6 +41,18 @@ export interface AgencyDisclosureFormData {
   isEditable?: boolean;
 }
 
+export interface AgentReferralFormData {
+  agentName?: string;
+  licenseNumber?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  agentSignature?: string;
+  date?: string;
+  isEditable?: boolean;
+}
+
 /**
  * Adds a signature image to a specific field in the PDF
  *
@@ -311,6 +323,129 @@ export async function fillAgencyDisclosureForm(
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const form = pdfDoc.getForm();
   
+  // Handle the editable flag
+  if (formData.isEditable === true) {
+    console.log('Keeping form fields editable as requested');
+    // For editable PDFs, we keep the form fields as is (not flattened)
+  } else {
+    // For non-editable PDFs, flatten the form fields
+    try {
+      form.flatten();
+      console.log('Flattened form fields (non-editable PDF)');
+    } catch (error) {
+      console.warn('Could not flatten form fields:', error);
+    }
+  }
+
+  // Save the document with appropriate options
+  const modifiedPdfBytes = await pdfDoc.save({
+    updateFieldAppearances: true // This updates the visual appearance of form fields
+  });
+
+  return Buffer.from(modifiedPdfBytes);
+}
+
+/**
+ * Fills out the agent referral fee agreement with the provided data
+ *
+ * @param formData Data to fill into the form fields
+ * @returns Buffer containing the filled PDF document
+ */
+export async function fillAgentReferralForm(
+  formData: AgentReferralFormData,
+  existingPdfBuffer?: Buffer,
+): Promise<Buffer> {
+  let pdfBuffer;
+
+  // If existing PDF buffer is provided, use it
+  if (existingPdfBuffer) {
+    console.log("Using existing PDF buffer for agent referral agreement");
+    pdfBuffer = existingPdfBuffer;
+  } else {
+    // Load the template PDF
+    console.log("Loading agent referral agreement template from file system");
+    const templatePath = path.join(process.cwd(), "uploads", "pdf", "agent_referral_agreement.pdf");
+    
+    try {
+      pdfBuffer = fs.readFileSync(templatePath);
+    } catch (error) {
+      console.error("Error reading agent referral agreement template PDF:", error);
+      throw new Error("Could not read agent referral agreement template PDF");
+    }
+  }
+
+  // Load the PDF document
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  const form = pdfDoc.getForm();
+  
+  // Fill in form fields
+  try {
+    // Agent Name
+    if (formData.agentName) {
+      try {
+        form.getTextField('agent_name').setText(formData.agentName);
+      } catch (error) {
+        console.warn("Could not set agent_name field:", error);
+      }
+    }
+    
+    // License Number
+    if (formData.licenseNumber) {
+      try {
+        form.getTextField('license_number').setText(formData.licenseNumber);
+      } catch (error) {
+        console.warn("Could not set license_number field:", error);
+      }
+    }
+    
+    // Address
+    if (formData.address) {
+      try {
+        form.getTextField('address').setText(formData.address);
+      } catch (error) {
+        console.warn("Could not set address field:", error);
+      }
+    }
+    
+    // City
+    if (formData.city) {
+      try {
+        form.getTextField('city').setText(formData.city);
+      } catch (error) {
+        console.warn("Could not set city field:", error);
+      }
+    }
+    
+    // State
+    if (formData.state) {
+      try {
+        form.getTextField('state').setText(formData.state);
+      } catch (error) {
+        console.warn("Could not set state field:", error);
+      }
+    }
+    
+    // Zip
+    if (formData.zip) {
+      try {
+        form.getTextField('zip').setText(formData.zip);
+      } catch (error) {
+        console.warn("Could not set zip field:", error);
+      }
+    }
+    
+    // Date
+    if (formData.date) {
+      try {
+        form.getTextField('date').setText(formData.date);
+      } catch (error) {
+        console.warn("Could not set date field:", error);
+      }
+    }
+  } catch (error) {
+    console.error("Error filling agent referral form fields:", error);
+  }
+
   // Handle the editable flag
   if (formData.isEditable === true) {
     console.log('Keeping form fields editable as requested');

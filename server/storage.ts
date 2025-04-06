@@ -62,6 +62,7 @@ export interface IStorage {
   // Agreement methods
   getAgreement(id: number): Promise<Agreement | undefined>;
   getAgreementsByProperty(propertyId: number): Promise<Agreement[]>;
+  getAgreementsByAgent(agentId: number): Promise<Agreement[]>;
   createAgreement(agreement: InsertAgreement): Promise<Agreement>;
   updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement>;
   
@@ -592,6 +593,13 @@ export class PgStorage implements IStorage {
     return await this.db.select()
       .from(agreements)
       .where(eq(agreements.propertyId, propertyId))
+      .orderBy(agreements.createdAt, "desc");
+  }
+  
+  async getAgreementsByAgent(agentId: number): Promise<Agreement[]> {
+    return await this.db.select()
+      .from(agreements)
+      .where(eq(agreements.agentId, agentId))
       .orderBy(agreements.createdAt, "desc");
   }
   
