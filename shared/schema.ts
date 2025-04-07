@@ -23,6 +23,7 @@ export const users = pgTable("users", {
   idBackUrl: text("id_back_url"),
   profilePhotoUrl: text("profile_photo_url"), // URL to the user's profile photo
   licenseNumber: text("license_number"), // Real estate license number for agents
+  brokerageName: text("brokerage_name"), // Brokerage name for agents
   isBlocked: boolean("is_blocked").default(false),
 });
 

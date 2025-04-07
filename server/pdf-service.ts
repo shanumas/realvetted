@@ -51,6 +51,11 @@ export interface AgentReferralFormData {
   agentSignature?: string;
   date?: string;
   isEditable?: boolean;
+  
+  // New fields for the enhanced referral form
+  brokerageName?: string;
+  phoneNumber?: string;
+  email?: string;
 }
 
 /**
@@ -380,12 +385,18 @@ export async function fillAgentReferralForm(
   
   // Fill in form fields
   try {
-    // Agent Name
+    // Agent Name - fill in both 'agent_name' (for backward compatibility) and 'agent' (new field)
     if (formData.agentName) {
       try {
         form.getTextField('agent_name').setText(formData.agentName);
       } catch (error) {
         console.warn("Could not set agent_name field:", error);
+      }
+      
+      try {
+        form.getTextField('agent').setText(formData.agentName);
+      } catch (error) {
+        console.warn("Could not set agent field:", error);
       }
     }
     
@@ -395,6 +406,33 @@ export async function fillAgentReferralForm(
         form.getTextField('license_number').setText(formData.licenseNumber);
       } catch (error) {
         console.warn("Could not set license_number field:", error);
+      }
+    }
+    
+    // Brokerage Name
+    if (formData.brokerageName) {
+      try {
+        form.getTextField('firm').setText(formData.brokerageName);
+      } catch (error) {
+        console.warn("Could not set firm field:", error);
+      }
+    }
+    
+    // Phone Number
+    if (formData.phoneNumber) {
+      try {
+        form.getTextField('agentPhone').setText(formData.phoneNumber);
+      } catch (error) {
+        console.warn("Could not set agentPhone field:", error);
+      }
+    }
+    
+    // Email
+    if (formData.email) {
+      try {
+        form.getTextField('agentEmail').setText(formData.email);
+      } catch (error) {
+        console.warn("Could not set agentEmail field:", error);
       }
     }
     
@@ -434,12 +472,27 @@ export async function fillAgentReferralForm(
       }
     }
     
-    // Date
+    // Date - fill in both 'date' (for backward compatibility) and 'today' (new field)
     if (formData.date) {
       try {
         form.getTextField('date').setText(formData.date);
       } catch (error) {
         console.warn("Could not set date field:", error);
+      }
+      
+      try {
+        form.getTextField('today').setText(formData.date);
+      } catch (error) {
+        console.warn("Could not set today field:", error);
+      }
+    }
+    
+    // Agent Signature - if there's a signature provided, set it in the 'agentSign' field
+    if (formData.agentSignature) {
+      try {
+        form.getTextField('agentSign').setText(formData.agentSignature);
+      } catch (error) {
+        console.warn("Could not set agentSign field:", error);
       }
     }
   } catch (error) {

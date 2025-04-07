@@ -52,7 +52,8 @@ async function generateAgentReferralAgreementTemplate() {
       color: rgb(0, 0, 0),
     });
     
-    const agentNameField = form.createTextField('agent_name');
+    // This field will be used for the agent's name (agent)
+    const agentNameField = form.createTextField('agent');
     agentNameField.addToPage(page, {
       x: margin + 100,
       y: 635,
@@ -76,9 +77,63 @@ async function generateAgentReferralAgreementTemplate() {
       height: 20,
     });
     
-    page.drawText('Address:', {
+    // Add brokerage firm name
+    page.drawText('Brokerage Firm:', {
       x: margin,
       y: 580,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // This field will be used for the brokerage firm name (firm)
+    const brokerageField = form.createTextField('firm');
+    brokerageField.addToPage(page, {
+      x: margin + 100,
+      y: 575,
+      width: 300,
+      height: 20,
+    });
+    
+    // Add phone number
+    page.drawText('Phone Number:', {
+      x: margin,
+      y: 550,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // This field will be used for the agent's phone number (agentPhone)
+    const phoneField = form.createTextField('agentPhone');
+    phoneField.addToPage(page, {
+      x: margin + 100,
+      y: 545,
+      width: 150,
+      height: 20,
+    });
+    
+    // Add email
+    page.drawText('Email:', {
+      x: margin,
+      y: 520,
+      size: 12,
+      font: helveticaFont,
+      color: rgb(0, 0, 0),
+    });
+    
+    // This field will be used for the agent's email (agentEmail)
+    const emailField = form.createTextField('agentEmail');
+    emailField.addToPage(page, {
+      x: margin + 100,
+      y: 515,
+      width: 300,
+      height: 20,
+    });
+    
+    page.drawText('Address:', {
+      x: margin,
+      y: 490,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -87,14 +142,15 @@ async function generateAgentReferralAgreementTemplate() {
     const addressField = form.createTextField('address');
     addressField.addToPage(page, {
       x: margin + 100,
-      y: 575,
+      y: 485,
       width: 300,
       height: 20,
     });
     
+    // City, State, Zip in one row
     page.drawText('City:', {
       x: margin,
-      y: 550,
+      y: 460,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -103,14 +159,14 @@ async function generateAgentReferralAgreementTemplate() {
     const cityField = form.createTextField('city');
     cityField.addToPage(page, {
       x: margin + 50,
-      y: 545,
+      y: 455,
       width: 150,
       height: 20,
     });
     
     page.drawText('State:', {
       x: margin + 210,
-      y: 550,
+      y: 460,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -119,14 +175,14 @@ async function generateAgentReferralAgreementTemplate() {
     const stateField = form.createTextField('state');
     stateField.addToPage(page, {
       x: margin + 250,
-      y: 545,
+      y: 455,
       width: 60,
       height: 20,
     });
     
     page.drawText('Zip:', {
       x: margin + 320,
-      y: 550,
+      y: 460,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -135,14 +191,14 @@ async function generateAgentReferralAgreementTemplate() {
     const zipField = form.createTextField('zip');
     zipField.addToPage(page, {
       x: margin + 350,
-      y: 545,
+      y: 455,
       width: 80,
       height: 20,
     });
     
     page.drawText('And', {
       x: margin,
-      y: 510,
+      y: 430,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -150,7 +206,7 @@ async function generateAgentReferralAgreementTemplate() {
     
     page.drawText('Randy Brummett ("Referral Party")', {
       x: margin,
-      y: 480,
+      y: 400,
       size: 12,
       font: helveticaFont,
       color: rgb(0, 0, 0),
@@ -249,10 +305,20 @@ async function generateAgentReferralAgreementTemplate() {
       color: rgb(0, 0, 0),
     });
     
+    // Create signature field (both with old name for backward compatibility and new name as requested)
     const agentSignatureField = form.createTextField('agent_signature');
     agentSignatureField.addToPage(page, {
       x: margin + 120,
       y: 175,
+      width: 200,
+      height: 20,
+    });
+    
+    // Create the agentSign field as requested
+    const agentSignField = form.createTextField('agentSign');
+    agentSignField.addToPage(page, {
+      x: margin + 120,
+      y: 150,
       width: 200,
       height: 20,
     });
@@ -265,10 +331,20 @@ async function generateAgentReferralAgreementTemplate() {
       color: rgb(0, 0, 0),
     });
     
+    // Today's date field
     const dateField = form.createTextField('date');
     dateField.addToPage(page, {
       x: margin + 370,
       y: 175,
+      width: 100,
+      height: 20,
+    });
+    
+    // Create today field as requested
+    const todayField = form.createTextField('today');
+    todayField.addToPage(page, {
+      x: margin + 370,
+      y: 150,
       width: 100,
       height: 20,
     });

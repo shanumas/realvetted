@@ -42,6 +42,9 @@ import { Loader2, RefreshCw, Check } from "lucide-react";
 const referralAgreementSchema = z.object({
   agentName: z.string().min(1, "Full name is required"),
   licenseNumber: z.string().min(1, "License number is required"),
+  brokerageName: z.string().min(1, "Brokerage name is required"),
+  phoneNumber: z.string().min(1, "Phone number is required"),
+  email: z.string().email("Invalid email address"),
   address: z.string().min(1, "Address is required"),
   city: z.string().min(1, "City is required"),
   state: z.string().min(1, "State is required"),
@@ -103,6 +106,9 @@ export default function ReferralAgreementPage() {
     defaultValues: {
       agentName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "",
       licenseNumber: user?.licenseNumber || "",
+      brokerageName: user?.brokerageName || "",
+      phoneNumber: user?.phone || "",
+      email: user?.email || "",
       address: user?.addressLine1 || "",
       city: user?.city || "",
       state: user?.state || "",
@@ -117,6 +123,9 @@ export default function ReferralAgreementPage() {
       form.reset({
         agentName: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
         licenseNumber: user.licenseNumber || "",
+        brokerageName: user.brokerageName || "",
+        phoneNumber: user.phone || "",
+        email: user.email || "",
         address: user.addressLine1 || "",
         city: user.city || "",
         state: user.state || "",
@@ -372,6 +381,50 @@ export default function ReferralAgreementPage() {
                   )}
                 />
               </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="brokerageName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Brokerage Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="tel" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="email" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

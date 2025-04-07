@@ -4099,7 +4099,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         state,
         zip,
         signature: agentSignature,
-        date
+        date,
+        // New fields
+        brokerageName,
+        phoneNumber,
+        email
       } = req.body;
 
       if (!agentSignature) {
@@ -4122,7 +4126,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         zip: zip || agent?.zip || '',
         agentSignature,
         date: date || new Date().toISOString().split('T')[0],
-        isEditable: false
+        isEditable: false,
+        // Add the new fields with fallbacks
+        brokerageName: brokerageName || agent?.brokerageName || '',
+        phoneNumber: phoneNumber || agent?.phone || '',
+        email: email || agent?.email || ''
       };
       
       // Generate the PDF with agent data
@@ -4161,7 +4169,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         state,
         zip,
         signature: agentSignature,
-        date
+        date,
+        // New fields
+        brokerageName,
+        phoneNumber,
+        email
       } = req.body;
       
       if (!agentSignature) {
@@ -4212,7 +4224,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         zip: zip || agent.zip || '',
         agentSignature,
         date: date || new Date().toISOString().split('T')[0],
-        isEditable: false
+        isEditable: false,
+        // Add the new fields with fallbacks
+        brokerageName: brokerageName || agent?.brokerageName || '',
+        phoneNumber: phoneNumber || agent?.phone || '',
+        email: email || agent?.email || ''
       };
       
       // Generate the PDF with agent data
