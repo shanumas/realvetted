@@ -4088,6 +4088,52 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
   
+  // Get prefilled agent referral agreement PDF
+  app.get("/api/agreements/agent-referral/pdf", isAuthenticated, hasRole(["agent"]), async (req, res) => {
+    try {
+      // Get the current agent
+      const agent = await storage.getUser(req.user.id);
+      
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: "Agent not found"
+        });
+      }
+      
+      // Prepare the PDF data with agent's information
+      const formData = {
+        agentName: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
+        licenseNumber: agent.licenseNumber || '',
+        address: agent.addressLine1 || '',
+        city: agent.city || '',
+        state: agent.state || '',
+        zip: agent.zip || '',
+        date: new Date().toISOString().split('T')[0],
+        isEditable: true, // Keep it editable for signing
+        brokerageName: agent.brokerageName || '',
+        phoneNumber: agent.phone || '',
+        email: agent.email || ''
+      };
+      
+      // Generate the PDF with agent data pre-filled
+      const pdfBuffer = await fillAgentReferralForm(formData);
+      
+      // Set response headers
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="agent_referral_agreement.pdf"');
+      
+      // Send PDF as response
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error generating agent referral agreement PDF:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to generate agent referral agreement PDF"
+      });
+    }
+  });
+  
   // Preview agent referral agreement
   app.post("/api/agreements/agent-referral/preview", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
@@ -4161,20 +4207,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   // Submit agent referral agreement
   app.post("/api/agreements/agent-referral", isAuthenticated, hasRole(["agent"]), async (req, res) => {
     try {
-      const {
-        agentName,
-        licenseNumber,
-        address,
-        city,
-        state,
-        zip,
-        signature: agentSignature,
-        date,
-        // New fields
-        brokerageName,
-        phoneNumber,
-        email
-      } = req.body;
+      const { signature: agentSignature, date } = req.body;
       
       if (!agentSignature) {
         return res.status(400).json({
@@ -4214,21 +4247,21 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       }
       
       // Create a new agreement
-      // First, prepare the PDF document
+      // Prepare the PDF document with agent's data from their profile
       const formData = {
-        agentName: agentName || `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
-        licenseNumber: licenseNumber || '',
-        address: address || agent.addressLine1 || '',
-        city: city || agent.city || '',
-        state: state || agent.state || '',
-        zip: zip || agent.zip || '',
+        agentName: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
+        licenseNumber: agent.licenseNumber || '',
+        address: agent.addressLine1 || '',
+        city: agent.city || '',
+        state: agent.state || '',
+        zip: agent.zip || '',
         agentSignature,
         date: date || new Date().toISOString().split('T')[0],
         isEditable: false,
-        // Add the new fields with fallbacks
-        brokerageName: brokerageName || agent?.brokerageName || '',
-        phoneNumber: phoneNumber || agent?.phone || '',
-        email: email || agent?.email || ''
+        // Add the agent profile data
+        brokerageName: agent.brokerageName || '',
+        phoneNumber: agent.phone || '',
+        email: agent.email || ''
       };
       
       // Generate the PDF with agent data
