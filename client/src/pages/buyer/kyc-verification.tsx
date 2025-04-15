@@ -119,8 +119,8 @@ export default function BuyerKYC() {
       const sessionData = await createVeriffSession();
       setVerificationSessionId(sessionData.sessionId);
       
-      // Launch Veriff verification
-      launchVeriff(sessionData.url, handleVerificationComplete);
+      // Launch Veriff verification with session ID
+      launchVeriff(sessionData.url, handleVerificationComplete, sessionData.sessionId);
       
       // Update UI
       setIsVerificationStarted(true);
@@ -158,8 +158,8 @@ export default function BuyerKYC() {
         let attemptCount = 0;
         const maxAttempts = 5;
         
-        // Show a loading toast that we're checking status
-        toast({
+        // Create a toast ID for status updates
+        const statusToastId = toast({
           title: "Checking verification status",
           description: "Please wait while we check your verification status...",
         });
@@ -169,10 +169,34 @@ export default function BuyerKYC() {
             // Wait before checking (start with 2 seconds, increase each time)
             await new Promise(resolve => setTimeout(resolve, 2000 + attemptCount * 1000));
             
-            // Force an update of the user's verification status
-            const forceResponse = await apiRequest("POST", "/api/users/force-verification");
+            // Force an update of the user's verification status, passing the session ID
+            const forceResponse = await apiRequest("POST", "/api/users/force-verification", {
+              sessionId: verificationSessionId
+            });
+            
             if (!forceResponse.ok) {
               console.warn("Failed to force verification update:", await forceResponse.text());
+              
+              // Update toast with attempt info
+              toast({
+                id: statusToastId,
+                title: "Checking verification status",
+                description: `Attempt ${attemptCount + 1}/${maxAttempts}. Waiting for verification...`,
+              });
+            } else {
+              // Try to get Veriff status from response
+              try {
+                const forceData = await forceResponse.json();
+                if (forceData.veriffStatus) {
+                  toast({
+                    id: statusToastId,
+                    title: "Verification Status",
+                    description: `Current Veriff status: ${forceData.veriffStatus}`,
+                  });
+                }
+              } catch (e) {
+                console.error("Error parsing force verification response:", e);
+              }
             }
             
             // Fetch the current user to get the latest profile status
@@ -184,6 +208,7 @@ export default function BuyerKYC() {
               if (userData.profileStatus === 'verified') {
                 verificationComplete = true;
                 toast({
+                  id: statusToastId,
                   title: "Verification Successful",
                   description: "Your identity has been verified successfully!",
                 });
@@ -193,6 +218,7 @@ export default function BuyerKYC() {
               } else if (userData.profileStatus === 'rejected') {
                 verificationComplete = true;
                 toast({
+                  id: statusToastId,
                   title: "Verification Failed",
                   description: "Your identity verification was rejected. Please try again.",
                   variant: "destructive",
@@ -206,6 +232,7 @@ export default function BuyerKYC() {
           // If we've tried the maximum number of times and still no change, just redirect
           if (!verificationComplete) {
             toast({
+              id: statusToastId,
               title: "Verification In Progress",
               description: "Your verification is still processing. You'll be notified when it completes.",
             });
@@ -216,6 +243,7 @@ export default function BuyerKYC() {
         } catch (error) {
           console.error("Error checking verification status:", error);
           toast({
+            id: statusToastId,
             title: "Status Check Failed",
             description: "We couldn't determine if your verification completed. Please check your dashboard for updates.",
             variant: "destructive",
