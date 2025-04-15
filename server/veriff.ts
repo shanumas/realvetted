@@ -1,6 +1,6 @@
 import { storage } from "./storage";
 import { User } from "@shared/schema";
-import {crypto} = from "crypto"
+import * as crypto from "crypto";
 
 // Veriff API key provided by the user
 const VERIFF_API_KEY = "1340b85e-5b2c-4223-8765-fb2f72901afa";
