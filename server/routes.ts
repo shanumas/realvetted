@@ -3420,21 +3420,20 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           });
         }
 
-        // Check if a viewing request already exists for this property and buyer
-        const existingRequests = await storage.getViewingRequestsByBuyer(
-          req.user!.id,
-        );
-        const existingRequestForProperty = existingRequests.find(
-          (request) =>
-            request.propertyId === requestData.propertyId &&
-            (request.status === "pending" ||
-              request.status === "approved" ||
-              request.status === "rescheduled"),
-        );
-
-        if (existingRequestForProperty) {
-          // If override flag is set, cancel the existing request before creating a new one
-          if (requestData.override) {
+        // Allow multiple viewing requests from the same buyer
+        // Only handle explicit override requests
+        if (requestData.override) {
+          // Get the most recent viewing request for this property by this buyer
+          const existingRequests = await storage.getViewingRequestsByBuyer(req.user!.id);
+          const existingRequestForProperty = existingRequests.find(
+            (request) =>
+              request.propertyId === requestData.propertyId &&
+              (request.status === "pending" ||
+                request.status === "approved" ||
+                request.status === "rescheduled"),
+          );
+          
+          if (existingRequestForProperty) {
             // Update the existing request to be canceled
             await storage.updateViewingRequest(existingRequestForProperty.id, {
               status: "canceled",
@@ -3451,17 +3450,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               details: {
                 oldRequestId: existingRequestForProperty.id,
                 oldRequestDate: existingRequestForProperty.requestedDate,
-              },
-            });
-          } else {
-            // If override flag is not set, return an error with information
-            return res.status(400).json({
-              success: false,
-              error:
-                "A viewing request for this property already exists. Please check your existing requests.",
-              data: {
-                existingRequestId: existingRequestForProperty.id,
-                existingRequestDate: existingRequestForProperty.requestedDate,
               },
             });
           }

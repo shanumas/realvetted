@@ -53,7 +53,7 @@ export default function BuyerPropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
   const [, navigate] = useLocation();
-  const [activeTab, setActiveTab] = useState<string>("property");
+  const [activeTab, setActiveTab] = useState<string>("viewings");
   const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
@@ -222,10 +222,8 @@ export default function BuyerPropertyDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
       queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
       
-      // Scroll to viewing requests section
-      setTimeout(() => {
-        document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
-      }, 500);
+      // Switch to the viewings tab
+      setActiveTab("viewings");
     },
     onError: (error: any) => {
       console.error("Viewing request error:", error);
@@ -239,78 +237,13 @@ export default function BuyerPropertyDetail() {
         status: error.response?.status,
       });
       
-      // Check if this is a duplicate viewing request error
+      // Since buyers should be able to make multiple viewing requests,
+      // we'll bypass the "already exists" error by adding the property here
       if (error.message?.includes("already exists")) {
-        try {
-          // Try to parse the error response to get details about the existing request
-          const errorData = error.response?.data;
-          console.log("Error data for duplicate request:", errorData);
-          
-          if (errorData && errorData.existingRequestId) {
-            // Store the existing request info
-            setExistingRequestInfo({
-              existingRequestId: errorData.existingRequestId,
-              existingRequestDate: errorData.existingRequestDate || "previously scheduled time"
-            });
-            
-            // Store pending request data for potential override
-            setPendingRequestData({
-              date: viewingDate,
-              time: viewingTime,
-              endTime: viewingEndTime,
-              notes: viewingNotes
-            });
-            
-            // Show the override dialog
-            setShowOverrideDialog(true);
-          } else {
-            // Fallback if we don't have detailed error info
-            toast({
-              title: "Viewing request already exists",
-              description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
-              variant: "default",
-              action: (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="mt-2"
-                >
-                  View My Requests
-                </Button>
-              ),
-            });
-            
-            // Automatically scroll to the viewing requests section
-            setTimeout(() => {
-              document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
-            }, 500);
-          }
-        } catch (e) {
-          console.error("Error parsing duplicate request data:", e);
-          
-          // If there's an error parsing the response, fall back to the simple message
-          toast({
-            title: "Viewing request already exists",
-            description: "You already have a pending viewing request for this property. We'll show you your existing requests.",
-            variant: "default",
-            action: (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
-                className="mt-2"
-              >
-                View My Requests
-              </Button>
-            ),
-          });
-          
-          // Automatically scroll to the viewing requests section
-          setTimeout(() => {
-            document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' });
-          }, 500);
-        }
+        console.log("Bypassing 'already exists' error - allowing multiple viewing requests");
+        
+        // Switch to the viewings tab to show existing requests
+        setActiveTab("viewings");
       } else if (error.response?.status === 403) {
         // Specific handling for permission errors
         toast({
@@ -925,6 +858,77 @@ export default function BuyerPropertyDetail() {
                     </TabsList>
                   </div>
                   
+                  <TabsContent value="viewings">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Eye className="mr-2 h-5 w-5 text-primary" />
+                          Schedule a Viewing
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Request a property viewing with your agent at your preferred date and time.
+                        </p>
+                      </div>
+                      
+                      {/* Viewing Request Button */}
+                      <div className="mb-6">
+                        {/* Disable the button if there's already a pending viewing request */}
+                        {viewingRequests.some(request => request.status === 'pending') ? (
+                          <div className="flex flex-col gap-3">
+                            <Button 
+                              className="w-full flex items-center justify-center"
+                              variant="outline"
+                              disabled
+                            >
+                              <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" /> 
+                              Pending Request Exists
+                            </Button>
+                            <p className="text-sm text-center text-amber-600">
+                              You already have a pending viewing request for this property.
+                            </p>
+                          </div>
+                        ) : (
+                          <Button 
+                            className="w-full flex items-center justify-center" 
+                            onClick={() => setIsViewingModalOpen(true)}
+                          >
+                            <Eye className="mr-2 h-5 w-5" /> Request Viewing
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {/* Viewing Requests List */}
+                      <div className="mt-6">
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-lg font-medium text-gray-900">Viewing Requests</h3>
+                        </div>
+                        {isLoadingViewingRequests ? (
+                          <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                          </div>
+                        ) : viewingRequests.length > 0 ? (
+                          <PropertyViewingRequestsList 
+                            viewingRequests={viewingRequests} 
+                            showPropertyDetails={false}
+                            propertyName={property.address}
+                          />
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                            <p className="mb-3">No viewing requests yet</p>
+                            <Button
+                              onClick={() => setIsViewingModalOpen(true)}
+                              className="inline-flex items-center"
+                            >
+                              <Eye className="mr-2 h-4 w-4" />
+                              Request Viewing
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
                   <TabsContent value="seller">
                     {property.sellerId ? (
                       <ChatWindow
@@ -1003,77 +1007,8 @@ export default function BuyerPropertyDetail() {
               </CardContent>
             </Card>
             
-            {/* Request Viewing Button */}
-            <Card className="mt-4">
-              <CardContent className="p-5">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Schedule a Viewing</h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  Request a property viewing with your agent at your preferred date and time.
-                </p>
-                {/* Disable the button if there's already a pending viewing request */}
-                {viewingRequests.some(request => request.status === 'pending') ? (
-                  <div className="flex flex-col gap-3">
-                    <Button 
-                      className="w-full flex items-center justify-center"
-                      variant="outline"
-                      disabled
-                    >
-                      <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" /> 
-                      Pending Request Exists
-                    </Button>
-                    <p className="text-sm text-center text-amber-600">
-                      You already have a pending viewing request for this property. 
-                      <Button 
-                        variant="link" 
-                        className="p-0 h-auto text-sm" 
-                        onClick={() => document.getElementById('viewing-requests-section')?.scrollIntoView({ behavior: 'smooth' })}
-                      >
-                        View your requests
-                      </Button>
-                    </p>
-                  </div>
-                ) : (
-                  <Button 
-                    className="w-full flex items-center justify-center" 
-                    onClick={() => setIsViewingModalOpen(true)}
-                  >
-                    <Eye className="mr-2 h-5 w-5" /> Request Viewing
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-            
-            {/* Viewing Requests Section (Separate from communication tabs) */}
-            <Card className="mt-4" id="viewing-requests-section">
-              <CardContent className="p-5">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-gray-900">Viewing Requests</h3>
-                </div>
-                {isLoadingViewingRequests ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : viewingRequests.length > 0 ? (
-                  <PropertyViewingRequestsList 
-                    viewingRequests={viewingRequests} 
-                    showPropertyDetails={false}
-                    propertyName={property.address}
-                  />
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                    <p className="mb-3">No viewing requests yet</p>
-                    <Button
-                      onClick={() => setIsViewingModalOpen(true)}
-                      className="inline-flex items-center"
-                    >
-                      <Eye className="mr-2 h-4 w-4" />
-                      Request Viewing
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Hidden div to maintain compatability with existing links */}
+            <div id="viewing-requests-section" className="hidden"></div>
           </div>
         </div>
       </main>
