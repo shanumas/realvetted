@@ -76,8 +76,10 @@ function HomePage() {
       // Only redirect if there's no saved location or the saved location is the root/auth page
       if (!lastLocation || lastLocation === '/' || lastLocation === '/auth') {
         // Default redirection based on role and verification status
-        if (user.role === "buyer" && user.profileStatus !== "verified") {
-          setLocation("/buyer/kyc");
+        if (user.role === "buyer") {
+          // Buyers go directly to dashboard regardless of verification status
+          // This allows tracking of buyer journey without requiring KYC
+          setLocation("/buyer/dashboard");
         } else if (user.role === "agent" && user.profileStatus !== "verified") {
           setLocation("/agent/kyc");
         } else if (user.role === "agent" && user.profileStatus === "verified") {
@@ -102,8 +104,6 @@ function HomePage() {
           };
           
           checkReferralAgreement();
-        } else if (user.role === "buyer") {
-          setLocation("/buyer/dashboard");
         } else if (user.role === "seller") {
           setLocation("/seller/dashboard");
         } else if (user.role === "admin") {
