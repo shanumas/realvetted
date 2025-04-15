@@ -613,6 +613,223 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
           
+          {/* Buyer Journey Tab */}
+          <TabsContent value="buyerJourney">
+            <Card>
+              <CardHeader>
+                <CardTitle>Buyer Journey Metrics</CardTitle>
+                <CardDescription>
+                  Track buyer progression through the platform funnel
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingBuyerJourney ? (
+                  <div className="flex justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : !buyerJourneyData?.success ? (
+                  <div className="text-center p-8 text-gray-500">
+                    <p>Error loading buyer journey metrics.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {/* Funnel Metrics Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <Card className="bg-white shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center mb-3">
+                              <Users className="h-6 w-6 text-blue-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                              {buyerJourneyData.data.totalBuyers}
+                            </h3>
+                            <p className="text-sm text-gray-500">Total Buyers</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-white shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
+                              <Home className="h-6 w-6 text-green-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                              {buyerJourneyData.data.buyersWithProperties}
+                            </h3>
+                            <p className="text-sm text-gray-500">Added Properties</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-white shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center mb-3">
+                              <MessageSquare className="h-6 w-6 text-purple-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                              {buyerJourneyData.data.buyersWithMessages}
+                            </h3>
+                            <p className="text-sm text-gray-500">Messaged with Agents</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      
+                      <Card className="bg-white shadow-sm">
+                        <CardContent className="pt-6">
+                          <div className="flex flex-col items-center text-center">
+                            <div className="h-12 w-12 rounded-full bg-orange-100 flex items-center justify-center mb-3">
+                              <Calendar className="h-6 w-6 text-orange-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+                              {buyerJourneyData.data.buyersWithViewings}
+                            </h3>
+                            <p className="text-sm text-gray-500">Requested Viewings</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    
+                    {/* Conversion Rates */}
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Conversion Rates</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <Card className="bg-white shadow-sm">
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col items-center text-center">
+                              <div className="flex items-center mb-2">
+                                <TrendingUp 
+                                  className={`h-5 w-5 mr-1 ${buyerJourneyData.data.conversionRates.toProperties > 50 ? 'text-green-600' : 'text-amber-600'}`} 
+                                />
+                                <span className="text-2xl font-bold">
+                                  {buyerJourneyData.data.conversionRates.toProperties.toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-500">Signup to Property</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-white shadow-sm">
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col items-center text-center">
+                              <div className="flex items-center mb-2">
+                                <TrendingUp 
+                                  className={`h-5 w-5 mr-1 ${buyerJourneyData.data.conversionRates.toMessages > 50 ? 'text-green-600' : 'text-amber-600'}`} 
+                                />
+                                <span className="text-2xl font-bold">
+                                  {buyerJourneyData.data.conversionRates.toMessages.toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-500">Property to Messages</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-white shadow-sm">
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col items-center text-center">
+                              <div className="flex items-center mb-2">
+                                <TrendingUp 
+                                  className={`h-5 w-5 mr-1 ${buyerJourneyData.data.conversionRates.toViewings > 50 ? 'text-green-600' : 'text-amber-600'}`} 
+                                />
+                                <span className="text-2xl font-bold">
+                                  {buyerJourneyData.data.conversionRates.toViewings.toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-500">Messages to Viewings</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        
+                        <Card className="bg-white shadow-sm">
+                          <CardContent className="pt-6">
+                            <div className="flex flex-col items-center text-center">
+                              <div className="flex items-center mb-2">
+                                <TrendingUp 
+                                  className={`h-5 w-5 mr-1 ${buyerJourneyData.data.conversionRates.overall > 30 ? 'text-green-600' : 'text-amber-600'}`} 
+                                />
+                                <span className="text-2xl font-bold">
+                                  {buyerJourneyData.data.conversionRates.overall.toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-500">Overall (Signup to Viewing)</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                    
+                    {/* User Journey Funnel Visualization */}
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">Buyer Journey Funnel</h3>
+                      <div className="relative bg-gray-100 rounded-lg p-4 h-[200px] flex items-end">
+                        {/* Signup Bar */}
+                        <div className="flex-1 mx-1 flex flex-col items-center">
+                          <div className="w-full bg-blue-500 rounded-t-md" style={{ height: `${100}%` }}></div>
+                          <div className="pt-2 text-sm text-center">
+                            <div className="font-semibold">{buyerJourneyData.data.totalBuyers}</div>
+                            <div className="text-xs text-gray-500">Signups</div>
+                          </div>
+                        </div>
+                        
+                        {/* Properties Bar */}
+                        <div className="flex-1 mx-1 flex flex-col items-center">
+                          <div 
+                            className="w-full bg-green-500 rounded-t-md" 
+                            style={{ 
+                              height: `${buyerJourneyData.data.totalBuyers > 0 
+                                ? (buyerJourneyData.data.buyersWithProperties / buyerJourneyData.data.totalBuyers) * 100 
+                                : 0}%` 
+                            }}
+                          ></div>
+                          <div className="pt-2 text-sm text-center">
+                            <div className="font-semibold">{buyerJourneyData.data.buyersWithProperties}</div>
+                            <div className="text-xs text-gray-500">Properties</div>
+                          </div>
+                        </div>
+                        
+                        {/* Messages Bar */}
+                        <div className="flex-1 mx-1 flex flex-col items-center">
+                          <div 
+                            className="w-full bg-purple-500 rounded-t-md" 
+                            style={{ 
+                              height: `${buyerJourneyData.data.totalBuyers > 0 
+                                ? (buyerJourneyData.data.buyersWithMessages / buyerJourneyData.data.totalBuyers) * 100 
+                                : 0}%` 
+                            }}
+                          ></div>
+                          <div className="pt-2 text-sm text-center">
+                            <div className="font-semibold">{buyerJourneyData.data.buyersWithMessages}</div>
+                            <div className="text-xs text-gray-500">Messages</div>
+                          </div>
+                        </div>
+                        
+                        {/* Viewings Bar */}
+                        <div className="flex-1 mx-1 flex flex-col items-center">
+                          <div 
+                            className="w-full bg-orange-500 rounded-t-md" 
+                            style={{ 
+                              height: `${buyerJourneyData.data.totalBuyers > 0 
+                                ? (buyerJourneyData.data.buyersWithViewings / buyerJourneyData.data.totalBuyers) * 100 
+                                : 0}%` 
+                            }}
+                          ></div>
+                          <div className="pt-2 text-sm text-center">
+                            <div className="font-semibold">{buyerJourneyData.data.buyersWithViewings}</div>
+                            <div className="text-xs text-gray-500">Viewings</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
           {/* Settings Tab */}
           <TabsContent value="settings">
             <Card>
