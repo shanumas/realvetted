@@ -723,6 +723,18 @@ export class PgStorage implements IStorage {
     
     return result[0];
   }
+  
+  async deleteViewingRequest(id: number): Promise<void> {
+    // First check if viewing request exists
+    const viewingRequest = await this.getViewingRequest(id);
+    if (!viewingRequest) {
+      throw new Error(`Viewing request with ID ${id} not found`);
+    }
+    
+    // Delete the viewing request
+    await this.db.delete(viewingRequests)
+      .where(eq(viewingRequests.id, id));
+  }
 }
 
 // Use the database storage implementation
