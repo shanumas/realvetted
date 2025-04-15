@@ -168,24 +168,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const status = await checkVeriffSessionStatus(sessionId);
+      console.log(`Checking verification status for session: ${sessionId}`);
       
-      // If the status is approved, update the user's profile status
-      if (status === 'approved' && req.user) {
-        await storage.updateUser(req.user.id, {
-          profileStatus: 'verified'
-        });
+      try {
+        const status = await checkVeriffSessionStatus(sessionId);
+        console.log(`Received verification status: ${status}`);
         
-        // Log the verification
-        console.log(`User ID ${req.user.id} automatically verified via background check.`);
+        // If the status is approved, update the user's profile status
+        if (status === 'approved' && req.user) {
+          await storage.updateUser(req.user.id, {
+            profileStatus: 'verified'
+          });
+          
+          // Log the verification
+          console.log(`User ID ${req.user.id} automatically verified via background check.`);
+        }
+        
+        res.json({
+          success: true,
+          status,
+          // Add explicit boolean for UI convenience
+          isVerified: status === 'approved'
+        });
+      } catch (veriffError) {
+        console.log("Verification not found or still in progress");
+        
+        // Return a more user-friendly response
+        res.json({
+          success: true,
+          status: "pending",
+          isVerified: false,
+          message: "Verification is still in progress or not yet started"
+        });
       }
-      
-      res.json({
-        success: true,
-        status,
-        // Add explicit boolean for UI convenience
-        isVerified: status === 'approved'
-      });
     } catch (error) {
       console.error("Veriff status check error:", error);
       res.status(500).json({

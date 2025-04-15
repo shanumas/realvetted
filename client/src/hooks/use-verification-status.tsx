@@ -41,7 +41,7 @@ export function useVerificationStatus(
         );
         const data = await response.json();
 
-        if (data.success && data.status === "approved") {
+        if (data.success && data.status === "success") {
           // Session is approved, refresh user data to get updated status
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 

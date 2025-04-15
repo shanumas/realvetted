@@ -110,37 +110,71 @@ export async function checkVeriffSessionStatus(
   sessionId: string,
 ): Promise<string> {
   try {
+    // Log the session ID being checked
+    console.log(`Checking Veriff session status for ID: ${sessionId}`);
+
     const signature = crypto
       .createHmac("sha256", SHARED_SECRET)
       .update(sessionId)
       .digest("hex");
-    const response = await fetch(
-      `https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`,
-      {
-        method: "GET",
-        headers: {
-          accept: "application/json",
-          "x-auth-client": VERIFF_API_KEY,
-          "x-hmac-signature": signature,
+
+    // Make the API request to Veriff
+    try {
+      const response = await fetch(
+        `https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`,
+        {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "x-auth-client": VERIFF_API_KEY,
+            "x-hmac-signature": signature,
+          },
         },
-      },
-    );
-
-    if (!response.ok) {
-      console.log("Response content:", await response.text());
-      if (response.status === 404) {
-        return "pending"; // Decision not made yet
-      }
-      console.log("Response content:", await response.text());
-      throw new Error(
-        `Failed to check Veriff session status: ${response.statusText}`,
       );
-    }
 
-    const data = await response.json();
-    return data.verification.status;
+      console.log(`Veriff API Response Status: ${response.status}`);
+
+      // Handle different response statuses appropriately
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log("Verification not found or still in progress");
+          return "pending"; // Decision not made yet
+        }
+
+        const errorText = await response.text();
+        console.log(`Error response from Veriff: ${errorText}`);
+        return "pending";
+      }
+
+      // Parse the JSON response if it's valid
+      const responseText = await response.text();
+      console.log(`Veriff API Response Body: ${responseText}`);
+
+      if (!responseText || responseText.trim() === "") {
+        console.log("Empty response from Veriff API");
+        return "pending";
+      }
+
+      try {
+        const data = JSON.parse(responseText);
+        if (data && data.status) {
+          console.log(`Verification status: ${data.status}`);
+          return data.status;
+        } else {
+          console.log("Invalid response format from Veriff API:", data);
+          return "pending";
+        }
+      } catch (jsonError) {
+        console.error("Error parsing Veriff API JSON response:", jsonError);
+        console.log("Raw response that couldn't be parsed:", responseText);
+        return "pending";
+      }
+    } catch (fetchError) {
+      console.error("Error fetching from Veriff API:", fetchError);
+      return "pending";
+    }
   } catch (error) {
     console.error("Error checking Veriff session status:", error);
-    return "error";
+    return "pending"; // Changed from "error" to "pending" for consistency
   }
 }
