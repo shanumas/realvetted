@@ -132,11 +132,16 @@ export async function checkVeriffSessionStatus(
       }
       console.log("Response content:", await response.text());
       throw new Error(
-        `Failed to check Veriff session status: ${response.status} ${response.statusText}`,
+        `Failed to check Veriff session status: ${response.statusText}`,
       );
     }
 
     const data = await response.json();
+    // Add null check before accessing status
+    if (!data || !data.verification) {
+      console.log("Unexpected response format:", data);
+      return "pending"; // Default to pending when data format is unexpected
+    }
     return data.verification.status;
   } catch (error) {
     console.error("Error checking Veriff session status:", error);
