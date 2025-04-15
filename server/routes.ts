@@ -206,25 +206,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Manual endpoint to update verification status (for testing or when webhook fails)
   app.post("/api/users/force-verification", isAuthenticated, async (req, res) => {
     try {
-      // Update the user's verification status to "verified"
-      const updatedUser = await storage.updateUser(req.user.id, {
-        profileStatus: "verified"
-      });
+      // Get the user's latest verification session ID
+      const user = await storage.getUser(req.user.id);
       
-      // Log the manual verification
-      await storage.createPropertyActivityLog({
-        propertyId: 0, // System log, not tied to property
-        userId: req.user.id,
-        activity: "identity_verification_manual_approval",
-        details: {
-          method: "manual",
-          previousStatus: req.user.profileStatus
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found"
+        });
+      }
+      
+      // Get the session ID either from request body or from the user's stored session ID
+      const verificationSessionId = req.body.sessionId || user.verificationSessionId;
+      
+      let veriffStatus = "pending";
+      let profileStatus = user.profileStatus;
+      
+      // If we have a session ID, check with Veriff
+      if (verificationSessionId) {
+        // Check the verification status with Veriff
+        veriffStatus = await checkVeriffSessionStatus(verificationSessionId);
+        
+        // Map Veriff status to our app status
+        if (veriffStatus === 'approved') {
+          profileStatus = 'verified';
+        } else if (veriffStatus === 'declined') {
+          profileStatus = 'rejected';
+        } else if (veriffStatus === 'submitted') {
+          profileStatus = 'pending';
         }
-      });
+      }
       
+      // Only update if the status has changed
+      if (profileStatus !== user.profileStatus) {
+        // Update the user's verification status
+        const updatedUser = await storage.updateUser(req.user.id, {
+          profileStatus: profileStatus,
+          verificationSessionId: verificationSessionId || user.verificationSessionId
+        });
+        
+        // Log the verification status change
+        await storage.createPropertyActivityLog({
+          propertyId: 0, // System log, not tied to property
+          userId: req.user.id,
+          activity: "identity_verification_status_update",
+          details: {
+            method: "veriff_check",
+            previousStatus: user.profileStatus,
+            newStatus: profileStatus,
+            sessionId: verificationSessionId
+          }
+        });
+        
+        return res.json({
+          success: true,
+          user: updatedUser,
+          veriffStatus: veriffStatus
+        });
+      }
+      
+      // Return current status if not changed
       res.json({
         success: true,
-        user: updatedUser
+        user: user,
+        veriffStatus: veriffStatus,
+        message: "Status is up to date"
       });
     } catch (error) {
       console.error("Manual verification error:", error);
