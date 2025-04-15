@@ -174,8 +174,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const status = await checkVeriffSessionStatus(sessionId);
         console.log(`Received verification status: ${status}`);
         
-        // If the status is approved, update the user's profile status
-        if (status === 'approved' && req.user) {
+        // If the status is approved or success, update the user's profile status
+        if ((status === 'approved' || status === 'success') && req.user) {
           await storage.updateUser(req.user.id, {
             profileStatus: 'verified'
           });
@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           success: true,
           status,
           // Add explicit boolean for UI convenience
-          isVerified: status === 'approved'
+          isVerified: status === 'approved' || status === 'success'
         });
       } catch (veriffError) {
         console.log("Verification not found or still in progress");
