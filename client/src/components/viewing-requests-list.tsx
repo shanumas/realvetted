@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, MessageSquare, Calendar, Clock, AlertCircle, FileSignature } from "lucide-react";
+import { Loader2, MessageSquare, Calendar, Clock, AlertCircle, FileSignature, X } from "lucide-react";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { ViewingRequestWithParticipants } from "@shared/types";
 import { useToast } from "@/hooks/use-toast";
