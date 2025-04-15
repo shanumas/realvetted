@@ -203,6 +203,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Manual endpoint to update verification status (for testing or when webhook fails)
+  app.post("/api/users/force-verification", isAuthenticated, async (req, res) => {
+    try {
+      // Update the user's verification status to "verified"
+      const updatedUser = await storage.updateUser(req.user.id, {
+        profileStatus: "verified"
+      });
+      
+      // Log the manual verification
+      await storage.createPropertyActivityLog({
+        propertyId: 0, // System log, not tied to property
+        userId: req.user.id,
+        activity: "identity_verification_manual_approval",
+        details: {
+          method: "manual",
+          previousStatus: req.user.profileStatus
+        }
+      });
+      
+      res.json({
+        success: true,
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Manual verification error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update verification status"
+      });
+    }
+  });
+  
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
     try {
       const data = kycUpdateSchema.parse(req.body);

@@ -9,10 +9,11 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { forceVerification } from "@/lib/verification";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -132,14 +133,48 @@ export default function BuyerDashboard() {
                         </svg>
                         Verification Pending
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate("/buyer/kyc?retry=true")}
-                        className="text-xs py-0.5"
-                      >
-                        Verify Now
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate("/buyer/kyc?retry=true")}
+                          className="text-xs py-0.5"
+                        >
+                          Verify Now
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              toast({
+                                title: "Forcing verification...",
+                                description: "Please wait while we update your verification status.",
+                              });
+                              
+                              await forceVerification();
+                              
+                              toast({
+                                title: "Verification Complete",
+                                description: "Your identity has been verified successfully.",
+                              });
+                              
+                              // Refresh the page to show the updated status
+                              window.location.reload();
+                            } catch (error) {
+                              toast({
+                                title: "Verification Failed",
+                                description: "Could not update verification status. Please try again later.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          className="text-xs py-0.5 bg-green-50 text-green-600 hover:bg-green-100"
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Force Verify
+                        </Button>
+                      </div>
                     </>
                   ) : user.profileStatus === 'rejected' ? (
                     <>

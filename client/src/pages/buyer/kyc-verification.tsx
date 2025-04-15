@@ -11,8 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { createVeriffSession, launchVeriff, checkVeriffStatus } from "@/lib/veriff";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Check, ExternalLink } from "lucide-react";
+import { Loader2, Check, ExternalLink, CheckCircle } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
+import { forceVerification } from "@/lib/verification";
 
 type KYCFormValues = z.infer<typeof kycUpdateSchema>;
 
