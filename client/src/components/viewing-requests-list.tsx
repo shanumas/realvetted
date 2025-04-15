@@ -114,9 +114,39 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
       });
     },
   });
+  
+  // Cancel viewing request mutation
+  const cancelRequestMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("DELETE", `/api/viewing-requests/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Viewing request cancelled",
+        description: "Your viewing request has been cancelled successfully.",
+      });
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: [endpoint] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error cancelling viewing request",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleStatusChange = (id: number, status: string) => {
     updateRequestMutation.mutate({ id, status });
+  };
+  
+  const handleCancelRequest = (id: number) => {
+    if (confirm("Are you sure you want to cancel this viewing request?")) {
+      cancelRequestMutation.mutate(id);
+    }
   };
 
   // Get counts for badges
@@ -268,6 +298,23 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                               View Property
                             </Button>
                           </Link>
+                          
+                          {/* Cancel button for buyers (and for pending or accepted requests) */}
+                          {role === 'buyer' && (request.status === 'pending' || request.status === 'accepted') && (
+                            <Button 
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleCancelRequest(request.id)}
+                              disabled={cancelRequestMutation.isPending}
+                            >
+                              {cancelRequestMutation.isPending && request.id === (cancelRequestMutation.variables as number) ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4 mr-1" />
+                              )}
+                              Cancel Viewing
+                            </Button>
+                          )}
                           
                           {role === 'agent' && request.status === 'pending' && (
                             <>
