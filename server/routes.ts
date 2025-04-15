@@ -1545,6 +1545,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+  
+  // Agent Journey Metrics
+  app.get(
+    "/api/admin/agent-journey-metrics",
+    isAuthenticated,
+    hasRole(["admin"]),
+    async (req, res) => {
+      try {
+        // Get all agents
+        const agents = await storage.getUsersByRole("agent");
+        const totalAgents = agents.length;
+        
+        // Get all properties
+        const properties = await storage.getAllProperties();
+        
+        // Count unique agents who have been assigned to properties
+        const uniqueAgentsWithProperties = new Set(properties.filter(property => property.agentId !== null).map(property => property.agentId));
+        const agentsWithAssignedProperties = uniqueAgentsWithProperties.size;
+        
+        // Get all messages
+        const allMessages = await storage.getMessagesByProperty(0, true);
+        
+        // Count unique agents who have sent/received messages
+        const uniqueAgentsWithMessages = new Set();
+        allMessages.forEach(message => {
+          const sender = message.senderId;
+          const receiver = message.receiverId;
+          
+          // Get the sender and receiver details
+          const senderDetails = agents.find(user => user.id === sender);
+          const receiverDetails = agents.find(user => user.id === receiver);
+          
+          // If sender is an agent, count them
+          if (senderDetails && senderDetails.role === "agent") {
+            uniqueAgentsWithMessages.add(sender);
+          }
+          // If receiver is an agent, count them
+          if (receiverDetails && receiverDetails.role === "agent") {
+            uniqueAgentsWithMessages.add(receiver);
+          }
+        });
+        const agentsWithMessages = uniqueAgentsWithMessages.size;
+        
+        // Get all viewing requests
+        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
+        
+        // Count unique agents who have handled viewing requests
+        const uniqueAgentsWithViewings = new Set(allViewingRequests.filter(request => request.agentId !== null).map(request => request.agentId));
+        const agentsWithViewings = uniqueAgentsWithViewings.size;
+        
+        // Get all agreements
+        const allAgreements = await storage.getAgreementsByType("all");
+        
+        // Count unique agents who have agreements
+        const uniqueAgentsWithAgreements = new Set(allAgreements.filter(agreement => agreement.agentId !== null).map(agreement => agreement.agentId));
+        const agentsWithAgreements = uniqueAgentsWithAgreements.size;
+        
+        res.json({
+          success: true,
+          data: {
+            totalAgents,
+            agentsWithAssignedProperties,
+            agentsWithMessages,
+            agentsWithViewings,
+            agentsWithAgreements,
+            conversionRates: {
+              toProperties: totalAgents > 0 ? (agentsWithAssignedProperties / totalAgents) * 100 : 0,
+              toMessages: agentsWithAssignedProperties > 0 ? (agentsWithMessages / agentsWithAssignedProperties) * 100 : 0,
+              toViewings: agentsWithMessages > 0 ? (agentsWithViewings / agentsWithMessages) * 100 : 0,
+              toAgreements: agentsWithViewings > 0 ? (agentsWithAgreements / agentsWithViewings) * 100 : 0,
+              overall: totalAgents > 0 ? (agentsWithAgreements / totalAgents) * 100 : 0
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Get agent journey metrics error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch agent journey metrics",
+        });
+      }
+    },
+  );
+  
+  // Seller Journey Metrics
+  app.get(
+    "/api/admin/seller-journey-metrics",
+    isAuthenticated,
+    hasRole(["admin"]),
+    async (req, res) => {
+      try {
+        // Get all sellers
+        const sellers = await storage.getUsersByRole("seller");
+        const totalSellers = sellers.length;
+        
+        // Get all properties
+        const properties = await storage.getAllProperties();
+        
+        // Count unique sellers who have properties
+        const uniqueSellersWithProperties = new Set(properties.filter(property => property.sellerId !== null).map(property => property.sellerId));
+        const sellersWithListedProperties = uniqueSellersWithProperties.size;
+        
+        // Get all messages
+        const allMessages = await storage.getMessagesByProperty(0, true);
+        
+        // Count unique sellers who have sent/received messages
+        const uniqueSellersWithMessages = new Set();
+        allMessages.forEach(message => {
+          const sender = message.senderId;
+          const receiver = message.receiverId;
+          
+          // Get the sender and receiver details
+          const senderDetails = sellers.find(user => user.id === sender);
+          const receiverDetails = sellers.find(user => user.id === receiver);
+          
+          // If sender is a seller, count them
+          if (senderDetails && senderDetails.role === "seller") {
+            uniqueSellersWithMessages.add(sender);
+          }
+          // If receiver is a seller, count them
+          if (receiverDetails && receiverDetails.role === "seller") {
+            uniqueSellersWithMessages.add(receiver);
+          }
+        });
+        const sellersWithMessages = uniqueSellersWithMessages.size;
+        
+        // Get all viewing requests for seller's properties
+        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
+        
+        // Find properties with sellers
+        const propertiesWithSellers = properties.filter(property => property.sellerId !== null);
+        
+        // Count unique sellers who have viewing requests for their properties
+        const sellersWithViewingRequests = new Set();
+        
+        allViewingRequests.forEach(request => {
+          const property = propertiesWithSellers.find(p => p.id === request.propertyId);
+          if (property && property.sellerId) {
+            sellersWithViewingRequests.add(property.sellerId);
+          }
+        });
+        
+        const sellersWithViewingRequestsCount = sellersWithViewingRequests.size;
+        
+        res.json({
+          success: true,
+          data: {
+            totalSellers,
+            sellersWithListedProperties,
+            sellersWithMessages,
+            sellersWithViewingRequests: sellersWithViewingRequestsCount,
+            conversionRates: {
+              toProperties: totalSellers > 0 ? (sellersWithListedProperties / totalSellers) * 100 : 0,
+              toMessages: sellersWithListedProperties > 0 ? (sellersWithMessages / sellersWithListedProperties) * 100 : 0,
+              toViewings: sellersWithMessages > 0 ? (sellersWithViewingRequestsCount / sellersWithMessages) * 100 : 0,
+              overall: totalSellers > 0 ? (sellersWithViewingRequestsCount / totalSellers) * 100 : 0
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Get seller journey metrics error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch seller journey metrics",
+        });
+      }
+    },
+  );
 
   app.put(
     "/api/admin/users/:id/block",
