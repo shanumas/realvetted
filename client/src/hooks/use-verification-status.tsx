@@ -22,6 +22,7 @@ export function useVerificationStatus(
   const shouldCheck =
     user &&
     user.profileStatus !== "verified" &&
+    sessionId && // Only check if we have a session ID
     (!lastChecked || new Date().getTime() - lastChecked.getTime() > interval);
 
   // Function to check verification status

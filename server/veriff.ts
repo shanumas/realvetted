@@ -79,7 +79,7 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
 
     // Map Veriff statuses to our app's status
     switch (status) {
-      case "approved":
+      case "success":
         profileStatus = "verified";
         break;
       case "declined":
