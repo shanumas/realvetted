@@ -170,9 +170,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const status = await checkVeriffSessionStatus(sessionId);
       
+      // If the status is approved, update the user's profile status
+      if (status === 'approved' && req.user) {
+        await storage.updateUser(req.user.id, {
+          profileStatus: 'verified'
+        });
+        
+        // Log the verification
+        console.log(`User ID ${req.user.id} automatically verified via background check.`);
+      }
+      
       res.json({
         success: true,
-        status
+        status,
+        // Add explicit boolean for UI convenience
+        isVerified: status === 'approved'
       });
     } catch (error) {
       console.error("Veriff status check error:", error);

@@ -47,6 +47,9 @@ export default function BuyerKYC() {
       const sessionData = await createVeriffSession();
       setVerificationSessionId(sessionData.sessionId);
       
+      // Store session ID in localStorage to allow background checking
+      localStorage.setItem('veriffSessionId', sessionData.sessionId);
+      
       // Launch Veriff verification
       launchVeriff(sessionData.url, handleVerificationComplete);
       

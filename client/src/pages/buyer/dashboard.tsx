@@ -9,8 +9,9 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -29,6 +30,13 @@ export default function BuyerDashboard() {
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
+  
+  // Get stored verification session ID if it exists
+  const storedSessionId = localStorage.getItem('veriffSessionId');
+  
+  // Use the verification status hook
+  const { checking, isVerified, lastChecked } = useVerificationStatus(storedSessionId);
+  
   // Check if there's a tab preference stored in localStorage
   const [activeTab, setActiveTab] = useState(() => {
     // Read from localStorage or default to properties
@@ -118,14 +126,32 @@ export default function BuyerDashboard() {
                 <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
                   <div className="flex">
                     <div className="flex-shrink-0">
-                      <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
+                      {checking ? (
+                        <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+                      ) : (
+                        <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      )}
                     </div>
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-yellow-800">Verification Pending</h3>
+                    <div className="ml-3 flex-grow">
+                      <div className="flex justify-between items-start">
+                        <h3 className="text-sm font-medium text-yellow-800">Verification Pending</h3>
+                        {storedSessionId && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {checking ? "Checking status..." : "Auto-checking enabled"}
+                          </span>
+                        )}
+                      </div>
                       <div className="mt-1 text-xs text-yellow-700">
-                        <p>Your identity verification is still pending. <Link href="/buyer/kyc" className="font-medium underline">Complete verification</Link> to unlock all features.</p>
+                        <p>
+                          {storedSessionId 
+                            ? "We're checking your verification status in the background. " 
+                            : "Your identity verification is still pending. "}
+                          <Link href="/buyer/kyc" className="font-medium underline">
+                            {storedSessionId ? "Verify again" : "Complete verification"}
+                          </Link> to unlock all features.
+                        </p>
                       </div>
                     </div>
                   </div>
