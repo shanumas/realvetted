@@ -24,6 +24,7 @@ export default function BuyerKYC() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
   
   // Check for URL parameters to see if we're in "retry" mode
   useEffect(() => {

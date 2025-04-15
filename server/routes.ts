@@ -173,11 +173,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Check the verification status with Veriff
       const status = await checkVeriffSessionStatus(sessionId);
+      console.log(`API - Checking status for session ${sessionId}: ${status}`);
+      
+      // If the status is approved, update the user's verification status
+      if (status === 'approved' || 
+          status === 'accepted' || 
+          status === 'completed' || 
+          status === 'verified') {
+        try {
+          // Find the user with this session ID
+          const users = await storage.getAllUsers();
+          const user = users.find(u => u.verificationSessionId === sessionId);
+          
+          if (user) {
+            console.log(`Found user ${user.id} with session ID ${sessionId}, updating status to verified`);
+            await storage.updateUser(user.id, {
+              profileStatus: 'verified'
+            });
+            
+            // Log the verification
+            await storage.createPropertyActivityLog({
+              propertyId: 0, // System log
+              userId: user.id,
+              activity: "identity_verification_status_update",
+              details: {
+                method: "status_check",
+                previousStatus: user.profileStatus,
+                newStatus: 'verified',
+                sessionId: sessionId
+              }
+            });
+          }
+        } catch (updateError) {
+          console.error("Error updating user verification status:", updateError);
+          // Continue with returning the status even if update fails
+        }
+      }
       
       res.json({
         success: true,
-        status
+        status,
+        sessionId
       });
     } catch (error) {
       console.error("Veriff status check error:", error);
