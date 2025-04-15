@@ -20,6 +20,7 @@ import {
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
+import { AgentEmailEditor } from "@/components/agent-email-editor";
 import {
   Dialog,
   DialogContent,
@@ -960,7 +961,23 @@ export default function BuyerPropertyDetail() {
                     )}
                   </TabsContent>
                   
-
+                  <TabsContent value="agent-email">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Mail className="mr-2 h-5 w-5 text-primary" />
+                          Agent Email Settings
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Update the listing agent's email address for this property
+                        </p>
+                      </div>
+                      <AgentEmailEditor 
+                        propertyId={propertyId} 
+                        currentEmail={property.sellerEmail || ""} 
+                      />
+                    </div>
+                  </TabsContent>
                 
                   <TabsContent value="activity">
                     <div className="p-4">
