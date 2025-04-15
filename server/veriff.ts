@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { User } from '@shared/schema';
 
 // Veriff API key provided by the user
-const VERIFF_API_KEY = '622b56e6-c765-4ff2-b99f-21df14b762ea';
+const VERIFF_API_KEY = '1340b85e-5b2c-4223-8765-fb2f72901afa';
 
 /**
  * Creates a new Veriff verification session for a user
@@ -12,7 +12,7 @@ const VERIFF_API_KEY = '622b56e6-c765-4ff2-b99f-21df14b762ea';
 export async function createVeriffSession(user: User): Promise<{ url: string; sessionId: string }> {
   try {
     // Create a Veriff verification session
-    const response = await fetch('https://api.veriff.me/v1/sessions', {
+    const response = await fetch('https://stationapi.veriff.com/v1/sessions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +101,7 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
  */
 export async function checkVeriffSessionStatus(sessionId: string): Promise<string> {
   try {
-    const response = await fetch(`https://api.veriff.me/v1/sessions/${sessionId}/decision`, {
+    const response = await fetch(`https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`, {
       method: 'GET',
       headers: {
         'X-AUTH-CLIENT': VERIFF_API_KEY
