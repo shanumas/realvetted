@@ -924,6 +924,7 @@ export default function BuyerPropertyDetail() {
                             viewingRequests={viewingRequests} 
                             showPropertyDetails={false}
                             propertyName={property.address}
+                            propertyId={propertyId}
                             viewAs="buyer"
                           />
                         ) : (
