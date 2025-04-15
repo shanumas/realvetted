@@ -897,7 +897,13 @@ export default function BuyerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-4">
+                    <TabsList className="w-full grid grid-cols-5">
+                      <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <Eye className="mr-1 h-4 w-4" /> 
+                          Viewings
+                        </span>
+                      </TabsTrigger>
                       <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Seller Chat
                       </TabsTrigger>
