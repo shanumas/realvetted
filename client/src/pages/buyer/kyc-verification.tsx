@@ -24,15 +24,16 @@ export default function BuyerKYC() {
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
   
-  // Redirect to dashboard if the user has already completed or initiated verification
+  // Check for URL parameters to see if we're in "retry" mode
   useEffect(() => {
-    if (user && (user.profileStatus === 'verified' || user.profileStatus === 'pending')) {
-      // User has already started or completed verification, redirect to dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const retry = urlParams.get('retry');
+    
+    // Only redirect if not in retry mode AND user is verified/pending
+    if (!retry && user && (user.profileStatus === 'verified')) {
       toast({
         title: "Verification status",
-        description: user.profileStatus === 'verified' 
-          ? "Your identity is already verified" 
-          : "Your verification is in progress",
+        description: "Your identity is already verified",
       });
       
       navigate("/buyer/dashboard");
