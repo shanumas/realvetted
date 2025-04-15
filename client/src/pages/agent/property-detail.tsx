@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
-import { ViewingRequestsList } from "@/components/viewing-requests-list";
+import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
 import { AgentEmailEditor } from "@/components/agent-email-editor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -340,7 +340,10 @@ export default function AgentPropertyDetail() {
                           Manage viewing requests from buyers
                         </p>
                       </div>
-                      <ViewingRequestsList propertyId={propertyId} />
+                      <PropertyViewingRequestsList 
+                        propertyId={propertyId} 
+                        viewAs="agent"
+                      />
                     </div>
                   </TabsContent>
                   
@@ -401,7 +404,7 @@ export default function AgentPropertyDetail() {
                           
                           {/* Fetch agreements for this property */}
                           {(() => {
-                            const { data: agreements, isLoading: loadingAgreements } = useQuery({
+                            const { data: agreements = [], isLoading: loadingAgreements } = useQuery<any[]>({
                               queryKey: [`/api/properties/${propertyId}/agreements`],
                               queryFn: getQueryFn({ on401: "throw" }),
                             });
@@ -491,6 +494,32 @@ export default function AgentPropertyDetail() {
                             );
                           })()}
                         </div>
+                      </div>
+                    </div>
+                  </TabsContent>
+                  
+                  <TabsContent value="email">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Mail className="mr-2 h-5 w-5 text-primary" />
+                          Listing Agent Contact Email
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Set or update the contact email for this property listing
+                        </p>
+                      </div>
+                      
+                      <div className="mt-4">
+                        <AgentEmailEditor 
+                          propertyId={propertyId} 
+                          currentEmail={property.sellerEmail} 
+                        />
+                      </div>
+                      
+                      <div className="mt-6 text-sm text-gray-500 bg-gray-50 p-4 rounded-md">
+                        <p>This email will be displayed to buyers and sellers as the primary contact for this property.</p>
+                        <p className="mt-2">Use an email address that you check regularly to ensure you don't miss important inquiries.</p>
                       </div>
                     </div>
                   </TabsContent>
