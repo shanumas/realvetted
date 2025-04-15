@@ -12,6 +12,7 @@ import {
   extractPropertyFromUrl,
 } from "./openai";
 import { lookupCaliforniaLicense } from "./license-lookup";
+import { createVeriffSession, checkVeriffSessionStatus } from "./veriff";
 import {
   propertySchema,
   agentLeadSchema,
@@ -123,6 +124,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false, 
         error: "Failed to look up license information"
+      });
+    }
+  });
+  
+  // Veriff integration routes
+  app.post("/api/veriff/create-session", isAuthenticated, async (req, res) => {
+    try {
+      // Make sure user exists
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized"
+        });
+      }
+      
+      // Create a Veriff session
+      const sessionData = await createVeriffSession(req.user);
+      
+      res.json({
+        success: true,
+        url: sessionData.url,
+        sessionId: sessionData.sessionId
+      });
+    } catch (error) {
+      console.error("Veriff session creation error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create verification session"
+      });
+    }
+  });
+  
+  // Check Veriff session status
+  app.get("/api/veriff/status/:sessionId", isAuthenticated, async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: "Session ID is required"
+        });
+      }
+      
+      const status = await checkVeriffSessionStatus(sessionId);
+      
+      res.json({
+        success: true,
+        status
+      });
+    } catch (error) {
+      console.error("Veriff status check error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check verification status"
+      });
+    }
+  });
+  
+  // Webhook for Veriff callbacks
+  app.post("/api/veriff/webhook", async (req, res) => {
+    try {
+      // Validate webhook authenticity if needed
+      
+      const webhookData = req.body;
+      
+      // Process the webhook data
+      await processVeriffWebhook(webhookData);
+      
+      res.status(200).send("Webhook received");
+    } catch (error) {
+      console.error("Veriff webhook processing error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to process webhook"
       });
     }
   });
