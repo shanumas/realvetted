@@ -1471,6 +1471,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+  
+  // Get buyer journey metrics for admin dashboard
+  app.get(
+    "/api/admin/buyer-journey-metrics",
+    isAuthenticated,
+    hasRole(["admin"]),
+    async (req, res) => {
+      try {
+        // Get all buyers
+        const buyers = await storage.getUsersByRole("buyer");
+        const totalBuyers = buyers.length;
+        
+        // Get all properties
+        const properties = await storage.getAllProperties();
+        const propertiesWithBuyerIds = properties.filter(property => property.createdBy !== null);
+        
+        // Count unique buyers who have created properties
+        const uniqueBuyersWithProperties = new Set(propertiesWithBuyerIds.map(property => property.createdBy));
+        const buyersWithProperties = uniqueBuyersWithProperties.size;
+        
+        // Get all messages
+        const allMessages = await storage.getMessagesByProperty(0, true);
+        
+        // Count unique buyers who have messaged with agents
+        const uniqueBuyersWithMessages = new Set();
+        allMessages.forEach(message => {
+          const sender = message.senderId;
+          const receiver = message.receiverId;
+          
+          // Get the sender and receiver details
+          const senderDetails = buyers.find(user => user.id === sender);
+          const receiverDetails = buyers.find(user => user.id === receiver);
+          
+          // If sender is a buyer and receiver is an agent, or vice versa, count this buyer
+          if (senderDetails && senderDetails.role === "buyer") {
+            uniqueBuyersWithMessages.add(sender);
+          }
+          if (receiverDetails && receiverDetails.role === "buyer") {
+            uniqueBuyersWithMessages.add(receiver);
+          }
+        });
+        const buyersWithMessages = uniqueBuyersWithMessages.size;
+        
+        // Get all viewing requests
+        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
+        
+        // Count unique buyers who have made viewing requests
+        const uniqueBuyersWithViewings = new Set(allViewingRequests.map(request => request.buyerId));
+        const buyersWithViewings = uniqueBuyersWithViewings.size;
+        
+        res.json({
+          success: true,
+          data: {
+            totalBuyers,
+            buyersWithProperties,
+            buyersWithMessages,
+            buyersWithViewings,
+            conversionRates: {
+              toProperties: totalBuyers > 0 ? (buyersWithProperties / totalBuyers) * 100 : 0,
+              toMessages: buyersWithProperties > 0 ? (buyersWithMessages / buyersWithProperties) * 100 : 0,
+              toViewings: buyersWithMessages > 0 ? (buyersWithViewings / buyersWithMessages) * 100 : 0,
+              overall: totalBuyers > 0 ? (buyersWithViewings / totalBuyers) * 100 : 0
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Get buyer journey metrics error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch buyer journey metrics",
+        });
+      }
+    },
+  );
 
   app.put(
     "/api/admin/users/:id/block",

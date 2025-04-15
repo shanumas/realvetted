@@ -425,7 +425,14 @@ export class PgStorage implements IStorage {
     return result[0];
   }
 
-  async getMessagesByProperty(propertyId: number): Promise<Message[]> {
+  async getMessagesByProperty(propertyId: number, getAllMessages: boolean = false): Promise<Message[]> {
+    if (getAllMessages) {
+      // Return all messages across all properties
+      return await this.db.select()
+        .from(messages)
+        .orderBy(messages.timestamp);
+    }
+    
     return await this.db.select()
       .from(messages)
       .where(eq(messages.propertyId, propertyId))
@@ -669,7 +676,14 @@ export class PgStorage implements IStorage {
     };
   }
   
-  async getViewingRequestsByProperty(propertyId: number): Promise<ViewingRequest[]> {
+  async getViewingRequestsByProperty(propertyId: number, getAllRequests: boolean = false): Promise<ViewingRequest[]> {
+    if (getAllRequests) {
+      // Return all viewing requests across all properties
+      return await this.db.select()
+        .from(viewingRequests)
+        .orderBy(desc(viewingRequests.requestedDate));
+    }
+    
     return await this.db.select()
       .from(viewingRequests)
       .where(eq(viewingRequests.propertyId, propertyId))

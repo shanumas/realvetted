@@ -15,7 +15,7 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { User, Property } from "@shared/schema";
 import { 
   Loader2, UserX, UserCheck, Shield, RefreshCw, Settings, Mail, Home, Users, UserCog,
-  FileText, Download, Eye
+  FileText, Download, Eye, BarChart3, TrendingUp, MessageSquare, Calendar
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -29,6 +29,20 @@ const emailSettingsSchema = z.object({
 });
 
 type EmailSettingsValues = z.infer<typeof emailSettingsSchema>;
+
+// Define interface for buyer journey metrics data
+interface BuyerJourneyMetrics {
+  totalBuyers: number;
+  buyersWithProperties: number;
+  buyersWithMessages: number;
+  buyersWithViewings: number;
+  conversionRates: {
+    toProperties: number;
+    toMessages: number;
+    toViewings: number;
+    overall: number;
+  };
+}
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -135,6 +149,13 @@ export default function AdminDashboard() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: reassignDialogOpen,
   });
+  
+  // Fetch buyer journey metrics
+  const { data: buyerJourneyData, isLoading: isLoadingBuyerJourney } = useQuery<{ success: boolean, data: BuyerJourneyMetrics }>({
+    queryKey: ["/api/admin/buyer-journey-metrics"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: activeTab === "buyerJourney",
+  });
 
   // Block/Unblock user mutation
   const toggleBlockMutation = useMutation({
@@ -239,6 +260,9 @@ export default function AdminDashboard() {
             </TabsTrigger>
             <TabsTrigger value="agreements" className="flex items-center">
               <FileText className="mr-2 h-4 w-4" /> Agreements
+            </TabsTrigger>
+            <TabsTrigger value="buyerJourney" className="flex items-center">
+              <BarChart3 className="mr-2 h-4 w-4" /> Buyer Journey
             </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center">
               <Settings className="mr-2 h-4 w-4" /> Settings
