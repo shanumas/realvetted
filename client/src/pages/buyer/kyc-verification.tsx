@@ -41,6 +41,72 @@ export default function BuyerKYC() {
       navigate("/buyer/dashboard");
     }
   }, [user, navigate, toast]);
+  
+  // Set up polling for verification status if user has verification session ID
+  useEffect(() => {
+    let pollingInterval: NodeJS.Timeout | null = null;
+    
+    // Check if user has a verification session ID that needs to be checked
+    if (user && user.verificationSessionId && !isPolling && user.profileStatus !== 'verified') {
+      console.log(`Starting to poll for verification status for session: ${user.verificationSessionId}`);
+      setIsPolling(true);
+      
+      // Poll the status every 8 seconds
+      pollingInterval = setInterval(async () => {
+        try {
+          // Call the API to check status
+          console.log(`Polling verification status for session: ${user.verificationSessionId}`);
+          
+          if (user.verificationSessionId) {
+            const status = await checkVeriffStatus(user.verificationSessionId);
+            console.log(`Polled verification status: ${status}`);
+            
+            // If status is now approved or declined, stop polling
+            if (status === 'approved' || status === 'accepted' || status === 'verified' || 
+                status === 'declined' || status === 'rejected') {
+              
+              if (pollingInterval) {
+                clearInterval(pollingInterval);
+                setIsPolling(false);
+              }
+              
+              // Force an update of user data by calling the force verification endpoint
+              await apiRequest("POST", "/api/users/force-verification", { 
+                sessionId: user.verificationSessionId 
+              });
+              
+              // Invalidate queries to refresh user data
+              const { queryClient } = await import("@/lib/queryClient");
+              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              
+              if (status === 'approved' || status === 'accepted' || status === 'verified') {
+                toast({
+                  title: "Verification Successful",
+                  description: "Your identity has been successfully verified!",
+                });
+                navigate("/buyer/dashboard");
+              } else {
+                toast({
+                  title: "Verification Failed",
+                  description: "Your identity verification was rejected. Please try again.",
+                  variant: "destructive",
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error polling verification status:", error);
+        }
+      }, 8000); // Poll every 8 seconds
+    }
+    
+    // Clean up the interval when the component unmounts
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [user, isPolling, navigate, toast]);
 
   const form = useForm<KYCFormValues>({
     resolver: zodResolver(kycUpdateSchema),
@@ -56,60 +122,18 @@ export default function BuyerKYC() {
     },
   });
 
-  // Set up polling for verification status
+  // New reactive effect to handle verification status once a verification is started
   useEffect(() => {
-    let pollingInterval: NodeJS.Timeout | null = null;
-    
+    // When verification is started and we have a session ID
     if (verificationSessionId && isVerificationStarted) {
-      // Poll every 5 seconds to check verification status
-      pollingInterval = setInterval(async () => {
-        try {
-          const status = await checkVeriffStatus(verificationSessionId);
-          console.log("Verification status:", status);
-          
-          // If verification is approved or declined, stop polling and update UI
-          if (status === 'approved' || status === 'declined' || status === 'expired' || status === 'abandoned') {
-            if (pollingInterval) {
-              clearInterval(pollingInterval);
-            }
-            
-            if (status === 'approved') {
-              toast({
-                title: "Verification Approved",
-                description: "Your identity has been successfully verified.",
-              });
-              
-              // Redirect to dashboard
-              navigate("/buyer/dashboard");
-            } else if (status === 'declined') {
-              toast({
-                title: "Verification Declined",
-                description: "Your identity verification was declined. Please try again with accurate information.",
-                variant: "destructive",
-              });
-              setIsVerificationStarted(false);
-            } else {
-              toast({
-                title: "Verification Expired",
-                description: "Your verification session has expired. Please try again.",
-                variant: "destructive",
-              });
-              setIsVerificationStarted(false);
-            }
-          }
-        } catch (error) {
-          console.error("Error checking verification status:", error);
-        }
-      }, 5000); // Check every 5 seconds
-    }
-    
-    // Clean up interval on component unmount
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
+      console.log(`Verification started with session ID: ${verificationSessionId}`);
+      
+      // Make sure we're polling for status updates
+      if (!isPolling) {
+        setIsPolling(true);
       }
-    };
-  }, [verificationSessionId, isVerificationStarted, navigate, toast]);
+    }
+  }, [verificationSessionId, isVerificationStarted, isPolling]);
 
   // Start Veriff verification flow
   const startVerification = async () => {

@@ -42,6 +42,47 @@ export default function BuyerDashboard() {
     return savedTab || "properties";
   });
   
+  // Add status for tracking verification checks
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
+  
+  // Continue checking verification status if in pending state
+  useEffect(() => {
+    let pollingInterval: NodeJS.Timeout | null = null;
+    
+    // Check if we need to continue polling for verification status
+    if (user && 
+        user.profileStatus === 'pending' && 
+        user.verificationSessionId && 
+        !isCheckingVerification) {
+      
+      console.log(`Dashboard: Starting verification polling for session: ${user.verificationSessionId}`);
+      setIsCheckingVerification(true);
+      
+      // Poll every 20 seconds to avoid too many requests
+      pollingInterval = setInterval(async () => {
+        try {
+          console.log(`Dashboard: Checking verification status`);
+          
+          // Call the force verification endpoint to check with Veriff
+          await forceVerification(user.verificationSessionId);
+          
+          // Refresh user data
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        } catch (error) {
+          console.error("Error checking verification status:", error);
+        }
+      }, 20000); // Check every 20 seconds
+    }
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setIsCheckingVerification(false);
+      }
+    };
+  }, [user, isCheckingVerification]);
+
   // Setup WebSocket for real-time updates
   useEffect(() => {
     // Set up WebSocket listener for property updates and viewing request changes
