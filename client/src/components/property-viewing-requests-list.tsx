@@ -28,6 +28,7 @@ import {
   Loader2,
   User,
   MapPin,
+  Trash2,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -56,7 +57,8 @@ export function PropertyViewingRequestsList({
   
   const [selectedRequestId, setSelectedRequestId] = useState<number | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "delete" | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   // Only fetch if propertyId is provided and viewingRequests aren't directly provided
   const { data: fetchedViewingRequests, isLoading } = useQuery<ViewingRequestWithParticipants[]>({
@@ -98,11 +100,50 @@ export function PropertyViewingRequestsList({
       });
     }
   };
+  
+  const handleDeleteViewingRequest = async (requestId: number) => {
+    try {
+      await apiRequest(`/api/viewing-requests/${requestId}`, "DELETE");
+      
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+      });
+      
+      // Also invalidate buyer and agent viewing request queries
+      queryClient.invalidateQueries({
+        queryKey: ["/api/viewing-requests/buyer"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/viewing-requests/agent"],
+      });
+      
+      toast({
+        title: "Success",
+        description: "Viewing request deleted successfully.",
+      });
+      
+      setIsDeleteDialogOpen(false);
+      setSelectedRequestId(null);
+    } catch (error) {
+      console.error("Error deleting viewing request:", error);
+      toast({
+        title: "Error",
+        description: "There was a problem deleting the viewing request.",
+        variant: "destructive",
+      });
+    }
+  };
 
-  const confirmDialog = (requestId: number, action: "approve" | "reject") => {
+  const confirmDialog = (requestId: number, action: "approve" | "reject" | "delete") => {
     setSelectedRequestId(requestId);
     setConfirmAction(action);
-    setIsConfirmDialogOpen(true);
+    
+    if (action === "delete") {
+      setIsDeleteDialogOpen(true);
+    } else {
+      setIsConfirmDialogOpen(true);
+    }
   };
 
   const handleConfirmAction = async () => {
@@ -313,6 +354,19 @@ export function PropertyViewingRequestsList({
                         </Button>
                       </div>
                     )}
+
+                    {/* Delete button for buyers to cancel their viewing requests */}
+                    {viewAs === "buyer" && (
+                      <div className="px-4 py-3 bg-gray-50 border-t flex justify-end space-x-2">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => confirmDialog(request.id, "delete")}
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" /> Delete Request
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -321,7 +375,7 @@ export function PropertyViewingRequestsList({
         </TabsContent>
       </Tabs>
 
-      {/* Confirmation Dialog */}
+      {/* Approval/Rejection Confirmation Dialog */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -348,6 +402,39 @@ export function PropertyViewingRequestsList({
               onClick={handleConfirmAction}
             >
               {confirmAction === "approve" ? "Approve" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Viewing Request</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this viewing request? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setSelectedRequestId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedRequestId) {
+                  handleDeleteViewingRequest(selectedRequestId);
+                }
+              }}
+            >
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
