@@ -36,6 +36,7 @@ import {
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { SellerAgencyDisclosureForm } from "@/components/seller-agency-disclosure-form";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
+import { AgentEmailEditor } from "@/components/agent-email-editor";
 
 export default function SellerPropertyView() {
   const [, params] = useRoute("/seller/property-view/:id");
@@ -595,7 +596,13 @@ export default function SellerPropertyView() {
                     </div>
                     <div className="flex items-center text-sm">
                       <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                      <span>{property.agent.email}</span>
+                      <div className="flex-1">
+                        <AgentEmailEditor
+                          propertyId={Number(propertyId)}
+                          currentEmail={property.agent.email}
+                          inline={true}
+                        />
+                      </div>
                     </div>
                     {property.agent.phone && (
                       <div className="flex items-center text-sm">
