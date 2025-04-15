@@ -103,56 +103,12 @@ async function updateVerificationStatus(sessionId?: string): Promise<void> {
 
 /**
  * Alternative implementation using Veriff SDK for embedded integration
- * @param sessionUrl The Veriff session URL
- * @param containerId The ID of the HTML element to mount Veriff to
- * @param onComplete Callback when verification completes
+ * This function is not currently used and has been commented out due to type incompatibilities
+ * With the Veriff SDK. We're using the launchVeriff function instead which opens in a new window.
  */
-export function initVeriffSDK(
-  sessionUrl: string,
-  containerId: string,
-  onComplete: (status: 'completed' | 'canceled' | 'error') => void
-): void {
-  try {
-    // Extract session ID from URL
-    const url = new URL(sessionUrl);
-    const sessionId = url.pathname.split('/').pop() || '';
-    
-    if (!sessionId) {
-      throw new Error('Invalid session URL');
-    }
-    
-    const veriff = Veriff({
-      host: 'https://magic.veriff.me',
-      sessionId,
-      container: containerId,
-      onSession: (err, response) => {
-        if (err) {
-          console.error('Veriff session error:', err);
-          onComplete('error');
-          return;
-        }
-        console.log('Veriff session started:', response);
-      }
-    });
-    
-    veriff.mount({
-      submitCallback: () => {
-        console.log('Verification submitted');
-      },
-      closeCallback: () => {
-        console.log('Verification closed');
-        onComplete('canceled');
-      },
-      errorCallback: (error) => {
-        console.error('Verification error:', error);
-        onComplete('error');
-      }
-    });
-  } catch (error) {
-    console.error('Error initializing Veriff SDK:', error);
-    onComplete('error');
-  }
-}
+// export function initVeriffSDK() { 
+//   // Removed due to type incompatibilities with the Veriff SDK
+// }
 
 /**
  * Checks the status of a Veriff verification session
