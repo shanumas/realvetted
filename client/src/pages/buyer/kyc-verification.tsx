@@ -383,21 +383,64 @@ export default function BuyerKYC() {
                   </div>
                 </div>
                 
-                <div className="flex space-x-3">
-                  <Button type="submit" className="flex-1" disabled={isSubmitting || isVerificationStarted}>
-                    {isSubmitting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    {isVerificationStarted ? "Verification in Progress..." : "Verify Identity"}
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => navigate("/buyer/dashboard")}
-                  >
-                    Skip for Now
-                  </Button>
+                <div className="flex flex-col space-y-3">
+                  <div className="flex space-x-3">
+                    <Button type="submit" className="flex-1" disabled={isSubmitting || isVerificationStarted}>
+                      {isSubmitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : null}
+                      {isVerificationStarted ? "Verification in Progress..." : "Verify Identity"}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => navigate("/buyer/dashboard")}
+                    >
+                      Skip for Now
+                    </Button>
+                  </div>
+                  
+                  {/* Button for users who have completed Veriff verification but status is stuck */}
+                  {user?.profileStatus === 'pending' && verificationSessionId && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <div className="text-sm text-gray-600 mb-2">
+                        Already completed verification but status is still pending? Try manual verification:
+                      </div>
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        className="w-full bg-green-50 text-green-600 hover:bg-green-100"
+                        onClick={async () => {
+                          try {
+                            toast({
+                              title: "Forcing verification...",
+                              description: "Please wait while we update your verification status.",
+                            });
+                            
+                            await forceVerification();
+                            
+                            toast({
+                              title: "Verification Complete",
+                              description: "Your identity has been verified successfully.",
+                            });
+                            
+                            // Redirect to dashboard
+                            navigate("/buyer/dashboard");
+                          } catch (error) {
+                            toast({
+                              title: "Verification Failed",
+                              description: "Could not update verification status. Please try again later.",
+                              variant: "destructive",
+                            });
+                          }
+                        }}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Force Verification Status
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </form>
             </Form>
