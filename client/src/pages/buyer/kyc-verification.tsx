@@ -149,10 +149,87 @@ export default function BuyerKYC() {
     if (status === 'completed') {
       toast({
         title: "Verification Submitted",
-        description: "Your identity verification has been submitted and is being processed. You will be automatically redirected when complete.",
+        description: "Your identity verification has been submitted. Processing verification...",
       });
       
-      // No need to submit basic info here as we already did it when starting verification
+      // Check the verification status regularly until it changes from pending
+      if (verificationSessionId) {
+        let verificationComplete = false;
+        let attemptCount = 0;
+        const maxAttempts = 5;
+        
+        // Show a loading toast that we're checking status
+        const toastId = crypto.randomUUID();
+        toast({
+          id: toastId,
+          title: "Checking verification status",
+          description: "Please wait while we check your verification status...",
+        });
+        
+        try {
+          while (!verificationComplete && attemptCount < maxAttempts) {
+            // Wait before checking (start with 2 seconds, increase each time)
+            await new Promise(resolve => setTimeout(resolve, 2000 + attemptCount * 1000));
+            
+            // Force an update of the user's verification status
+            const forceResponse = await apiRequest("POST", "/api/users/force-verification");
+            if (!forceResponse.ok) {
+              console.warn("Failed to force verification update:", await forceResponse.text());
+            }
+            
+            // Fetch the current user to get the latest profile status
+            const userResponse = await apiRequest("GET", "/api/auth/user");
+            if (userResponse.ok) {
+              const userData = await userResponse.json();
+              
+              // If status has changed from pending, we're done
+              if (userData.profileStatus === 'verified') {
+                verificationComplete = true;
+                toast({
+                  title: "Verification Successful",
+                  description: "Your identity has been verified successfully!",
+                });
+                
+                // Redirect to dashboard
+                navigate("/buyer/dashboard");
+              } else if (userData.profileStatus === 'rejected') {
+                verificationComplete = true;
+                toast({
+                  title: "Verification Failed",
+                  description: "Your identity verification was rejected. Please try again.",
+                  variant: "destructive",
+                });
+              }
+            }
+            
+            attemptCount++;
+          }
+          
+          // If we've tried the maximum number of times and still no change, just redirect
+          if (!verificationComplete) {
+            toast({
+              title: "Verification In Progress",
+              description: "Your verification is still processing. You'll be notified when it completes.",
+            });
+            
+            // Redirect to dashboard
+            navigate("/buyer/dashboard");
+          }
+        } catch (error) {
+          console.error("Error checking verification status:", error);
+          toast({
+            title: "Status Check Failed",
+            description: "We couldn't determine if your verification completed. Please check your dashboard for updates.",
+            variant: "destructive",
+          });
+          
+          // Redirect to dashboard anyway
+          navigate("/buyer/dashboard");
+        } finally {
+          // Dismiss the loading toast
+          toast.dismiss(toastId);
+        }
+      }
     } else if (status === 'canceled') {
       toast({
         title: "Verification Canceled",

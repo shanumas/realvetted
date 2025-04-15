@@ -50,9 +50,38 @@ export function launchVeriff(
   const checkInterval = setInterval(() => {
     if (veriffWindow.closed) {
       clearInterval(checkInterval);
-      onComplete('completed');
+      
+      // Force status update on window close
+      updateVerificationStatus()
+        .then(() => {
+          onComplete('completed');
+        })
+        .catch(error => {
+          console.error("Error updating verification status:", error);
+          onComplete('completed'); // Still call completed even if update fails
+        });
     }
   }, 1000);
+}
+
+/**
+ * Updates the user's verification status by checking with the server
+ * This can be called after the Veriff window closes to make sure status is up-to-date
+ */
+async function updateVerificationStatus(): Promise<void> {
+  try {
+    // Call the force verification endpoint to update the status
+    await apiRequest('POST', '/api/users/force-verification');
+    
+    // Invalidate the user data in the cache to make sure we get fresh data
+    // This assumes you're using TanStack Query elsewhere
+    if (window.queryClient) {
+      window.queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+    }
+  } catch (error) {
+    console.error("Failed to update verification status:", error);
+    throw error;
+  }
 }
 
 /**
