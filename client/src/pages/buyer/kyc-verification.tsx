@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createVeriffSession, launchVeriff } from "@/lib/veriff";
+import { createVeriffSession, launchVeriff, checkVeriffStatus } from "@/lib/veriff";
 import { apiRequest } from "@/lib/queryClient";
 import { Loader2, Check, ExternalLink } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
@@ -23,6 +23,21 @@ export default function BuyerKYC() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
+  
+  // Redirect to dashboard if the user has already completed or initiated verification
+  useEffect(() => {
+    if (user && (user.profileStatus === 'verified' || user.profileStatus === 'pending')) {
+      // User has already started or completed verification, redirect to dashboard
+      toast({
+        title: "Verification status",
+        description: user.profileStatus === 'verified' 
+          ? "Your identity is already verified" 
+          : "Your verification is in progress",
+      });
+      
+      navigate("/buyer/dashboard");
+    }
+  }, [user, navigate, toast]);
 
   const form = useForm<KYCFormValues>({
     resolver: zodResolver(kycUpdateSchema),
