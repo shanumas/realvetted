@@ -1,48 +1,55 @@
-import { storage } from './storage';
-import { User } from '@shared/schema';
+import { storage } from "./storage";
+import { User } from "@shared/schema";
+import crypto from "crypto";
 
 // Veriff API key provided by the user
-const VERIFF_API_KEY = '622b56e6-c765-4ff2-b99f-21df14b762ea';
+const VERIFF_API_KEY = "1340b85e-5b2c-4223-8765-fb2f72901afa";
+
+const SHARED_SECRET = "220dbc0a-8f57-4597-82a2-e70a36708cf6";
 
 /**
  * Creates a new Veriff verification session for a user
  * @param user The user to create a verification session for
  * @returns The session URL and session ID
  */
-export async function createVeriffSession(user: User): Promise<{ url: string; sessionId: string }> {
+export async function createVeriffSession(
+  user: User,
+): Promise<{ url: string; sessionId: string }> {
   try {
     // Create a Veriff verification session
-    const response = await fetch('https://api.veriff.me/v1/sessions', {
-      method: 'POST',
+    const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-AUTH-CLIENT': VERIFF_API_KEY
+        "Content-Type": "application/json",
+        "X-AUTH-CLIENT": VERIFF_API_KEY,
       },
       body: JSON.stringify({
         verification: {
-          callback: 'https://example.com/callback', // This would be your webhook URL in production
+          callback: "https://example.com/callback", // This would be your webhook URL in production
           person: {
-            firstName: user.firstName || '',
-            lastName: user.lastName || '',
-            idNumber: ''
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+            idNumber: "",
           },
           vendorData: String(user.id), // Store user ID for reference
-          timestamp: new Date().toISOString()
-        }
-      })
+          timestamp: new Date().toISOString(),
+        },
+      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to create Veriff session: ${response.statusText}`);
+      throw new Error(
+        `Failed to create Veriff session: ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
     return {
       url: data.verification.url,
-      sessionId: data.verification.id
+      sessionId: data.verification.id,
     };
   } catch (error) {
-    console.error('Error creating Veriff session:', error);
+    console.error("Error creating Veriff session:", error);
     throw error;
   }
 }
@@ -59,7 +66,7 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     const status = webhookData.verification.status;
 
     if (isNaN(userId)) {
-      throw new Error('Invalid user ID in webhook data');
+      throw new Error("Invalid user ID in webhook data");
     }
 
     // Get the user
@@ -69,27 +76,27 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     }
 
     let profileStatus: string;
-    
+
     // Map Veriff statuses to our app's status
     switch (status) {
-      case 'approved':
-        profileStatus = 'verified';
+      case "approved":
+        profileStatus = "verified";
         break;
-      case 'declined':
-        profileStatus = 'rejected';
+      case "declined":
+        profileStatus = "rejected";
         break;
-      case 'expired':
-      case 'abandoned':
-        profileStatus = 'pending'; // Allow retry
+      case "expired":
+      case "abandoned":
+        profileStatus = "pending"; // Allow retry
         break;
       default:
-        profileStatus = 'pending';
+        profileStatus = "pending";
     }
 
     // Update the user's profile status
     await storage.updateUser(userId, { profileStatus });
   } catch (error) {
-    console.error('Error processing Veriff webhook:', error);
+    console.error("Error processing Veriff webhook:", error);
     throw error;
   }
 }
@@ -99,26 +106,40 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
  * @param sessionId The ID of the Veriff session to check
  * @returns The status of the verification
  */
-export async function checkVeriffSessionStatus(sessionId: string): Promise<string> {
+export async function checkVeriffSessionStatus(
+  sessionId: string,
+): Promise<string> {
   try {
-    const response = await fetch(`https://api.veriff.me/v1/sessions/${sessionId}/decision`, {
-      method: 'GET',
-      headers: {
-        'X-AUTH-CLIENT': VERIFF_API_KEY
-      }
-    });
+    const signature = crypto
+      .createHmac("sha256", SHARED_SECRET)
+      .update(sessionId)
+      .digest("hex");
+    const response = await fetch(
+      `https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`,
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          "x-auth-client": "1340b85e-5b2c-4223-8765-fb2f72901afa",
+          "x-hmac-signature": signature,
+        },
+      },
+    );
 
     if (!response.ok) {
       if (response.status === 404) {
-        return 'pending'; // Decision not made yet
+        return "pending"; // Decision not made yet
       }
-      throw new Error(`Failed to check Veriff session status: ${response.statusText}`);
+      console.log("Response content:", await response.text());
+      throw new Error(
+        `Failed to check Veriff session status: ${response.status} ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
     return data.verification.status;
   } catch (error) {
-    console.error('Error checking Veriff session status:', error);
-    return 'error';
+    console.error("Error checking Veriff session status:", error);
+    return "error";
   }
 }
