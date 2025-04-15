@@ -896,12 +896,18 @@ export default function BuyerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-3">
+                    <TabsList className="w-full grid grid-cols-4">
                       <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Seller Chat
                       </TabsTrigger>
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
+                      </TabsTrigger>
+                      <TabsTrigger value="agent-email" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <Mail className="mr-1 h-4 w-4" /> 
+                          Agent Email
+                        </span>
                       </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">

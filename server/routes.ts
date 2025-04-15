@@ -4342,5 +4342,109 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
 
+  // Update a property's agent email
+  app.patch(
+    "/api/properties/:id/agent-email",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const propertyId = parseInt(req.params.id);
+        const property = await storage.getProperty(propertyId);
+        const userId = req.user!.id;
+        const role = req.user!.role;
+        const { agentEmail } = req.body;
+
+        if (!property) {
+          return res.status(404).json({
+            success: false,
+            error: "Property not found",
+          });
+        }
+
+        // Validate the email format
+        if (!agentEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(agentEmail)) {
+          return res.status(400).json({
+            success: false,
+            error: "Please provide a valid email address",
+          });
+        }
+
+        // Any user associated with the property can update the agent email
+        const isSeller = role === "seller" && property.sellerId === userId;
+        const isAssignedAgent = role === "agent" && property.agentId === userId;
+        const isBuyer = role === "buyer" && property.buyerId === userId;
+        const isAdmin = role === "admin";
+
+        if (!(isSeller || isAssignedAgent || isBuyer || isAdmin)) {
+          return res.status(403).json({
+            success: false,
+            error: "You don't have permission to update this property's agent email",
+          });
+        }
+
+        // Update only the agent email
+        const updatedProperty = await storage.updateProperty(propertyId, {
+          sellerEmail: agentEmail,
+          updatedAt: new Date(),
+        });
+
+        // Log the activity
+        await storage.createPropertyActivityLog({
+          propertyId: propertyId,
+          userId: userId,
+          activity: "Agent email updated",
+          details: { 
+            previousEmail: property.sellerEmail,
+            newEmail: agentEmail,
+            updatedBy: {
+              id: userId,
+              role: role
+            }
+          },
+        });
+
+        // Send WebSocket notification
+        const notifyUserIds: number[] = [];
+
+        // Notify the seller if not the updater
+        if (property.sellerId && property.sellerId !== userId) {
+          notifyUserIds.push(property.sellerId);
+        }
+
+        // Notify the agent if assigned and not the updater
+        if (property.agentId && property.agentId !== userId) {
+          notifyUserIds.push(property.agentId);
+        }
+
+        // Notify the buyer if assigned and not the updater
+        if (property.buyerId && property.buyerId !== userId) {
+          notifyUserIds.push(property.buyerId);
+        }
+
+        // Send the notification
+        if (notifyUserIds.length > 0) {
+          websocketServer.broadcastToUsers(notifyUserIds, {
+            type: "property_update",
+            data: {
+              propertyId: propertyId,
+              message: `The agent email for ${property.address} has been updated.`,
+            },
+          });
+        }
+
+        res.json({
+          success: true,
+          data: updatedProperty,
+        });
+      } catch (error) {
+        res.status(500).json({
+          success: false,
+          error:
+            error instanceof Error ? error.message : "Failed to update agent email",
+        });
+      }
+    },
+  );
+
   return httpServer;
 }
