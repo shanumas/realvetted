@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { forceVerification } from "@/lib/verification";
-import websocketClient from "@/lib/websocket";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,34 +49,7 @@ export default function BuyerDashboard() {
   useEffect(() => {
     let pollingInterval: NodeJS.Timeout | null = null;
     
-    // Log all user verification details for troubleshooting
-    if (user) {
-      console.log(`User verification details - Status: ${user.profileStatus}, Session ID: ${user.verificationSessionId || 'none'}`);
-    }
-    
-    // First, do an immediate check if we have a pending status with session ID
-    const checkVerificationStatus = async () => {
-      if (user?.verificationSessionId && user.profileStatus === 'pending') {
-        console.log(`Checking verification status for session: ${user.verificationSessionId}`);
-        try {
-          // Call the force verification endpoint to check with Veriff
-          // Handle null case explicitly for TypeScript
-          const sessionId = user.verificationSessionId || undefined;
-          const result = await forceVerification(sessionId);
-          console.log('Verification check result:', result);
-          
-          // Refresh user data
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        } catch (error) {
-          console.error("Error checking verification status:", error);
-        }
-      }
-    };
-    
-    // Run an immediate check
-    checkVerificationStatus();
-    
-    // Also set up polling if needed
+    // Check if we need to continue polling for verification status
     if (user && 
         user.profileStatus === 'pending' && 
         user.verificationSessionId && 
@@ -86,8 +58,20 @@ export default function BuyerDashboard() {
       console.log(`Dashboard: Starting verification polling for session: ${user.verificationSessionId}`);
       setIsCheckingVerification(true);
       
-      // Poll every 10 seconds to be more responsive
-      pollingInterval = setInterval(checkVerificationStatus, 10000);
+      // Poll every 20 seconds to avoid too many requests
+      pollingInterval = setInterval(async () => {
+        try {
+          console.log(`Dashboard: Checking verification status`);
+          
+          // Call the force verification endpoint to check with Veriff
+          await forceVerification(user.verificationSessionId);
+          
+          // Refresh user data
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        } catch (error) {
+          console.error("Error checking verification status:", error);
+        }
+      }, 20000); // Check every 20 seconds
     }
     
     // Clean up interval on component unmount
@@ -101,46 +85,28 @@ export default function BuyerDashboard() {
 
   // Setup WebSocket for real-time updates
   useEffect(() => {
-    // Set up WebSocket notification handler
-    const handleNotification = (data: any) => {
-      console.log("Dashboard processing notification:", data);
-      
-      // Handle verification status updates from authentication messages
-      if (data.message === "Authentication successful") {
-        console.log("Authentication successful notification received, updating verification status");
-        
-        // Force verification check
-        if (user?.verificationSessionId) {
-          forceVerification(user.verificationSessionId)
-            .then(() => {
-              // Refresh user data to update status in UI
-              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-              
-              toast({
-                title: "Verification Completed",
-                description: "Your identity has been verified successfully!",
-                variant: "default"
-              });
-            })
-            .catch(error => {
-              console.error("Error updating verification after auth:", error);
-            });
+    // Set up WebSocket listener for property updates and viewing request changes
+    const onMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'notification' || data.type === 'property_update') {
+          // Refresh property data and viewing requests
+          queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
         }
+      } catch (e) {
+        console.error("Error parsing WebSocket message:", e);
       }
-      
-      // Refresh property data and viewing requests for other notifications
-      queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
     };
-    
-    // Connect WebSocket notification handler
-    const unsubscribe = websocketClient.onNotification(handleNotification);
+
+    // Connect event listener
+    window.addEventListener('message', onMessage);
     
     // Clean up
     return () => {
-      unsubscribe();
+      window.removeEventListener('message', onMessage);
     };
-  }, [user]);
+  }, []);
 
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
@@ -208,47 +174,14 @@ export default function BuyerDashboard() {
                         </svg>
                         Verification Pending
                       </div>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => navigate("/buyer/kyc?retry=true")}
-                          className="text-xs py-0.5"
-                        >
-                          Verify Now
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={async () => {
-                            try {
-                              toast({
-                                title: "Checking verification status",
-                                description: "Forcing verification check now..."
-                              });
-                              if (user.verificationSessionId) {
-                                const result = await forceVerification(user.verificationSessionId);
-                                console.log("Manual verification check result:", result);
-                                queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-                                toast({
-                                  title: "Status check complete",
-                                  description: `Status from Veriff: ${result.veriffStatus || 'Unknown'}`
-                                });
-                              }
-                            } catch (error) {
-                              console.error("Error manually checking status:", error);
-                              toast({
-                                title: "Status check failed",
-                                description: "Could not check verification status",
-                                variant: "destructive"
-                              });
-                            }
-                          }}
-                          className="text-xs py-0.5 bg-blue-50 hover:bg-blue-100"
-                        >
-                          Check Status
-                        </Button>
-                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => navigate("/buyer/kyc?retry=true")}
+                        className="text-xs py-0.5"
+                      >
+                        Verify Now
+                      </Button>
                     </>
                   ) : user.profileStatus === 'rejected' ? (
                     <>
