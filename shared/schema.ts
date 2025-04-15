@@ -162,7 +162,7 @@ export const kycUpdateSchema = z.object({
   zip: z.string(),
   idFrontUrl: z.string().optional(),
   idBackUrl: z.string().optional(),
-  verificationSessionId: z.string().optional(),
+  verificationSessionId: z.string().nullable().optional(),
 });
 
 export const propertySchema = createInsertSchema(properties).omit({

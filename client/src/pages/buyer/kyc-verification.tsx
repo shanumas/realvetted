@@ -275,10 +275,12 @@ export default function BuyerKYC() {
       const values = form.getValues();
       
       // Update user profile with KYC info
-      const response = await apiRequest("PUT", "/api/users/kyc", {
+      // Only include verificationSessionId if it exists and is not null
+      const payload = {
         ...values,
-        verificationSessionId: verificationSessionId
-      });
+        ...(verificationSessionId ? { verificationSessionId } : {})
+      };
+      const response = await apiRequest("PUT", "/api/users/kyc", payload);
 
       if (!response.ok) {
         throw new Error("Failed to submit profile information");
