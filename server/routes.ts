@@ -222,18 +222,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let veriffStatus = "pending";
       let profileStatus = user.profileStatus;
       
+      console.log(`Force verification for user ${user.id} with session ID: ${verificationSessionId}`);
+      
       // If we have a session ID, check with Veriff
       if (verificationSessionId) {
-        // Check the verification status with Veriff
-        veriffStatus = await checkVeriffSessionStatus(verificationSessionId);
-        
-        // Map Veriff status to our app status
-        if (veriffStatus === 'approved') {
-          profileStatus = 'verified';
-        } else if (veriffStatus === 'declined') {
-          profileStatus = 'rejected';
-        } else if (veriffStatus === 'submitted') {
-          profileStatus = 'pending';
+        try {
+          // Check the verification status with Veriff
+          veriffStatus = await checkVeriffSessionStatus(verificationSessionId);
+          console.log(`Received Veriff status: ${veriffStatus} for session: ${verificationSessionId}`);
+          
+          // Map Veriff status to our app status
+          if (veriffStatus === 'approved') {
+            profileStatus = 'verified';
+          } else if (veriffStatus === 'declined') {
+            profileStatus = 'rejected';
+          } else if (veriffStatus === 'submitted') {
+            profileStatus = 'pending';
+          }
+        } catch (error) {
+          console.error("Error checking verification status with Veriff:", error);
+          // Don't update the status if there was an error checking with Veriff
+          // Keep the existing status
         }
       }
       
