@@ -71,19 +71,36 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     let profileStatus: string;
     
     // Map Veriff statuses to our app's status
-    switch (status) {
-      case 'approved':
-        profileStatus = 'verified';
-        break;
-      case 'declined':
-        profileStatus = 'rejected';
-        break;
-      case 'expired':
-      case 'abandoned':
-        profileStatus = 'pending'; // Allow retry
-        break;
-      default:
-        profileStatus = 'pending';
+    console.log(`Processing Veriff webhook status: "${status}"`);
+    
+    // Handle various forms of "approved" status
+    if (status === 'approved' || 
+        status === 'accepted' || 
+        status === 'completed' || 
+        status === 'verified') {
+      profileStatus = 'verified';
+      console.log("Setting webhook profile status to verified");
+    } 
+    // Handle various forms of "declined" status
+    else if (status === 'declined' || 
+             status === 'rejected' || 
+             status === 'failed') {
+      profileStatus = 'rejected';
+      console.log("Setting webhook profile status to rejected");
+    } 
+    // Handle various forms of "pending" status or retry statuses
+    else if (status === 'submitted' || 
+             status === 'pending' || 
+             status === 'started' || 
+             status === 'review' ||
+             status === 'expired' ||
+             status === 'abandoned') {
+      profileStatus = 'pending'; // Allow retry
+      console.log("Setting webhook profile status to pending");
+    }
+    else {
+      profileStatus = 'pending';
+      console.log(`Unrecognized Veriff webhook status: "${status}", setting default status: "pending"`);
     }
 
     // Update the user's profile status
@@ -116,6 +133,7 @@ export async function checkVeriffSessionStatus(sessionId: string): Promise<strin
     }
 
     const data = await response.json();
+    console.log("Veriff API response:", JSON.stringify(data));
     return data.verification.status;
   } catch (error) {
     console.error('Error checking Veriff session status:', error);

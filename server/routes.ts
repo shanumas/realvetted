@@ -237,12 +237,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Received Veriff status: ${veriffStatus} for session: ${verificationSessionId}`);
           
           // Map Veriff status to our app status
-          if (veriffStatus === 'approved') {
+          console.log(`Processing Veriff status: "${veriffStatus}"`);
+          
+          // Handle various forms of "approved" status
+          if (veriffStatus === 'approved' || 
+              veriffStatus === 'accepted' || 
+              veriffStatus === 'completed' || 
+              veriffStatus === 'verified') {
             profileStatus = 'verified';
-          } else if (veriffStatus === 'declined') {
+            console.log("Setting profile status to verified");
+          } 
+          // Handle various forms of "declined" status
+          else if (veriffStatus === 'declined' || 
+                   veriffStatus === 'rejected' || 
+                   veriffStatus === 'failed') {
             profileStatus = 'rejected';
-          } else if (veriffStatus === 'submitted') {
+            console.log("Setting profile status to rejected");
+          } 
+          // Handle various forms of "pending" status
+          else if (veriffStatus === 'submitted' || 
+                   veriffStatus === 'pending' || 
+                   veriffStatus === 'started' || 
+                   veriffStatus === 'review') {
             profileStatus = 'pending';
+            console.log("Setting profile status to pending");
+          }
+          else {
+            console.log(`Unrecognized Veriff status: "${veriffStatus}", keeping current status: "${profileStatus}"`);
           }
         } catch (error) {
           console.error("Error checking verification status with Veriff:", error);
