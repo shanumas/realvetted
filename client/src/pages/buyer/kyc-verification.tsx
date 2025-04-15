@@ -378,12 +378,22 @@ export default function BuyerKYC() {
                   </div>
                 </div>
                 
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Submit for Verification
-                </Button>
+                <div className="flex space-x-3">
+                  <Button type="submit" className="flex-1" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Submit for Verification
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => navigate("/buyer/dashboard")}
+                  >
+                    Skip for Now
+                  </Button>
+                </div>
               </form>
             </Form>
           </CardContent>
