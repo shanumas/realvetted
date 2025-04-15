@@ -44,7 +44,7 @@ export interface IStorage {
   
   // Message methods
   getMessage(id: number): Promise<Message | undefined>;
-  getMessagesByProperty(propertyId: number): Promise<Message[]>;
+  getMessagesByProperty(propertyId: number, getAllMessages?: boolean): Promise<Message[]>;
   getMessagesBetweenUsers(propertyId: number, user1Id: number, user2Id: number): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
   markMessageAsRead(id: number): Promise<Message>;
@@ -70,7 +70,7 @@ export interface IStorage {
   // Viewing request methods
   getViewingRequest(id: number): Promise<ViewingRequest | undefined>;
   getViewingRequestWithParticipants(id: number): Promise<ViewingRequestWithParticipants | undefined>;
-  getViewingRequestsByProperty(propertyId: number): Promise<ViewingRequest[]>;
+  getViewingRequestsByProperty(propertyId: number, getAllRequests?: boolean): Promise<ViewingRequest[]>;
   getViewingRequestsByBuyer(buyerId: number): Promise<ViewingRequest[]>;
   getViewingRequestsByAgent(agentId: number): Promise<ViewingRequest[]>;
   createViewingRequest(request: InsertViewingRequest): Promise<ViewingRequest>;
