@@ -103,6 +103,7 @@ export function PropertyViewingRequestsList({
   
   const handleDeleteViewingRequest = async (requestId: number) => {
     try {
+      // The server endpoint technically updates status to "cancelled" rather than deleting
       await apiRequest(`/api/viewing-requests/${requestId}`, "DELETE");
       
       // Invalidate relevant queries
@@ -120,16 +121,16 @@ export function PropertyViewingRequestsList({
       
       toast({
         title: "Success",
-        description: "Viewing request deleted successfully.",
+        description: "Viewing request cancelled successfully.",
       });
       
       setIsDeleteDialogOpen(false);
       setSelectedRequestId(null);
     } catch (error) {
-      console.error("Error deleting viewing request:", error);
+      console.error("Error cancelling viewing request:", error);
       toast({
         title: "Error",
-        description: "There was a problem deleting the viewing request.",
+        description: "There was a problem cancelling the viewing request.",
         variant: "destructive",
       });
     }
@@ -355,7 +356,7 @@ export function PropertyViewingRequestsList({
                       </div>
                     )}
 
-                    {/* Delete button for buyers to cancel their viewing requests */}
+                    {/* Cancel button for buyers to cancel their viewing requests */}
                     {viewAs === "buyer" && (
                       <div className="px-4 py-3 bg-gray-50 border-t flex justify-end space-x-2">
                         <Button
@@ -363,7 +364,7 @@ export function PropertyViewingRequestsList({
                           size="sm"
                           onClick={() => confirmDialog(request.id, "delete")}
                         >
-                          <Trash2 className="h-4 w-4 mr-1" /> Delete Request
+                          <X className="h-4 w-4 mr-1" /> Cancel Request
                         </Button>
                       </div>
                     )}
@@ -407,13 +408,13 @@ export function PropertyViewingRequestsList({
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
+      {/* Cancel Request Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Viewing Request</DialogTitle>
+            <DialogTitle>Cancel Viewing Request</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this viewing request? This action cannot be undone.
+              Are you sure you want to cancel this viewing request? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -424,7 +425,7 @@ export function PropertyViewingRequestsList({
                 setSelectedRequestId(null);
               }}
             >
-              Cancel
+              Keep Request
             </Button>
             <Button
               variant="destructive"
@@ -434,7 +435,7 @@ export function PropertyViewingRequestsList({
                 }
               }}
             >
-              Delete
+              Cancel Request
             </Button>
           </DialogFooter>
         </DialogContent>
