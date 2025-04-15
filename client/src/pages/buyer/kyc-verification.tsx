@@ -159,9 +159,7 @@ export default function BuyerKYC() {
         const maxAttempts = 5;
         
         // Show a loading toast that we're checking status
-        const toastId = crypto.randomUUID();
         toast({
-          id: toastId,
           title: "Checking verification status",
           description: "Please wait while we check your verification status...",
         });
@@ -226,8 +224,7 @@ export default function BuyerKYC() {
           // Redirect to dashboard anyway
           navigate("/buyer/dashboard");
         } finally {
-          // Dismiss the loading toast
-          toast.dismiss(toastId);
+          // We don't need to dismiss toast manually - they auto-dismiss
         }
       }
     } else if (status === 'canceled') {
