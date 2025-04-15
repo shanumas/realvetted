@@ -142,6 +142,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a Veriff session
       const sessionData = await createVeriffSession(req.user);
       
+      // Update the user with the session ID
+      await storage.updateUser(req.user.id, {
+        verificationSessionId: sessionData.sessionId
+      });
+      
       res.json({
         success: true,
         url: sessionData.url,
