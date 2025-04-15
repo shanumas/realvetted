@@ -4602,7 +4602,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         // Any user associated with the property can update the agent email
         const isSeller = role === "seller" && property.sellerId === userId;
         const isAssignedAgent = role === "agent" && property.agentId === userId;
-        const isBuyer = role === "buyer" && property.buyerId === userId;
+        const isBuyer = role === "buyer" && property.createdBy === userId; // Fixed: use createdBy instead of buyerId
         const isAdmin = role === "admin";
 
         if (!(isSeller || isAssignedAgent || isBuyer || isAdmin)) {
@@ -4615,7 +4615,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         // Update only the agent email
         const updatedProperty = await storage.updateProperty(propertyId, {
           sellerEmail: agentEmail,
-          updatedAt: new Date(),
         });
 
         // Log the activity
@@ -4646,9 +4645,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           notifyUserIds.push(property.agentId);
         }
 
-        // Notify the buyer if assigned and not the updater
-        if (property.buyerId && property.buyerId !== userId) {
-          notifyUserIds.push(property.buyerId);
+        // Notify the buyer if they created the property and aren't the updater
+        if (property.createdBy && property.createdBy !== userId) {
+          notifyUserIds.push(property.createdBy);
         }
 
         // Send the notification
