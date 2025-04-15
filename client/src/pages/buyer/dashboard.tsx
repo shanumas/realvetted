@@ -102,7 +102,7 @@ export default function BuyerDashboard() {
       <SiteHeader />
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Welcome Banner */}
+        {/* Welcome Banner with Verification Status */}
         <div className="px-4 py-5 sm:px-6 bg-white shadow rounded-lg mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -112,6 +112,41 @@ export default function BuyerDashboard() {
               <p className="mt-1 max-w-2xl text-sm text-gray-500">
                 Start your property search by adding a new property address below.
               </p>
+              
+              {/* Verification Status Badge */}
+              {user && (
+                <div className="mt-2">
+                  {user.profileStatus === 'verified' ? (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <svg className="mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
+                        <circle cx="4" cy="4" r="3" />
+                      </svg>
+                      Identity Verified
+                    </div>
+                  ) : user.profileStatus === 'pending' ? (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                      <svg className="mr-1.5 h-2 w-2 text-yellow-400" fill="currentColor" viewBox="0 0 8 8">
+                        <circle cx="4" cy="4" r="3" />
+                      </svg>
+                      Verification Pending
+                    </div>
+                  ) : user.profileStatus === 'rejected' ? (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <svg className="mr-1.5 h-2 w-2 text-red-400" fill="currentColor" viewBox="0 0 8 8">
+                        <circle cx="4" cy="4" r="3" />
+                      </svg>
+                      Verification Failed
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <svg className="mr-1.5 h-2 w-2 text-gray-400" fill="currentColor" viewBox="0 0 8 8">
+                        <circle cx="4" cy="4" r="3" />
+                      </svg>
+                      Verification Required
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
               <PlusIcon className="mr-2 h-4 w-4" />

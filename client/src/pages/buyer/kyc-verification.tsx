@@ -38,6 +38,61 @@ export default function BuyerKYC() {
     },
   });
 
+  // Set up polling for verification status
+  useEffect(() => {
+    let pollingInterval: NodeJS.Timeout | null = null;
+    
+    if (verificationSessionId && isVerificationStarted) {
+      // Poll every 5 seconds to check verification status
+      pollingInterval = setInterval(async () => {
+        try {
+          const status = await checkVeriffStatus(verificationSessionId);
+          console.log("Verification status:", status);
+          
+          // If verification is approved or declined, stop polling and update UI
+          if (status === 'approved' || status === 'declined' || status === 'expired' || status === 'abandoned') {
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+            }
+            
+            if (status === 'approved') {
+              toast({
+                title: "Verification Approved",
+                description: "Your identity has been successfully verified.",
+              });
+              
+              // Redirect to dashboard
+              navigate("/buyer/dashboard");
+            } else if (status === 'declined') {
+              toast({
+                title: "Verification Declined",
+                description: "Your identity verification was declined. Please try again with accurate information.",
+                variant: "destructive",
+              });
+              setIsVerificationStarted(false);
+            } else {
+              toast({
+                title: "Verification Expired",
+                description: "Your verification session has expired. Please try again.",
+                variant: "destructive",
+              });
+              setIsVerificationStarted(false);
+            }
+          }
+        } catch (error) {
+          console.error("Error checking verification status:", error);
+        }
+      }, 5000); // Check every 5 seconds
+    }
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [verificationSessionId, isVerificationStarted, navigate, toast]);
+
   // Start Veriff verification flow
   const startVerification = async () => {
     try {
@@ -57,6 +112,9 @@ export default function BuyerKYC() {
         title: "Verification Started",
         description: "Please complete the identity verification process in the new window.",
       });
+      
+      // Submit the basic info right away so we have it in our system
+      await submitBasicInfo();
     } catch (error) {
       console.error("Verification error:", error);
       toast({
@@ -74,11 +132,10 @@ export default function BuyerKYC() {
     if (status === 'completed') {
       toast({
         title: "Verification Submitted",
-        description: "Your identity verification has been submitted and is being processed.",
+        description: "Your identity verification has been submitted and is being processed. You will be automatically redirected when complete.",
       });
       
-      // Update user profile with basic info
-      await submitBasicInfo();
+      // No need to submit basic info here as we already did it when starting verification
     } else if (status === 'canceled') {
       toast({
         title: "Verification Canceled",
