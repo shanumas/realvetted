@@ -121,29 +121,37 @@ export default function BuyerDashboard() {
                 Start your property search by adding a new property address below.
               </p>
               
-              {/* Verification Status Banner */}
-              {user?.profileStatus !== "verified" && (
-                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      {checking ? (
-                        <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
-                      ) : (
-                        <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
+              {/* Verification Status Banner - Always shown */}
+              <div className={`mt-3 p-2 ${user?.profileStatus === "verified" ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"} rounded-md`}>
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    {checking ? (
+                      <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+                    ) : user?.profileStatus === "verified" ? (
+                      <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="ml-3 flex-grow">
+                    <div className="flex justify-between items-start">
+                      <h3 className={`text-sm font-medium ${user?.profileStatus === "verified" ? "text-green-800" : "text-yellow-800"}`}>
+                        Verification Status: <span className="font-bold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
+                      </h3>
+                      {storedSessionId && user?.profileStatus !== "verified" && (
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                          {checking ? "Checking status..." : "Auto-checking enabled"}
+                        </span>
                       )}
                     </div>
-                    <div className="ml-3 flex-grow">
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-sm font-medium text-yellow-800">Verification Pending</h3>
-                        {storedSessionId && (
-                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                            {checking ? "Checking status..." : "Auto-checking enabled"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 text-xs text-yellow-700">
+                    <div className="mt-1 text-xs text-gray-700">
+                      {user?.profileStatus === "verified" ? (
+                        <p>Your identity has been verified successfully. You have full access to all platform features.</p>
+                      ) : (
                         <p>
                           {storedSessionId 
                             ? "We're checking your verification status in the background. " 
@@ -152,11 +160,11 @@ export default function BuyerDashboard() {
                             {storedSessionId ? "Verify again" : "Complete verification"}
                           </Link> to unlock all features.
                         </p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
               <PlusIcon className="mr-2 h-4 w-4" />
