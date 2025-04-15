@@ -255,7 +255,7 @@ export default function BuyerKYC() {
       // Update user profile with KYC info
       const response = await apiRequest("PUT", "/api/users/kyc", {
         ...values,
-        verificationSessionId
+        verificationSessionId: verificationSessionId
       });
 
       if (!response.ok) {

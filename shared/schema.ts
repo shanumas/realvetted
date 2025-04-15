@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   licenseNumber: text("license_number"), // Real estate license number for agents
   brokerageName: text("brokerage_name"), // Brokerage name for agents
   isBlocked: boolean("is_blocked").default(false),
+  verificationSessionId: text("verification_session_id"), // Veriff verification session ID
 });
 
 // Property listings
@@ -161,6 +162,7 @@ export const kycUpdateSchema = z.object({
   zip: z.string(),
   idFrontUrl: z.string().optional(),
   idBackUrl: z.string().optional(),
+  verificationSessionId: z.string().optional(),
 });
 
 export const propertySchema = createInsertSchema(properties).omit({

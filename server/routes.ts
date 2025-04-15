@@ -284,10 +284,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
     try {
       const data = kycUpdateSchema.parse(req.body);
-      const updatedUser = await storage.updateUser(req.user.id, {
+      
+      // Create the update object, preserving the verification session ID if provided
+      const updateData: any = {
         ...data,
         profileStatus: "pending", // Set status to pending for manual/AI review
-      });
+      };
+      
+      const updatedUser = await storage.updateUser(req.user.id, updateData);
 
       // If ID documents are provided, verify with AI
       if (data.idFrontUrl && data.idBackUrl) {
