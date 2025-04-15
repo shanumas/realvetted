@@ -63,13 +63,7 @@ export function PropertyActivityLog({ propertyId }: PropertyActivityLogProps) {
                   )}
                 </div>
                 
-                {log.details && (
-                  <div className="mt-2 text-sm bg-gray-50 p-2 rounded">
-                    <pre className="whitespace-pre-wrap font-sans">
-                      {JSON.stringify(log.details, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                {/* Removed JSON display of log details */}
               </div>
             </div>
           </CardContent>
