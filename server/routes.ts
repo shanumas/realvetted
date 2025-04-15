@@ -265,17 +265,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let veriffStatus = "pending";
       let profileStatus = user.profileStatus;
       
-      console.log(`Force verification for user ${user.id} with session ID: ${verificationSessionId}`);
+      console.log(`[FORCE-VERIFY] Request for user ${user.id} using session ID: ${verificationSessionId}`);
+      console.log(`[FORCE-VERIFY] Current profile status: ${user.profileStatus}`);
       
       // If we have a session ID, check with Veriff
       if (verificationSessionId) {
         try {
           // Check the verification status with Veriff
           veriffStatus = await checkVeriffSessionStatus(verificationSessionId);
-          console.log(`Received Veriff status: ${veriffStatus} for session: ${verificationSessionId}`);
+          console.log(`[FORCE-VERIFY] Veriff API returned: "${veriffStatus}" for session: ${verificationSessionId}`);
           
           // Map Veriff status to our app status
-          console.log(`Processing Veriff status: "${veriffStatus}"`);
+          console.log(`[FORCE-VERIFY] Processing Veriff status: "${veriffStatus}"`);
           
           // Handle various forms of "approved" status
           if (veriffStatus === 'approved' || 
@@ -283,14 +284,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               veriffStatus === 'completed' || 
               veriffStatus === 'verified') {
             profileStatus = 'verified';
-            console.log("Setting profile status to verified");
+            console.log(`[FORCE-VERIFY] Setting profile status to verified (from ${user.profileStatus})`);
           } 
           // Handle various forms of "declined" status
           else if (veriffStatus === 'declined' || 
                    veriffStatus === 'rejected' || 
                    veriffStatus === 'failed') {
             profileStatus = 'rejected';
-            console.log("Setting profile status to rejected");
+            console.log(`[FORCE-VERIFY] Setting profile status to rejected (from ${user.profileStatus})`);
           } 
           // Handle various forms of "pending" status
           else if (veriffStatus === 'submitted' || 
@@ -298,13 +299,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                    veriffStatus === 'started' || 
                    veriffStatus === 'review') {
             profileStatus = 'pending';
-            console.log("Setting profile status to pending");
+            console.log(`[FORCE-VERIFY] Setting profile status to pending (from ${user.profileStatus})`);
           }
           else {
-            console.log(`Unrecognized Veriff status: "${veriffStatus}", keeping current status: "${profileStatus}"`);
+            console.log(`[FORCE-VERIFY] Unrecognized Veriff status: "${veriffStatus}", keeping current status: "${profileStatus}"`);
           }
         } catch (error) {
-          console.error("Error checking verification status with Veriff:", error);
+          console.error("[FORCE-VERIFY] Error checking verification status with Veriff:", error);
           // Don't update the status if there was an error checking with Veriff
           // Keep the existing status
         }
@@ -312,11 +313,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Only update if the status has changed
       if (profileStatus !== user.profileStatus) {
+        console.log(`[FORCE-VERIFY] Status changed from ${user.profileStatus} to ${profileStatus}, updating database`);
+        
         // Update the user's verification status
         const updatedUser = await storage.updateUser(req.user.id, {
           profileStatus: profileStatus,
           verificationSessionId: verificationSessionId || user.verificationSessionId
         });
+        
+        console.log(`[FORCE-VERIFY] User updated successfully, new status: ${updatedUser.profileStatus}`);
         
         // Log the verification status change
         await storage.createPropertyActivityLog({
@@ -334,19 +339,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           success: true,
           user: updatedUser,
-          veriffStatus: veriffStatus
+          veriffStatus: veriffStatus,
+          statusChanged: true
         });
       }
+      
+      console.log(`[FORCE-VERIFY] No status change needed, keeping as ${profileStatus}`);
       
       // Return current status if not changed
       res.json({
         success: true,
         user: user,
         veriffStatus: veriffStatus,
+        statusChanged: false,
         message: "Status is up to date"
       });
     } catch (error) {
-      console.error("Manual verification error:", error);
+      console.error("[FORCE-VERIFY] Manual verification error:", error);
       res.status(500).json({
         success: false,
         error: "Failed to update verification status"

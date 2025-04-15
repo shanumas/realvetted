@@ -49,7 +49,34 @@ export default function BuyerDashboard() {
   useEffect(() => {
     let pollingInterval: NodeJS.Timeout | null = null;
     
-    // Check if we need to continue polling for verification status
+    // Log all user verification details for troubleshooting
+    if (user) {
+      console.log(`User verification details - Status: ${user.profileStatus}, Session ID: ${user.verificationSessionId || 'none'}`);
+    }
+    
+    // First, do an immediate check if we have a pending status with session ID
+    const checkVerificationStatus = async () => {
+      if (user?.verificationSessionId && user.profileStatus === 'pending') {
+        console.log(`Checking verification status for session: ${user.verificationSessionId}`);
+        try {
+          // Call the force verification endpoint to check with Veriff
+          // Handle null case explicitly for TypeScript
+          const sessionId = user.verificationSessionId || undefined;
+          const result = await forceVerification(sessionId);
+          console.log('Verification check result:', result);
+          
+          // Refresh user data
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        } catch (error) {
+          console.error("Error checking verification status:", error);
+        }
+      }
+    };
+    
+    // Run an immediate check
+    checkVerificationStatus();
+    
+    // Also set up polling if needed
     if (user && 
         user.profileStatus === 'pending' && 
         user.verificationSessionId && 
@@ -58,20 +85,8 @@ export default function BuyerDashboard() {
       console.log(`Dashboard: Starting verification polling for session: ${user.verificationSessionId}`);
       setIsCheckingVerification(true);
       
-      // Poll every 20 seconds to avoid too many requests
-      pollingInterval = setInterval(async () => {
-        try {
-          console.log(`Dashboard: Checking verification status`);
-          
-          // Call the force verification endpoint to check with Veriff
-          await forceVerification(user.verificationSessionId);
-          
-          // Refresh user data
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        } catch (error) {
-          console.error("Error checking verification status:", error);
-        }
-      }, 20000); // Check every 20 seconds
+      // Poll every 10 seconds to be more responsive
+      pollingInterval = setInterval(checkVerificationStatus, 10000);
     }
     
     // Clean up interval on component unmount
@@ -174,14 +189,47 @@ export default function BuyerDashboard() {
                         </svg>
                         Verification Pending
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate("/buyer/kyc?retry=true")}
-                        className="text-xs py-0.5"
-                      >
-                        Verify Now
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => navigate("/buyer/kyc?retry=true")}
+                          className="text-xs py-0.5"
+                        >
+                          Verify Now
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={async () => {
+                            try {
+                              toast({
+                                title: "Checking verification status",
+                                description: "Forcing verification check now..."
+                              });
+                              if (user.verificationSessionId) {
+                                const result = await forceVerification(user.verificationSessionId);
+                                console.log("Manual verification check result:", result);
+                                queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                                toast({
+                                  title: "Status check complete",
+                                  description: `Status from Veriff: ${result.veriffStatus || 'Unknown'}`
+                                });
+                              }
+                            } catch (error) {
+                              console.error("Error manually checking status:", error);
+                              toast({
+                                title: "Status check failed",
+                                description: "Could not check verification status",
+                                variant: "destructive"
+                              });
+                            }
+                          }}
+                          className="text-xs py-0.5 bg-blue-50 hover:bg-blue-100"
+                        >
+                          Check Status
+                        </Button>
+                      </div>
                     </>
                   ) : user.profileStatus === 'rejected' ? (
                     <>
