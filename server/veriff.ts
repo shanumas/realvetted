@@ -127,6 +127,7 @@ export async function checkVeriffSessionStatus(
     );
 
     if (!response.ok) {
+      console.log("Response content:", await response.text());
       if (response.status === 404) {
         return "pending"; // Decision not made yet
       }
@@ -137,12 +138,28 @@ export async function checkVeriffSessionStatus(
     }
 
     const data = await response.json();
-    // Add null check before accessing status
-    if (!data || !data.verification) {
-      console.log("Unexpected response format:", data);
-      return "pending"; // Default to pending when data format is unexpected
+    
+    // Check if the response has the expected format
+    if (!data) {
+      console.log("Empty response from Veriff API");
+      return "pending";
     }
-    return data.verification.status;
+    
+    // If the API returns success status but verification is null,
+    // this generally means the verification is still pending or not found
+    if (data.status === 'success' && !data.verification) {
+      console.log("Verification not found or still in progress");
+      return "pending";
+    }
+    
+    // Handle case where verification object exists
+    if (data.verification && data.verification.status) {
+      return data.verification.status;
+    }
+    
+    // Default fallback
+    console.log("Unexpected response format:", data);
+    return "pending";
   } catch (error) {
     console.error("Error checking Veriff session status:", error);
     return "error";
