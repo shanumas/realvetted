@@ -924,6 +924,7 @@ export default function BuyerPropertyDetail() {
                             viewingRequests={viewingRequests} 
                             showPropertyDetails={false}
                             propertyName={property.address}
+                            viewAs="buyer"
                           />
                         ) : (
                           <div className="text-center py-8 text-gray-500">

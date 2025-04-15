@@ -75,6 +75,7 @@ export interface IStorage {
   getViewingRequestsByAgent(agentId: number): Promise<ViewingRequest[]>;
   createViewingRequest(request: InsertViewingRequest): Promise<ViewingRequest>;
   updateViewingRequest(id: number, data: Partial<ViewingRequest>): Promise<ViewingRequest>;
+  deleteViewingRequest(id: number): Promise<void>;
   
   // Session store
   sessionStore: session.Store;
