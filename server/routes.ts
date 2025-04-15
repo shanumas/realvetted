@@ -142,11 +142,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create a Veriff session
       const sessionData = await createVeriffSession(req.user);
       
-      // Update the user with the session ID
-      await storage.updateUser(req.user.id, {
-        verificationSessionId: sessionData.sessionId
-      });
-      
       res.json({
         success: true,
         url: sessionData.url,
@@ -173,49 +168,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Check the verification status with Veriff
       const status = await checkVeriffSessionStatus(sessionId);
-      console.log(`API - Checking status for session ${sessionId}: ${status}`);
-      
-      // If the status is approved, update the user's verification status
-      if (status === 'approved' || 
-          status === 'accepted' || 
-          status === 'completed' || 
-          status === 'verified') {
-        try {
-          // Find the user with this session ID
-          const users = await storage.getAllUsers();
-          const user = users.find(u => u.verificationSessionId === sessionId);
-          
-          if (user) {
-            console.log(`Found user ${user.id} with session ID ${sessionId}, updating status to verified`);
-            await storage.updateUser(user.id, {
-              profileStatus: 'verified'
-            });
-            
-            // Log the verification
-            await storage.createPropertyActivityLog({
-              propertyId: 0, // System log
-              userId: user.id,
-              activity: "identity_verification_status_update",
-              details: {
-                method: "status_check",
-                previousStatus: user.profileStatus,
-                newStatus: 'verified',
-                sessionId: sessionId
-              }
-            });
-          }
-        } catch (updateError) {
-          console.error("Error updating user verification status:", updateError);
-          // Continue with returning the status even if update fails
-        }
-      }
       
       res.json({
         success: true,
-        status,
-        sessionId
+        status
       });
     } catch (error) {
       console.error("Veriff status check error:", error);
@@ -246,125 +203,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Manual endpoint to update verification status (for testing or when webhook fails)
-  app.post("/api/users/force-verification", isAuthenticated, async (req, res) => {
-    try {
-      // Get the user's latest verification session ID
-      const user = await storage.getUser(req.user.id);
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: "User not found"
-        });
-      }
-      
-      // Get the session ID either from request body or from the user's stored session ID
-      const verificationSessionId = req.body.sessionId || user.verificationSessionId;
-      
-      let veriffStatus = "pending";
-      let profileStatus = user.profileStatus;
-      
-      console.log(`Force verification for user ${user.id} with session ID: ${verificationSessionId}`);
-      
-      // If we have a session ID, check with Veriff
-      if (verificationSessionId) {
-        try {
-          // Check the verification status with Veriff
-          veriffStatus = await checkVeriffSessionStatus(verificationSessionId);
-          console.log(`Received Veriff status: ${veriffStatus} for session: ${verificationSessionId}`);
-          
-          // Map Veriff status to our app status
-          console.log(`Processing Veriff status: "${veriffStatus}"`);
-          
-          // Handle various forms of "approved" status
-          if (veriffStatus === 'approved' || 
-              veriffStatus === 'accepted' || 
-              veriffStatus === 'completed' || 
-              veriffStatus === 'verified') {
-            profileStatus = 'verified';
-            console.log("Setting profile status to verified");
-          } 
-          // Handle various forms of "declined" status
-          else if (veriffStatus === 'declined' || 
-                   veriffStatus === 'rejected' || 
-                   veriffStatus === 'failed') {
-            profileStatus = 'rejected';
-            console.log("Setting profile status to rejected");
-          } 
-          // Handle various forms of "pending" status
-          else if (veriffStatus === 'submitted' || 
-                   veriffStatus === 'pending' || 
-                   veriffStatus === 'started' || 
-                   veriffStatus === 'review') {
-            profileStatus = 'pending';
-            console.log("Setting profile status to pending");
-          }
-          else {
-            console.log(`Unrecognized Veriff status: "${veriffStatus}", keeping current status: "${profileStatus}"`);
-          }
-        } catch (error) {
-          console.error("Error checking verification status with Veriff:", error);
-          // Don't update the status if there was an error checking with Veriff
-          // Keep the existing status
-        }
-      }
-      
-      // Only update if the status has changed
-      if (profileStatus !== user.profileStatus) {
-        // Update the user's verification status
-        const updatedUser = await storage.updateUser(req.user.id, {
-          profileStatus: profileStatus,
-          verificationSessionId: verificationSessionId || user.verificationSessionId
-        });
-        
-        // Log the verification status change
-        await storage.createPropertyActivityLog({
-          propertyId: 0, // System log, not tied to property
-          userId: req.user.id,
-          activity: "identity_verification_status_update",
-          details: {
-            method: "veriff_check",
-            previousStatus: user.profileStatus,
-            newStatus: profileStatus,
-            sessionId: verificationSessionId
-          }
-        });
-        
-        return res.json({
-          success: true,
-          user: updatedUser,
-          veriffStatus: veriffStatus
-        });
-      }
-      
-      // Return current status if not changed
-      res.json({
-        success: true,
-        user: user,
-        veriffStatus: veriffStatus,
-        message: "Status is up to date"
-      });
-    } catch (error) {
-      console.error("Manual verification error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to update verification status"
-      });
-    }
-  });
-  
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
     try {
       const data = kycUpdateSchema.parse(req.body);
-      
-      // Create the update object, preserving the verification session ID if provided
-      const updateData: any = {
+      const updatedUser = await storage.updateUser(req.user.id, {
         ...data,
         profileStatus: "pending", // Set status to pending for manual/AI review
-      };
-      
-      const updatedUser = await storage.updateUser(req.user.id, updateData);
+      });
 
       // If ID documents are provided, verify with AI
       if (data.idFrontUrl && data.idBackUrl) {

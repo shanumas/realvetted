@@ -104,12 +104,7 @@ export function PropertyViewingRequestsList({
   const handleDeleteViewingRequest = async (requestId: number) => {
     try {
       // The server endpoint technically updates status to "cancelled" rather than deleting
-      const response = await apiRequest("DELETE", `/api/viewing-requests/${requestId}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to cancel viewing request");
-      }
+      await apiRequest(`/api/viewing-requests/${requestId}`, "DELETE");
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({
@@ -135,7 +130,7 @@ export function PropertyViewingRequestsList({
       console.error("Error cancelling viewing request:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "There was a problem cancelling the viewing request.",
+        description: "There was a problem cancelling the viewing request.",
         variant: "destructive",
       });
     }

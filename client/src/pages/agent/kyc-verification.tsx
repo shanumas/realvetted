@@ -156,14 +156,11 @@ export default function AgentKYC() {
       const uploadResult = await uploadIDDocuments(idFront, idBack);
       
       // Update user profile with KYC info
-      // Build the payload - make sure we don't include null or undefined values
-      const payload = {
+      const response = await apiRequest("PUT", "/api/users/kyc", {
         ...values,
-        ...(uploadResult.idFrontUrl ? { idFrontUrl: uploadResult.idFrontUrl } : {}),
-        ...(uploadResult.idBackUrl ? { idBackUrl: uploadResult.idBackUrl } : {})
-      };
-      
-      const response = await apiRequest("PUT", "/api/users/kyc", payload);
+        idFrontUrl: uploadResult.idFrontUrl,
+        idBackUrl: uploadResult.idBackUrl,
+      });
 
       if (!response.ok) {
         throw new Error("Failed to submit KYC information");

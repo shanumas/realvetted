@@ -2,7 +2,7 @@ import { storage } from './storage';
 import { User } from '@shared/schema';
 
 // Veriff API key provided by the user
-const VERIFF_API_KEY = '1340b85e-5b2c-4223-8765-fb2f72901afa';
+const VERIFF_API_KEY = '622b56e6-c765-4ff2-b99f-21df14b762ea';
 
 /**
  * Creates a new Veriff verification session for a user
@@ -12,7 +12,7 @@ const VERIFF_API_KEY = '1340b85e-5b2c-4223-8765-fb2f72901afa';
 export async function createVeriffSession(user: User): Promise<{ url: string; sessionId: string }> {
   try {
     // Create a Veriff verification session
-    const response = await fetch('https://stationapi.veriff.com/v1/sessions', {
+    const response = await fetch('https://api.veriff.me/v1/sessions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -71,36 +71,19 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     let profileStatus: string;
     
     // Map Veriff statuses to our app's status
-    console.log(`Processing Veriff webhook status: "${status}"`);
-    
-    // Handle various forms of "approved" status
-    if (status === 'approved' || 
-        status === 'accepted' || 
-        status === 'completed' || 
-        status === 'verified') {
-      profileStatus = 'verified';
-      console.log("Setting webhook profile status to verified");
-    } 
-    // Handle various forms of "declined" status
-    else if (status === 'declined' || 
-             status === 'rejected' || 
-             status === 'failed') {
-      profileStatus = 'rejected';
-      console.log("Setting webhook profile status to rejected");
-    } 
-    // Handle various forms of "pending" status or retry statuses
-    else if (status === 'submitted' || 
-             status === 'pending' || 
-             status === 'started' || 
-             status === 'review' ||
-             status === 'expired' ||
-             status === 'abandoned') {
-      profileStatus = 'pending'; // Allow retry
-      console.log("Setting webhook profile status to pending");
-    }
-    else {
-      profileStatus = 'pending';
-      console.log(`Unrecognized Veriff webhook status: "${status}", setting default status: "pending"`);
+    switch (status) {
+      case 'approved':
+        profileStatus = 'verified';
+        break;
+      case 'declined':
+        profileStatus = 'rejected';
+        break;
+      case 'expired':
+      case 'abandoned':
+        profileStatus = 'pending'; // Allow retry
+        break;
+      default:
+        profileStatus = 'pending';
     }
 
     // Update the user's profile status
@@ -118,7 +101,7 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
  */
 export async function checkVeriffSessionStatus(sessionId: string): Promise<string> {
   try {
-    const response = await fetch(`https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`, {
+    const response = await fetch(`https://api.veriff.me/v1/sessions/${sessionId}/decision`, {
       method: 'GET',
       headers: {
         'X-AUTH-CLIENT': VERIFF_API_KEY
@@ -133,7 +116,6 @@ export async function checkVeriffSessionStatus(sessionId: string): Promise<strin
     }
 
     const data = await response.json();
-    console.log("Veriff API response:", JSON.stringify(data));
     return data.verification.status;
   } catch (error) {
     console.error('Error checking Veriff session status:', error);

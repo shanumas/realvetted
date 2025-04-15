@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PropertyCard } from "@/components/property-card";
@@ -9,11 +9,10 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, CheckCircle } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { forceVerification } from "@/lib/verification";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +27,6 @@ import {
 export default function BuyerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
   // Check if there's a tab preference stored in localStorage
@@ -42,47 +40,6 @@ export default function BuyerDashboard() {
     return savedTab || "properties";
   });
   
-  // Add status for tracking verification checks
-  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
-  
-  // Continue checking verification status if in pending state
-  useEffect(() => {
-    let pollingInterval: NodeJS.Timeout | null = null;
-    
-    // Check if we need to continue polling for verification status
-    if (user && 
-        user.profileStatus === 'pending' && 
-        user.verificationSessionId && 
-        !isCheckingVerification) {
-      
-      console.log(`Dashboard: Starting verification polling for session: ${user.verificationSessionId}`);
-      setIsCheckingVerification(true);
-      
-      // Poll every 20 seconds to avoid too many requests
-      pollingInterval = setInterval(async () => {
-        try {
-          console.log(`Dashboard: Checking verification status`);
-          
-          // Call the force verification endpoint to check with Veriff
-          await forceVerification(user.verificationSessionId);
-          
-          // Refresh user data
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        } catch (error) {
-          console.error("Error checking verification status:", error);
-        }
-      }, 20000); // Check every 20 seconds
-    }
-    
-    // Clean up interval on component unmount
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-        setIsCheckingVerification(false);
-      }
-    };
-  }, [user, isCheckingVerification]);
-
   // Setup WebSocket for real-time updates
   useEffect(() => {
     // Set up WebSocket listener for property updates and viewing request changes
@@ -145,7 +102,7 @@ export default function BuyerDashboard() {
       <SiteHeader />
       
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {/* Welcome Banner with Verification Status */}
+        {/* Welcome Banner */}
         <div className="px-4 py-5 sm:px-6 bg-white shadow rounded-lg mb-6">
           <div className="flex items-center justify-between">
             <div>
@@ -155,71 +112,6 @@ export default function BuyerDashboard() {
               <p className="mt-1 max-w-2xl text-sm text-gray-500">
                 Start your property search by adding a new property address below.
               </p>
-              
-              {/* Verification Status Badge and Verification Button */}
-              {user && (
-                <div className="mt-2 flex items-center space-x-3">
-                  {user.profileStatus === 'verified' ? (
-                    <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <svg className="mr-1.5 h-2 w-2 text-green-400" fill="currentColor" viewBox="0 0 8 8">
-                        <circle cx="4" cy="4" r="3" />
-                      </svg>
-                      Identity Verified
-                    </div>
-                  ) : user.profileStatus === 'pending' ? (
-                    <>
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        <svg className="mr-1.5 h-2 w-2 text-yellow-400" fill="currentColor" viewBox="0 0 8 8">
-                          <circle cx="4" cy="4" r="3" />
-                        </svg>
-                        Verification Pending
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate("/buyer/kyc?retry=true")}
-                        className="text-xs py-0.5"
-                      >
-                        Verify Now
-                      </Button>
-                    </>
-                  ) : user.profileStatus === 'rejected' ? (
-                    <>
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                        <svg className="mr-1.5 h-2 w-2 text-red-400" fill="currentColor" viewBox="0 0 8 8">
-                          <circle cx="4" cy="4" r="3" />
-                        </svg>
-                        Verification Failed
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate("/buyer/kyc")}
-                        className="text-xs py-0.5"
-                      >
-                        Retry Verification
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        <svg className="mr-1.5 h-2 w-2 text-gray-400" fill="currentColor" viewBox="0 0 8 8">
-                          <circle cx="4" cy="4" r="3" />
-                        </svg>
-                        Verification Required
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => navigate("/buyer/kyc")}
-                        className="text-xs py-0.5"
-                      >
-                        Verify Identity
-                      </Button>
-                    </>
-                  )}
-                </div>
-              )}
             </div>
             <Button onClick={() => setIsModalOpen(true)}>
               <PlusIcon className="mr-2 h-4 w-4" />

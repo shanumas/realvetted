@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,11 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { createVeriffSession, launchVeriff, checkVeriffStatus } from "@/lib/veriff";
+import { createVeriffSession, launchVeriff } from "@/lib/veriff";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Check, ExternalLink, CheckCircle } from "lucide-react";
+import { Loader2, Check, ExternalLink } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
-import { forceVerification } from "@/lib/verification";
 
 type KYCFormValues = z.infer<typeof kycUpdateSchema>;
 
@@ -24,89 +23,6 @@ export default function BuyerKYC() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
-  
-  // Check for URL parameters to see if we're in "retry" mode
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const retry = urlParams.get('retry');
-    
-    // Only redirect if not in retry mode AND user is verified/pending
-    if (!retry && user && (user.profileStatus === 'verified')) {
-      toast({
-        title: "Verification status",
-        description: "Your identity is already verified",
-      });
-      
-      navigate("/buyer/dashboard");
-    }
-  }, [user, navigate, toast]);
-  
-  // Set up polling for verification status if user has verification session ID
-  useEffect(() => {
-    let pollingInterval: NodeJS.Timeout | null = null;
-    
-    // Check if user has a verification session ID that needs to be checked
-    if (user && user.verificationSessionId && !isPolling && user.profileStatus !== 'verified') {
-      console.log(`Starting to poll for verification status for session: ${user.verificationSessionId}`);
-      setIsPolling(true);
-      
-      // Poll the status every 8 seconds
-      pollingInterval = setInterval(async () => {
-        try {
-          // Call the API to check status
-          console.log(`Polling verification status for session: ${user.verificationSessionId}`);
-          
-          if (user.verificationSessionId) {
-            const status = await checkVeriffStatus(user.verificationSessionId);
-            console.log(`Polled verification status: ${status}`);
-            
-            // If status is now approved or declined, stop polling
-            if (status === 'approved' || status === 'accepted' || status === 'verified' || 
-                status === 'declined' || status === 'rejected') {
-              
-              if (pollingInterval) {
-                clearInterval(pollingInterval);
-                setIsPolling(false);
-              }
-              
-              // Force an update of user data by calling the force verification endpoint
-              await apiRequest("POST", "/api/users/force-verification", { 
-                sessionId: user.verificationSessionId 
-              });
-              
-              // Invalidate queries to refresh user data
-              const { queryClient } = await import("@/lib/queryClient");
-              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-              
-              if (status === 'approved' || status === 'accepted' || status === 'verified') {
-                toast({
-                  title: "Verification Successful",
-                  description: "Your identity has been successfully verified!",
-                });
-                navigate("/buyer/dashboard");
-              } else {
-                toast({
-                  title: "Verification Failed",
-                  description: "Your identity verification was rejected. Please try again.",
-                  variant: "destructive",
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Error polling verification status:", error);
-        }
-      }, 8000); // Poll every 8 seconds
-    }
-    
-    // Clean up the interval when the component unmounts
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [user, isPolling, navigate, toast]);
 
   const form = useForm<KYCFormValues>({
     resolver: zodResolver(kycUpdateSchema),
@@ -122,19 +38,6 @@ export default function BuyerKYC() {
     },
   });
 
-  // New reactive effect to handle verification status once a verification is started
-  useEffect(() => {
-    // When verification is started and we have a session ID
-    if (verificationSessionId && isVerificationStarted) {
-      console.log(`Verification started with session ID: ${verificationSessionId}`);
-      
-      // Make sure we're polling for status updates
-      if (!isPolling) {
-        setIsPolling(true);
-      }
-    }
-  }, [verificationSessionId, isVerificationStarted, isPolling]);
-
   // Start Veriff verification flow
   const startVerification = async () => {
     try {
@@ -144,8 +47,8 @@ export default function BuyerKYC() {
       const sessionData = await createVeriffSession();
       setVerificationSessionId(sessionData.sessionId);
       
-      // Launch Veriff verification with session ID
-      launchVeriff(sessionData.url, handleVerificationComplete, sessionData.sessionId);
+      // Launch Veriff verification
+      launchVeriff(sessionData.url, handleVerificationComplete);
       
       // Update UI
       setIsVerificationStarted(true);
@@ -154,9 +57,6 @@ export default function BuyerKYC() {
         title: "Verification Started",
         description: "Please complete the identity verification process in the new window.",
       });
-      
-      // Submit the basic info right away so we have it in our system
-      await submitBasicInfo();
     } catch (error) {
       console.error("Verification error:", error);
       toast({
@@ -174,106 +74,11 @@ export default function BuyerKYC() {
     if (status === 'completed') {
       toast({
         title: "Verification Submitted",
-        description: "Your identity verification has been submitted. Processing verification...",
+        description: "Your identity verification has been submitted and is being processed.",
       });
       
-      // Check the verification status regularly until it changes from pending
-      if (verificationSessionId) {
-        let verificationComplete = false;
-        let attemptCount = 0;
-        const maxAttempts = 5;
-        
-        // Create a toast for status updates
-        toast({
-          title: "Checking verification status",
-          description: "Please wait while we check your verification status...",
-        });
-        
-        try {
-          while (!verificationComplete && attemptCount < maxAttempts) {
-            // Wait before checking (start with 2 seconds, increase each time)
-            await new Promise(resolve => setTimeout(resolve, 2000 + attemptCount * 1000));
-            
-            // Force an update of the user's verification status, passing the session ID
-            const forceResponse = await apiRequest("POST", "/api/users/force-verification", {
-              sessionId: verificationSessionId
-            });
-            
-            if (!forceResponse.ok) {
-              console.warn("Failed to force verification update:", await forceResponse.text());
-              
-              // Update toast with attempt info
-              toast({
-                title: "Checking verification status",
-                description: `Attempt ${attemptCount + 1}/${maxAttempts}. Waiting for verification...`,
-              });
-            } else {
-              // Try to get Veriff status from response
-              try {
-                const forceData = await forceResponse.json();
-                if (forceData.veriffStatus) {
-                  toast({
-                    title: "Verification Status",
-                    description: `Current Veriff status: ${forceData.veriffStatus}`,
-                  });
-                }
-              } catch (e) {
-                console.error("Error parsing force verification response:", e);
-              }
-            }
-            
-            // Fetch the current user to get the latest profile status
-            const userResponse = await apiRequest("GET", "/api/auth/user");
-            if (userResponse.ok) {
-              const userData = await userResponse.json();
-              
-              // If status has changed from pending, we're done
-              if (userData.profileStatus === 'verified') {
-                verificationComplete = true;
-                toast({
-                  title: "Verification Successful",
-                  description: "Your identity has been verified successfully!",
-                });
-                
-                // Redirect to dashboard
-                navigate("/buyer/dashboard");
-              } else if (userData.profileStatus === 'rejected') {
-                verificationComplete = true;
-                toast({
-                  title: "Verification Failed",
-                  description: "Your identity verification was rejected. Please try again.",
-                  variant: "destructive",
-                });
-              }
-            }
-            
-            attemptCount++;
-          }
-          
-          // If we've tried the maximum number of times and still no change, just redirect
-          if (!verificationComplete) {
-            toast({
-              title: "Verification In Progress",
-              description: "Your verification is still processing. You'll be notified when it completes.",
-            });
-            
-            // Redirect to dashboard
-            navigate("/buyer/dashboard");
-          }
-        } catch (error) {
-          console.error("Error checking verification status:", error);
-          toast({
-            title: "Status Check Failed",
-            description: "We couldn't determine if your verification completed. Please check your dashboard for updates.",
-            variant: "destructive",
-          });
-          
-          // Redirect to dashboard anyway
-          navigate("/buyer/dashboard");
-        } finally {
-          // We don't need to dismiss toast manually - they auto-dismiss
-        }
-      }
+      // Update user profile with basic info
+      await submitBasicInfo();
     } else if (status === 'canceled') {
       toast({
         title: "Verification Canceled",
@@ -300,12 +105,10 @@ export default function BuyerKYC() {
       const values = form.getValues();
       
       // Update user profile with KYC info
-      // Only include verificationSessionId if it exists and is not null
-      const payload = {
+      const response = await apiRequest("PUT", "/api/users/kyc", {
         ...values,
-        ...(verificationSessionId ? { verificationSessionId } : {})
-      };
-      const response = await apiRequest("PUT", "/api/users/kyc", payload);
+        verificationSessionId
+      });
 
       if (!response.ok) {
         throw new Error("Failed to submit profile information");
@@ -506,25 +309,21 @@ export default function BuyerKYC() {
                   </div>
                 </div>
                 
-                <div className="flex flex-col space-y-3">
-                  <div className="flex space-x-3">
-                    <Button type="submit" className="flex-1" disabled={isSubmitting || isVerificationStarted}>
-                      {isSubmitting ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      {isVerificationStarted ? "Verification in Progress..." : "Verify Identity"}
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      className="flex-1"
-                      onClick={() => navigate("/buyer/dashboard")}
-                    >
-                      Skip for Now
-                    </Button>
-                  </div>
-                  
-
+                <div className="flex space-x-3">
+                  <Button type="submit" className="flex-1" disabled={isSubmitting || isVerificationStarted}>
+                    {isSubmitting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    {isVerificationStarted ? "Verification in Progress..." : "Verify Identity"}
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => navigate("/buyer/dashboard")}
+                  >
+                    Skip for Now
+                  </Button>
                 </div>
               </form>
             </Form>
