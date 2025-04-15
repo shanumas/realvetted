@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { forceVerification } from "@/lib/verification";
+import websocketClient from "@/lib/websocket";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -100,28 +101,46 @@ export default function BuyerDashboard() {
 
   // Setup WebSocket for real-time updates
   useEffect(() => {
-    // Set up WebSocket listener for property updates and viewing request changes
-    const onMessage = (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'notification' || data.type === 'property_update') {
-          // Refresh property data and viewing requests
-          queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
+    // Set up WebSocket notification handler
+    const handleNotification = (data: any) => {
+      console.log("Dashboard processing notification:", data);
+      
+      // Handle verification status updates from authentication messages
+      if (data.message === "Authentication successful") {
+        console.log("Authentication successful notification received, updating verification status");
+        
+        // Force verification check
+        if (user?.verificationSessionId) {
+          forceVerification(user.verificationSessionId)
+            .then(() => {
+              // Refresh user data to update status in UI
+              queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+              
+              toast({
+                title: "Verification Completed",
+                description: "Your identity has been verified successfully!",
+                variant: "default"
+              });
+            })
+            .catch(error => {
+              console.error("Error updating verification after auth:", error);
+            });
         }
-      } catch (e) {
-        console.error("Error parsing WebSocket message:", e);
       }
+      
+      // Refresh property data and viewing requests for other notifications
+      queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
     };
-
-    // Connect event listener
-    window.addEventListener('message', onMessage);
+    
+    // Connect WebSocket notification handler
+    const unsubscribe = websocketClient.onNotification(handleNotification);
     
     // Clean up
     return () => {
-      window.removeEventListener('message', onMessage);
+      unsubscribe();
     };
-  }, []);
+  }, [user]);
 
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
