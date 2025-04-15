@@ -188,7 +188,6 @@ export default function BuyerKYC() {
                 const forceData = await forceResponse.json();
                 if (forceData.veriffStatus) {
                   toast({
-                    id: statusToastId,
                     title: "Verification Status",
                     description: `Current Veriff status: ${forceData.veriffStatus}`,
                   });
@@ -207,7 +206,6 @@ export default function BuyerKYC() {
               if (userData.profileStatus === 'verified') {
                 verificationComplete = true;
                 toast({
-                  id: statusToastId,
                   title: "Verification Successful",
                   description: "Your identity has been verified successfully!",
                 });
@@ -217,7 +215,6 @@ export default function BuyerKYC() {
               } else if (userData.profileStatus === 'rejected') {
                 verificationComplete = true;
                 toast({
-                  id: statusToastId,
                   title: "Verification Failed",
                   description: "Your identity verification was rejected. Please try again.",
                   variant: "destructive",
@@ -231,7 +228,6 @@ export default function BuyerKYC() {
           // If we've tried the maximum number of times and still no change, just redirect
           if (!verificationComplete) {
             toast({
-              id: statusToastId,
               title: "Verification In Progress",
               description: "Your verification is still processing. You'll be notified when it completes.",
             });
@@ -242,7 +238,6 @@ export default function BuyerKYC() {
         } catch (error) {
           console.error("Error checking verification status:", error);
           toast({
-            id: statusToastId,
             title: "Status Check Failed",
             description: "We couldn't determine if your verification completed. Please check your dashboard for updates.",
             variant: "destructive",
