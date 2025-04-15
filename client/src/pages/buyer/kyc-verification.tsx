@@ -158,8 +158,8 @@ export default function BuyerKYC() {
         let attemptCount = 0;
         const maxAttempts = 5;
         
-        // Create a toast ID for status updates
-        const statusToastId = toast({
+        // Create a toast for status updates
+        toast({
           title: "Checking verification status",
           description: "Please wait while we check your verification status...",
         });
@@ -179,7 +179,6 @@ export default function BuyerKYC() {
               
               // Update toast with attempt info
               toast({
-                id: statusToastId,
                 title: "Checking verification status",
                 description: `Attempt ${attemptCount + 1}/${maxAttempts}. Waiting for verification...`,
               });
