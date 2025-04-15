@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { uploadIDDocuments, extractDataFromID, KYCExtractedData } from "@/lib/openai";
+import { createVeriffSession, launchVeriff } from "@/lib/veriff";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Upload, FileCheck } from "lucide-react";
+import { Loader2, Check, ExternalLink, FileCheck, Upload } from "lucide-react";
 import { kycUpdateSchema } from "@shared/schema";
 
 type KYCFormValues = z.infer<typeof kycUpdateSchema>;
@@ -21,10 +21,8 @@ export default function BuyerKYC() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isProcessingID, setIsProcessingID] = useState(false);
-  const [idFront, setIdFront] = useState<File | null>(null);
-  const [idBack, setIdBack] = useState<File | null>(null);
-  const [dataExtracted, setDataExtracted] = useState(false);
+  const [isVerificationStarted, setIsVerificationStarted] = useState(false);
+  const [verificationSessionId, setVerificationSessionId] = useState<string | null>(null);
 
   const form = useForm<KYCFormValues>({
     resolver: zodResolver(kycUpdateSchema),
@@ -40,112 +38,86 @@ export default function BuyerKYC() {
     },
   });
 
-  // Extract and fill data from ID when both front and back are uploaded
-  useEffect(() => {
-    const extractDataAndFillForm = async () => {
-      if (idFront && idBack) {
-        try {
-          setIsProcessingID(true);
-          
-          // Show extraction toast
-          toast({
-            title: "Processing ID",
-            description: "We're extracting information from your ID...",
-          });
-          
-          // Extract data from ID
-          const extractedData = await extractDataFromID(idFront, idBack);
-          
-          // Update form values with extracted data
-          if (extractedData) {
-            const updates: Partial<KYCFormValues> = {};
-            
-            if (extractedData.firstName) updates.firstName = extractedData.firstName;
-            if (extractedData.lastName) updates.lastName = extractedData.lastName;
-            if (extractedData.dateOfBirth) updates.dateOfBirth = extractedData.dateOfBirth;
-            if (extractedData.addressLine1) updates.addressLine1 = extractedData.addressLine1;
-            if (extractedData.addressLine2) updates.addressLine2 = extractedData.addressLine2;
-            if (extractedData.city) updates.city = extractedData.city;
-            if (extractedData.state) updates.state = extractedData.state;
-            if (extractedData.zip) updates.zip = extractedData.zip;
-            
-            form.reset({ ...form.getValues(), ...updates });
-            setDataExtracted(true);
-            
-            toast({
-              title: "ID Processed",
-              description: "Information from your ID has been automatically filled in. Please verify and correct if needed.",
-            });
-          }
-        } catch (error) {
-          console.error("Error extracting ID data:", error);
-          toast({
-            title: "Processing error",
-            description: "Could not automatically extract data from your ID. Please fill in the information manually.",
-            variant: "destructive",
-          });
-        } finally {
-          setIsProcessingID(false);
-        }
-      }
-    };
-    
-    if (idFront && idBack && !dataExtracted) {
-      extractDataAndFillForm();
-    }
-  }, [idFront, idBack, dataExtracted, form, toast]);
-
-  const handleIdFrontUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setIdFront(e.target.files[0]);
-      setDataExtracted(false); // Reset extraction flag when new ID is uploaded
-    }
-  };
-
-  const handleIdBackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setIdBack(e.target.files[0]);
-      setDataExtracted(false); // Reset extraction flag when new ID is uploaded
-    }
-  };
-
-  const onSubmit = async (values: KYCFormValues) => {
+  // Start Veriff verification flow
+  const startVerification = async () => {
     try {
       setIsSubmitting(true);
-
-      if (!idFront || !idBack) {
-        toast({
-          title: "Missing documents",
-          description: "Please upload both front and back of your ID",
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Upload ID documents
-      const uploadResult = await uploadIDDocuments(idFront, idBack);
+      
+      // Create a Veriff verification session
+      const sessionData = await createVeriffSession();
+      setVerificationSessionId(sessionData.sessionId);
+      
+      // Launch Veriff verification
+      launchVeriff(sessionData.url, handleVerificationComplete);
+      
+      // Update UI
+      setIsVerificationStarted(true);
+      
+      toast({
+        title: "Verification Started",
+        description: "Please complete the identity verification process in the new window.",
+      });
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast({
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  // Handle the completion of Veriff verification
+  const handleVerificationComplete = async (status: 'completed' | 'canceled' | 'error') => {
+    if (status === 'completed') {
+      toast({
+        title: "Verification Submitted",
+        description: "Your identity verification has been submitted and is being processed.",
+      });
+      
+      // Update user profile with basic info
+      await submitBasicInfo();
+    } else if (status === 'canceled') {
+      toast({
+        title: "Verification Canceled",
+        description: "You canceled the verification process. Please try again when ready.",
+        variant: "destructive",
+      });
+      setIsVerificationStarted(false);
+    } else {
+      toast({
+        title: "Verification Error",
+        description: "There was an error with the verification process. Please try again.",
+        variant: "destructive",
+      });
+      setIsVerificationStarted(false);
+    }
+  };
+  
+  // Submit the basic user info even without completing verification
+  const submitBasicInfo = async () => {
+    try {
+      setIsSubmitting(true);
+      
+      // Get the form values
+      const values = form.getValues();
       
       // Update user profile with KYC info
       const response = await apiRequest("PUT", "/api/users/kyc", {
         ...values,
-        idFrontUrl: uploadResult.idFrontUrl,
-        idBackUrl: uploadResult.idBackUrl,
+        verificationSessionId
       });
 
       if (!response.ok) {
-        throw new Error("Failed to submit KYC information");
+        throw new Error("Failed to submit profile information");
       }
-
-      toast({
-        title: "KYC Submitted",
-        description: "Your identity verification has been submitted and is being processed.",
-      });
 
       // Redirect to dashboard
       navigate("/buyer/dashboard");
     } catch (error) {
-      console.error("KYC submission error:", error);
+      console.error("Profile submission error:", error);
       toast({
         title: "Submission failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -154,6 +126,12 @@ export default function BuyerKYC() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+  
+  // Submit handler for the form
+  const onSubmit = async (values: KYCFormValues) => {
+    // Start the verification process
+    await startVerification();
   };
 
   return (
@@ -173,98 +151,51 @@ export default function BuyerKYC() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900">Upload ID Documents</h3>
-                  <p className="text-sm text-gray-500 mt-1">Please upload clear images of your identification documents.</p>
+                  <h3 className="text-lg font-medium text-gray-900">Identity Verification</h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    We use Veriff, a trusted identity verification service, to securely verify your identity.
+                  </p>
                 </div>
                 
                 <div className="space-y-4">
-                  {/* Processing indicator */}
-                  {isProcessingID && (
+                  {/* Verification Status */}
+                  {isVerificationStarted ? (
                     <div className="p-3 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center space-x-2 mb-4">
                       <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                      <span>Processing your ID documents...</span>
+                      <span>Identity verification in progress. Please complete the process in the opened window.</span>
                     </div>
-                  )}
-                  
-                  {/* Successfully extracted data indicator */}
-                  {dataExtracted && (
+                  ) : verificationSessionId ? (
                     <div className="p-3 bg-green-50 text-green-700 rounded-lg flex items-center justify-center space-x-2 mb-4">
-                      <FileCheck className="h-5 w-5 text-green-500" />
-                      <span>ID data successfully extracted! Please verify the information below.</span>
+                      <Check className="h-5 w-5 text-green-500" />
+                      <span>Verification session submitted! Your identity will be verified shortly.</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="flex items-center justify-center mb-4">
+                        <ExternalLink className="h-12 w-12 text-primary-600" />
+                      </div>
+                      <h4 className="text-center text-md font-medium mb-2">Veriff Secure Identity Verification</h4>
+                      <p className="text-center text-sm text-gray-600 mb-4">
+                        You'll be guided through a secure process to verify your identity using your government-issued ID 
+                        and a live selfie. This helps ensure the safety and security of all PropertyMatch users.
+                      </p>
+                      
+                      <ul className="text-sm space-y-2 mb-3">
+                        <li className="flex items-start">
+                          <Check className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <span>Have your government-issued ID (driver's license, passport, etc.) ready</span>
+                        </li>
+                        <li className="flex items-start">
+                          <Check className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <span>Ensure you're in a well-lit area</span>
+                        </li>
+                        <li className="flex items-start">
+                          <Check className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
+                          <span>Your webcam will be used for a quick live selfie</span>
+                        </li>
+                      </ul>
                     </div>
                   )}
-                  
-                  {/* ID Front Upload */}
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
-                      idFront 
-                        ? dataExtracted 
-                          ? "border-green-300 bg-green-50" 
-                          : "border-blue-300 bg-blue-50" 
-                        : "border-gray-300"
-                    }`}
-                    onClick={() => !isProcessingID && document.getElementById("id-front")?.click()}
-                  >
-                    <div className="space-y-2">
-                      {idFront && isProcessingID ? (
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
-                      ) : idFront && dataExtracted ? (
-                        <FileCheck className="mx-auto h-8 w-8 text-green-500" />
-                      ) : (
-                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                      )}
-                      <div className="text-sm text-gray-600">
-                        <label htmlFor="id-front" className={`cursor-pointer font-medium ${isProcessingID ? 'text-blue-600' : 'text-primary-600 hover:text-primary-500'}`}>
-                          {idFront ? idFront.name : "Upload front of ID"}
-                        </label>
-                        <p className="text-xs mt-1">JPG, PNG or PDF up to 5MB</p>
-                      </div>
-                      <input 
-                        id="id-front" 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*, application/pdf" 
-                        onChange={handleIdFrontUpload}
-                        disabled={isProcessingID}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* ID Back Upload */}
-                  <div 
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer ${
-                      idBack 
-                        ? dataExtracted 
-                          ? "border-green-300 bg-green-50" 
-                          : "border-blue-300 bg-blue-50" 
-                        : "border-gray-300"
-                    }`}
-                    onClick={() => !isProcessingID && document.getElementById("id-back")?.click()}
-                  >
-                    <div className="space-y-2">
-                      {idBack && isProcessingID ? (
-                        <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-500" />
-                      ) : idBack && dataExtracted ? (
-                        <FileCheck className="mx-auto h-8 w-8 text-green-500" />
-                      ) : (
-                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                      )}
-                      <div className="text-sm text-gray-600">
-                        <label htmlFor="id-back" className={`cursor-pointer font-medium ${isProcessingID ? 'text-blue-600' : 'text-primary-600 hover:text-primary-500'}`}>
-                          {idBack ? idBack.name : "Upload back of ID"}
-                        </label>
-                        <p className="text-xs mt-1">JPG, PNG or PDF up to 5MB</p>
-                      </div>
-                      <input 
-                        id="id-back" 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*, application/pdf"
-                        onChange={handleIdBackUpload}
-                        disabled={isProcessingID}
-                      />
-                    </div>
-                  </div>
                 </div>
                 
                 {/* Personal Details */}

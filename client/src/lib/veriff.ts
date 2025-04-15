@@ -1,4 +1,4 @@
-import { Veriff } from '@veriff/js-sdk';
+import Veriff from '@veriff/js-sdk';
 import { apiRequest } from './queryClient';
 
 /**
