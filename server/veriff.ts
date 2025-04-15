@@ -16,7 +16,7 @@ export async function createVeriffSession(user: User): Promise<{ url: string; se
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-AUTH-CLIENT': VERIFF_API_KEY
+        'Authorization': `Bearer ${VERIFF_API_KEY}`
       },
       body: JSON.stringify({
         verification: {
@@ -47,52 +47,7 @@ export async function createVeriffSession(user: User): Promise<{ url: string; se
   }
 }
 
-/**
- * Processes a Veriff webhook to update the user's verification status
- * @param webhookData The data received from Veriff's webhook
- */
-export async function processVeriffWebhook(webhookData: any): Promise<void> {
-  try {
-    // Validate webhook signature if needed
-
-    const userId = parseInt(webhookData.vendorData);
-    const status = webhookData.verification.status;
-
-    if (isNaN(userId)) {
-      throw new Error('Invalid user ID in webhook data');
-    }
-
-    // Get the user
-    const user = await storage.getUser(userId);
-    if (!user) {
-      throw new Error(`User not found with ID: ${userId}`);
-    }
-
-    let profileStatus: string;
-    
-    // Map Veriff statuses to our app's status
-    switch (status) {
-      case 'approved':
-        profileStatus = 'verified';
-        break;
-      case 'declined':
-        profileStatus = 'rejected';
-        break;
-      case 'expired':
-      case 'abandoned':
-        profileStatus = 'pending'; // Allow retry
-        break;
-      default:
-        profileStatus = 'pending';
-    }
-
-    // Update the user's profile status
-    await storage.updateUser(userId, { profileStatus });
-  } catch (error) {
-    console.error('Error processing Veriff webhook:', error);
-    throw error;
-  }
-}
+// The processVeriffWebhook function has been moved directly into the webhook handler in routes.ts
 
 /**
  * Checks the status of a Veriff verification session
@@ -101,12 +56,19 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
  */
 export async function checkVeriffSessionStatus(sessionId: string): Promise<string> {
   try {
+    console.log(`Checking Veriff session status for session: ${sessionId}`);
+    
     const response = await fetch(`https://stationapi.veriff.com/v1/sessions/${sessionId}/decision`, {
       method: 'GET',
       headers: {
-        'X-AUTH-CLIENT': VERIFF_API_KEY
+        'Authorization': `Bearer ${VERIFF_API_KEY}`,
+        'Content-Type': 'application/json'
       }
     });
+    
+    // Log the response status and headers for debugging
+    console.log(`Veriff API response status: ${response.status} ${response.statusText}`);
+    console.log(`Veriff API response headers:`, Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -116,6 +78,8 @@ export async function checkVeriffSessionStatus(sessionId: string): Promise<strin
     }
 
     const data = await response.json();
+    console.log(`Veriff API response data:`, JSON.stringify(data, null, 2));
+    
     return data.verification.status;
   } catch (error) {
     console.error('Error checking Veriff session status:', error);

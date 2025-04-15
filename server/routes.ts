@@ -194,11 +194,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate webhook authenticity if needed
       
       const webhookData = req.body;
+      console.log("Received Veriff webhook data:", JSON.stringify(webhookData, null, 2));
       
-      // Process the webhook data
-      await processVeriffWebhook(webhookData);
+      // Extract user ID and status from webhook data
+      const userId = parseInt(webhookData.vendorData || '0');
+      const status = webhookData.verification?.status || 'pending';
       
-      res.status(200).send("Webhook received");
+      console.log(`Processing webhook for user ${userId} with status ${status}`);
+      
+      if (!userId || isNaN(userId)) {
+        console.error("Invalid or missing user ID in webhook data");
+        return res.status(400).send("Invalid user ID");
+      }
+      
+      // Get the user
+      const user = await storage.getUser(userId);
+      if (!user) {
+        console.error(`User not found with ID: ${userId}`);
+        return res.status(404).send("User not found");
+      }
+      
+      // Map Veriff statuses to our app's status
+      let profileStatus: string;
+      switch (status) {
+        case 'approved':
+          profileStatus = 'verified';
+          break;
+        case 'declined':
+          profileStatus = 'rejected';
+          break;
+        case 'expired':
+        case 'abandoned':
+          profileStatus = 'pending'; // Allow retry
+          break;
+        default:
+          profileStatus = 'pending';
+      }
+      
+      console.log(`Updating user ${userId} status from ${user.profileStatus} to ${profileStatus}`);
+      
+      // Update the user's profile status
+      await storage.updateUser(userId, { profileStatus });
+      
+      // Log the verification status change
+      await storage.createPropertyActivityLog({
+        propertyId: 0, // System log, not tied to property
+        userId: userId,
+        activity: "identity_verification_status_update",
+        details: {
+          method: "veriff_webhook",
+          previousStatus: user.profileStatus,
+          newStatus: profileStatus
+        }
+      });
+      
+      res.status(200).send("Webhook processed successfully");
     } catch (error) {
       console.error("Veriff webhook processing error:", error);
       res.status(500).json({
