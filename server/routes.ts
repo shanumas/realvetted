@@ -162,9 +162,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Check Veriff session status
+  // Make this endpoint publicly accessible for client-side verification status checking
   app.get("/api/veriff/status/:sessionId", isAuthenticated, async (req, res) => {
     try {
       const { sessionId } = req.params;
+      
+      console.log(`[VERIFF-STATUS] Checking status for session: ${sessionId}, user: ${req.user.id}`);
       
       if (!sessionId) {
         return res.status(400).json({
