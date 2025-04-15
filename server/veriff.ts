@@ -20,8 +20,8 @@ export async function createVeriffSession(
     const response = await fetch("https://stationapi.veriff.com/v1/sessions", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "X-AUTH-CLIENT": VERIFF_API_KEY,
+        accept: "application/json",
+        "x-auth-client": VERIFF_API_KEY,
       },
       body: JSON.stringify({
         verification: {
@@ -138,28 +138,7 @@ export async function checkVeriffSessionStatus(
     }
 
     const data = await response.json();
-    
-    // Check if the response has the expected format
-    if (!data) {
-      console.log("Empty response from Veriff API");
-      return "pending";
-    }
-    
-    // If the API returns success status but verification is null,
-    // this generally means the verification is still pending or not found
-    if (data.status === 'success' && !data.verification) {
-      console.log("Verification not found or still in progress");
-      return "pending";
-    }
-    
-    // Handle case where verification object exists
-    if (data.verification && data.verification.status) {
-      return data.verification.status;
-    }
-    
-    // Default fallback
-    console.log("Unexpected response format:", data);
-    return "pending";
+    return data.verification.status;
   } catch (error) {
     console.error("Error checking Veriff session status:", error);
     return "error";
