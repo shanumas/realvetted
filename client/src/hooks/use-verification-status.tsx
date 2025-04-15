@@ -37,11 +37,9 @@ export function useVerificationStatus(
       if (sessionId) {
         const response = await apiRequest(
           "GET",
-          `/api/veriff/status/58326b8e-ca82-4dd2-aeac-d9735566e617`,
+          `/api/veriff/status/${sessionId}`,
         );
         const data = await response.json();
-
-        console.log("Veriff status response---------------------:", data);
 
         if (data.success && data.status === "approved") {
           // Session is approved, refresh user data to get updated status
