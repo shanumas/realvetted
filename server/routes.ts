@@ -2191,7 +2191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get a specific agreement document
+  // Get a specific agreement document metadata
   app.get("/api/agreements/:id/document", isAuthenticated, async (req, res) => {
     try {
       const agreementId = parseInt(req.params.id);
@@ -2246,6 +2246,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         error: "Failed to get agreement document",
+      });
+    }
+  });
+  
+  // Serve the actual PDF content of an agreement
+  app.get("/api/agreements/:id/view-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const agreementId = parseInt(req.params.id);
+      const agreement = await storage.getAgreement(agreementId);
+      
+      if (!agreement) {
+        return res.status(404).json({
+          success: false,
+          error: "Agreement not found",
+        });
+      }
+      
+      // Get the property to check permissions
+      const property = await storage.getPropertyWithParticipants(agreement.propertyId);
+      
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found",
+        });
+      }
+      
+      // Verify user has permission to access this agreement
+      const userId = req.user!.id;
+      const userRole = req.user!.role;
+      
+      const hasAccess =
+        userRole === "admin" ||
+        (userRole === "buyer" && property.buyerId === userId) ||
+        (userRole === "agent" && property.agentId === userId) ||
+        (userRole === "seller" && property.sellerId === userId);
+        
+      if (!hasAccess) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to access this agreement",
+        });
+      }
+      
+      if (!agreement.documentUrl) {
+        return res.status(404).json({
+          success: false,
+          error: "No document URL found for this agreement",
+        });
+      }
+      
+      // Prepare file path from document URL
+      let filePath = "";
+      if (agreement.documentUrl.startsWith("/uploads/")) {
+        filePath = path.join(process.cwd(), agreement.documentUrl.substring(1));
+      } else {
+        filePath = path.join(process.cwd(), "uploads", agreement.documentUrl);
+      }
+      
+      // Check if file exists
+      try {
+        await fs.promises.access(filePath, fs.constants.F_OK);
+      } catch (error) {
+        console.error(`File not found at path: ${filePath}`);
+        return res.status(404).json({
+          success: false,
+          error: "Document file not found",
+        });
+      }
+      
+      // If user is an agent viewing an agreement created by a buyer, we need to regenerate the PDF
+      // to ensure it includes the buyer's changes and signature
+      if (userRole === "agent" && agreement.type === "agency_disclosure" && 
+          agreement.buyerId && agreement.buyerId !== userId &&
+          agreement.status === "signed_by_buyer") {
+          
+        console.log("Agent viewing buyer-signed agreement, regenerating PDF with signatures...");
+        
+        try {
+          // Get the buyer and agent
+          const buyer = await storage.getUser(agreement.buyerId);
+          const agent = await storage.getUser(userId);
+          
+          if (!buyer || !agent) {
+            throw new Error("Could not find buyer or agent");
+          }
+          
+          // Prepare form data
+          const formDataForPdf: AgencyDisclosureFormData = {
+            buyerName1: buyer
+              ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() ||
+                buyer.email
+              : "",
+            agentName: agent
+              ? `${agent.firstName || ""} ${agent.lastName || ""}`.trim() ||
+                agent.email
+              : "",
+            agentBrokerageName: "Coldwell Banker Grass Roots Realty",
+            agentLicenseNumber: "2244751", // Example license number
+            propertyAddress: property.address,
+            propertyCity: property.city || "",
+            propertyState: property.state || "",
+            propertyZip: property.zip || "",
+            isEditable: false,
+          };
+          
+          // Generate the PDF with data
+          let pdfBuffer = await fillAgencyDisclosureForm(formDataForPdf);
+          
+          // Add buyer signature if available
+          if (agreement.buyerSignature) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              agreement.buyerSignature,
+              "buyer1"
+            );
+          }
+          
+          // Add agent signature if available
+          if (agreement.agentSignature) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              agreement.agentSignature,
+              "agent"
+            );
+          }
+          
+          // Set response headers
+          res.setHeader("Content-Type", "application/pdf");
+          res.setHeader("Content-Disposition", `inline; filename="Agency_Disclosure_${agreementId}.pdf"`);
+          
+          // Send the regenerated PDF
+          return res.send(pdfBuffer);
+        } catch (error) {
+          console.error("Error regenerating PDF:", error);
+          // If regeneration fails, fall back to serving the static file
+        }
+      }
+      
+      // Read and serve the file
+      const fileBuffer = await fs.promises.readFile(filePath);
+      
+      // Set response headers
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `inline; filename="Agreement_${agreementId}.pdf"`);
+      
+      // Send the file
+      res.send(fileBuffer);
+    } catch (error) {
+      console.error("Error serving agreement PDF:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to serve agreement PDF",
       });
     }
   });
