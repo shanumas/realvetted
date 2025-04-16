@@ -31,11 +31,11 @@ export function useVerificationStatus(
     if (!user || checking) {
       return;
     }
-    
+
     // If user is already verified, clear the session ID from localStorage and return
     if (user.profileStatus === "verified") {
       if (sessionId) {
-        localStorage.removeItem('veriffSessionId');
+        localStorage.removeItem("veriffSessionId");
       }
       return;
     }
@@ -51,7 +51,7 @@ export function useVerificationStatus(
         );
         const data = await response.json();
 
-        if (data.success && (data.status === "approved" || data.status === "success" || data.isVerified === true)) {
+        if (data.decision === "approved") {
           // Session is approved, refresh user data to get updated status
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 
@@ -59,9 +59,9 @@ export function useVerificationStatus(
             title: "Verification Complete",
             description: "Your identity has been successfully verified!",
           });
-          
+
           // Clear the session ID from localStorage as verification is complete
-          localStorage.removeItem('veriffSessionId');
+          localStorage.removeItem("veriffSessionId");
         }
       }
       // Otherwise, check the user's current verification status
