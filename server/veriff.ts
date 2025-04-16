@@ -158,11 +158,19 @@ export async function checkVeriffSessionStatus(
 
       try {
         const data = JSON.parse(responseText);
-        if (data && data.status) {
+        console.log("Invalid response format from Veriff API:", data);
+        
+        // Check for decision property first (as per the error logs)
+        if (data && data.decision) {
+          console.log(`Verification decision: ${data.decision}`);
+          return data.decision; // Return decision as the status
+        } 
+        // Fall back to status if decision isn't present
+        else if (data && data.status) {
           console.log(`Verification status: ${data.status}`);
           return data.status;
         } else {
-          console.log("Invalid response format from Veriff API:", data);
+          console.log("Neither decision nor status found in Veriff API response:", data);
           return "pending";
         }
       } catch (jsonError) {

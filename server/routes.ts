@@ -184,9 +184,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`User ID ${req.user.id} automatically verified via background check.`);
         }
         
+        // Return both status and decision fields for backward compatibility
         res.json({
           success: true,
           status,
+          decision: status, // Include decision field since frontend expects it
           // Add explicit boolean for UI convenience
           isVerified: status === 'approved' || status === 'success'
         });
