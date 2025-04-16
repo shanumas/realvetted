@@ -376,7 +376,8 @@ export default function BuyerPropertyDetail() {
               // Check for a recently signed agency disclosure agreement
               const recentDisclosures = data.data.filter((agreement: any) => 
                 agreement.type === "agency_disclosure" && 
-                (agreement.status === "completed" || agreement.status === "pending") &&
+                (agreement.status === "completed" || agreement.status === "pending" || 
+                agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
                 user?.id && agreement.buyerId === user.id &&
                 new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
               );
