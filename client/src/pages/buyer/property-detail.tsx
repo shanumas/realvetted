@@ -314,18 +314,64 @@ export default function BuyerPropertyDetail() {
     }
     
     // Store viewing request data for later submission after signing the disclosure form
-    setViewingRequestData({
+    const requestData = {
       date: viewingDate,
       time: viewingTime,
       endTime: viewingEndTime,
       notes: viewingNotes
-    });
+    };
+    
+    setViewingRequestData(requestData);
     
     // Close the viewing modal
     setIsViewingModalOpen(false);
     
-    // Open the disclosure form
-    setIsDisclosureFormOpen(true);
+    // Check if there are existing viewing requests or signed disclosure forms
+    if (viewingRequests && viewingRequests.length > 0) {
+      console.log("Existing viewing requests found, skipping disclosure form");
+      // User already has viewing requests for this property, skip disclosure form
+      requestViewingMutation.mutate({
+        ...requestData,
+        override: true // Allow override
+      });
+      return;
+    }
+    
+    // Check if the user has already signed a disclosure for this property
+    apiRequest("GET", `/api/properties/${propertyId}/agreements`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.data) {
+          // Check for ANY previous agency disclosure agreement for this property and user
+          const previousAgreements = data.data.filter((agreement: any) => 
+            agreement.type === "agency_disclosure" && 
+            (agreement.status === "completed" || agreement.status === "pending" || 
+            agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
+            user?.id && agreement.buyerId === user.id
+          );
+          
+          if (previousAgreements.length > 0) {
+            // User has already signed a disclosure for this property, skip showing the form
+            console.log("User already signed disclosure form for this property, skipping");
+            requestViewingMutation.mutate({
+              ...requestData,
+              override: true
+            });
+            return;
+          }
+          
+          // No previous disclosure form signed, show the form
+          setIsDisclosureFormOpen(true);
+        } else {
+          // If API call fails, just proceed to the form
+          setIsDisclosureFormOpen(true);
+        }
+      })
+      .catch(error => {
+        console.error("Error checking for existing agreements:", error);
+        // On error, just show the form
+        setIsDisclosureFormOpen(true);
+      });
   };
   
   // Handle submission after the disclosure form is signed
@@ -369,148 +415,96 @@ export default function BuyerPropertyDetail() {
       // If we just closed the form and we still have viewing request data,
       // query for the latest agreement to see if it was signed
       if (viewingRequestData && propertyId) {
-        // First check if we already have a pending viewing request for this property
-        apiRequest("GET", `/api/properties/${propertyId}/viewing-requests`)
+        // Check if the user has ever signed a disclosure form for this property
+        apiRequest("GET", `/api/properties/${propertyId}/agreements`)
           .then(response => response.json())
-          .then(existingRequests => {
-            // If we have existing viewing requests, proceed without requiring disclosure form
-            if (existingRequests && existingRequests.length > 0) {
-              console.log("Found existing viewing requests for this property, skipping disclosure form check");
-              handleDisclosureFormComplete(true); // Proceed with override
-              return;
-            }
-            
-            // If no existing requests, proceed with normal disclosure form check
-            apiRequest("GET", `/api/properties/${propertyId}/agreements`)
-              .then(response => response.json())
-              .then(data => {
-                if (data.success && data.data) {
-                  // Check for a recently signed agency disclosure agreement
-                  const recentDisclosures = data.data.filter((agreement: any) => 
-                    agreement.type === "agency_disclosure" && 
-                    (agreement.status === "completed" || agreement.status === "pending" || 
-                    agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
-                    user?.id && agreement.buyerId === user.id &&
-                    new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
-                  );
-                  
-                  if (recentDisclosures.length > 0) {
-                    // If we found a recent disclosure, proceed with the viewing request
-                    handleDisclosureFormComplete();
-                  } else {
-                    // Instead of auto-canceling, ask the user what they want to do
-                    toast({
-                      title: "Disclosure Form Not Signed",
-                      description: "Do you want to proceed with your viewing request anyway? You'll need to sign the disclosure form later.",
-                      duration: 8000,
-                      action: (
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleDisclosureFormCancel}
-                          >
-                            Cancel Request
-                          </Button>
-                          <Button 
-                            variant="default" 
-                            size="sm" 
-                            onClick={() => handleDisclosureFormComplete(true)}
-                          >
-                            Continue Anyway
-                          </Button>
-                        </div>
-                      ),
-                    });
-                    
-                    // Don't automatically cancel, let the user decide
-                    // Don't run handleDisclosureFormCancel() here
-                  }
-                } else {
-                  // If the API call fails or returns no data, show a toast with options instead of auto-cancelling
-                  toast({
-                    title: "Unable to verify form signature",
-                    description: "Do you want to proceed with your viewing request anyway?",
-                    duration: 8000,
-                    action: (
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={handleDisclosureFormCancel}
-                        >
-                          Cancel Request
-                        </Button>
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          onClick={() => handleDisclosureFormComplete(true)}
-                        >
-                          Continue Anyway
-                        </Button>
-                      </div>
-                    ),
-                  });
-                }
-              })
-              .catch(error => {
-                console.error("Error fetching agreements:", error);
-                handleDisclosureFormComplete(true); // Proceed anyway if we can't check
+          .then(data => {
+            if (data.success && data.data) {
+              // Check for ANY previous agency disclosure agreement for this property and user
+              // Not just recent ones - if they've ever signed one, they don't need to sign again
+              const previousAgreements = data.data.filter((agreement: any) => 
+                agreement.type === "agency_disclosure" && 
+                (agreement.status === "completed" || agreement.status === "pending" || 
+                agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
+                user?.id && agreement.buyerId === user.id
+              );
+              
+              if (previousAgreements.length > 0) {
+                // If the user has signed a disclosure form for this property before, 
+                // allow them to submit a new viewing request without signing again
+                console.log("Found existing disclosure agreement for this property, proceeding with viewing request");
+                handleDisclosureFormComplete(true); // Proceed with override
+                return;
+              }
+              
+              // Check for a recently signed agency disclosure agreement (within the last minute)
+              const recentDisclosures = data.data.filter((agreement: any) => 
+                agreement.type === "agency_disclosure" && 
+                (agreement.status === "completed" || agreement.status === "pending" || 
+                agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
+                user?.id && agreement.buyerId === user.id &&
+                new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
+              );
+              
+              if (recentDisclosures.length > 0) {
+                // If we found a recent disclosure, proceed with the viewing request
+                handleDisclosureFormComplete();
+              } else {
+                // Instead of auto-canceling, ask the user what they want to do
+                toast({
+                  title: "Disclosure Form Not Signed",
+                  description: "Do you want to proceed with your viewing request anyway? You'll need to sign the disclosure form later.",
+                  duration: 8000,
+                  action: (
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleDisclosureFormCancel}
+                      >
+                        Cancel Request
+                      </Button>
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={() => handleDisclosureFormComplete(true)}
+                      >
+                        Continue Anyway
+                      </Button>
+                    </div>
+                  ),
+                });
+              }
+            } else {
+              // If the API call fails or returns no data, show a toast with options
+              toast({
+                title: "Unable to verify form signature",
+                description: "Do you want to proceed with your viewing request anyway?",
+                duration: 8000,
+                action: (
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handleDisclosureFormCancel}
+                    >
+                      Cancel Request
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      onClick={() => handleDisclosureFormComplete(true)}
+                    >
+                      Continue Anyway
+                    </Button>
+                  </div>
+                ),
               });
+            }
           })
           .catch(error => {
-            console.error("Error fetching existing viewing requests:", error);
-            // Fall back to the normal disclosure form check
-            apiRequest("GET", `/api/properties/${propertyId}/agreements`)
-              .then(response => response.json())
-              .then(data => {
-                if (data.success && data.data) {
-                  const recentDisclosures = data.data.filter((agreement: any) => 
-                    agreement.type === "agency_disclosure" && 
-                    (agreement.status === "completed" || agreement.status === "pending" || 
-                    agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
-                    user?.id && agreement.buyerId === user.id &&
-                    new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
-                  );
-                  
-                  if (recentDisclosures.length > 0) {
-                    // If we found a recent disclosure, proceed with the viewing request
-                    handleDisclosureFormComplete();
-                  } else {
-                    // Just proceed without showing the prompt
-                    handleDisclosureFormComplete(true);
-                  }
-                } else {
-                  // If API call fails, just proceed
-                  handleDisclosureFormComplete(true);
-                }
-              })
-          })
-          .catch(() => {
-            // On error, show a toast with options instead of auto-cancelling
-            toast({
-              title: "Error verifying form signature",
-              description: "Do you want to proceed with your viewing request anyway?",
-              duration: 8000,
-              action: (
-                <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleDisclosureFormCancel}
-                  >
-                    Cancel Request
-                  </Button>
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={() => handleDisclosureFormComplete(true)}
-                  >
-                    Continue Anyway
-                  </Button>
-                </div>
-              ),
-            });
+            console.error("Error fetching agreements:", error);
+            handleDisclosureFormComplete(true); // Proceed anyway if we can't check
           });
       }
     }
