@@ -374,6 +374,25 @@ export async function fillAgencyDisclosureForm(
       }
     }
     
+    // Set buyer signatures if provided
+    if (formData.buyerSignature1) {
+      try {
+        form.getTextField('sign1').setText(formData.buyerSignature1);
+        console.log(`Successfully filled 'sign1' field with buyer's primary signature`);
+      } catch (error) {
+        console.warn("Could not set sign1 field:", error);
+      }
+    }
+    
+    if (formData.buyerSignature2) {
+      try {
+        form.getTextField('sign2').setText(formData.buyerSignature2);
+        console.log(`Successfully filled 'sign2' field with buyer's secondary signature`);
+      } catch (error) {
+        console.warn("Could not set sign2 field:", error);
+      }
+    }
+    
     // Fill in other fields from formData if provided
     if (formData.buyerName2) {
       try {
