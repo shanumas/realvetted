@@ -195,10 +195,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (veriffError) {
         console.log("Verification not found or still in progress");
         
-        // Return a more user-friendly response
+        // Return a more user-friendly response with both status and decision fields
         res.json({
           success: true,
           status: "pending",
+          decision: "pending", // Include decision field since frontend expects it
           isVerified: false,
           message: "Verification is still in progress or not yet started"
         });

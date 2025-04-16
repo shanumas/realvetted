@@ -121,7 +121,8 @@ export async function checkVeriffStatus(sessionId: string): Promise<string> {
     }
     
     const data = await response.json();
-    return data.status;
+    // Return decision field if present, otherwise fall back to status
+    return data.decision || data.status;
   } catch (error) {
     console.error('Error checking Veriff status:', error);
     throw error;

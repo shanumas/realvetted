@@ -51,7 +51,8 @@ export function useVerificationStatus(
         );
         const data = await response.json();
 
-        if (data.decision === "approved") {
+        // Check for either decision field or status field with "approved" value
+        if (data.decision === "approved" || data.status === "approved") {
           // Session is approved, refresh user data to get updated status
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
 

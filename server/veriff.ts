@@ -134,49 +134,12 @@ export async function checkVeriffSessionStatus(
 
       const responseText = await response.text();
 
-      console.log(`Veriff API Response Status Verification: ${responseText}`);
-
-      // Handle different response statuses appropriately
-      if (!response.ok) {
-        if (response.status === 404) {
-          console.log("Verification not found or still in progress");
-          return "pending"; // Decision not made yet
-        }
-
-        console.log(`Error response from Veriff: ${responseText}`);
-        return "pending";
-      }
-
-      // Parse the JSON response if it's valid
-
-      console.log(`Veriff API Response Body: ${responseText}`);
-
-      if (!responseText || responseText.trim() === "") {
-        console.log("Empty response from Veriff API");
-        return "pending";
-      }
-
-      try {
-        const data = JSON.parse(responseText);
-        console.log("Invalid response format from Veriff API:", data);
-        
-        // Check for decision property first (as per the error logs)
-        if (data && data.decision) {
-          console.log(`Verification decision: ${data.decision}`);
-          return data.decision; // Return decision as the status
-        } 
-        // Fall back to status if decision isn't present
-        else if (data && data.status) {
-          console.log(`Verification status: ${data.status}`);
-          return data.status;
-        } else {
-          console.log("Neither decision nor status found in Veriff API response:", data);
-          return "pending";
-        }
-      } catch (jsonError) {
-        console.error("Error parsing Veriff API JSON response:", jsonError);
-        console.log("Raw response that couldn't be parsed:", responseText);
-        return "pending";
+      const data = JSON.parse(responseText);
+      if (data && data.decision) {
+        console.log(`Verification status: ${data.decision}`);
+        return data.decision;
+      } else {
+        return data.decision;
       }
     } catch (fetchError) {
       console.error("Error fetching from Veriff API:", fetchError);
