@@ -85,7 +85,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   const filteredRequests = viewingRequests?.filter(request => {
     if (activeTab === "pending") return request.status === "pending";
     if (activeTab === "approved") return request.status === "accepted"; // Use 'accepted' status from backend
-    if (activeTab === "rejected") return request.status === "rejected";
+    if (activeTab === "rejected") return request.status === "rejected" || request.status === "cancelled"; // Handle both spellings
     if (activeTab === "completed") return request.status === "completed";
     return true; // Show all requests on "all" tab
   });
@@ -178,7 +178,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   // Get counts for badges
   const pendingCount = viewingRequests?.filter(req => req.status === "pending").length || 0;
   const approvedCount = viewingRequests?.filter(req => req.status === "accepted").length || 0; // Use 'accepted' status from backend
-  const rejectedCount = viewingRequests?.filter(req => req.status === "rejected").length || 0;
+  const rejectedCount = viewingRequests?.filter(req => req.status === "rejected" || req.status === "cancelled").length || 0;
   const completedCount = viewingRequests?.filter(req => req.status === "completed").length || 0;
 
   // Determine who to chat with based on role
@@ -262,10 +262,12 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             variant={
                               request.status === 'pending' ? 'outline' : 
                               request.status === 'accepted' ? 'success' :
-                              request.status === 'rejected' ? 'destructive' : 'default'
+                              (request.status === 'rejected' || request.status === 'cancelled') ? 'destructive' : 'default'
                             }
                           >
-                            {request.status === 'accepted' ? 'Approved' : request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                            {request.status === 'accepted' ? 'Approved' : 
+                             request.status === 'cancelled' ? 'Cancelled' : 
+                             request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                           </Badge>
                         </div>
                       </CardHeader>
