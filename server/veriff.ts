@@ -3,9 +3,9 @@ import { User } from "@shared/schema";
 import * as crypto from "crypto";
 
 // Veriff API key provided by the user
-const VERIFF_API_KEY = "1340b85e-5b2c-4223-8765-fb2f72901afa";
+const VERIFF_API_KEY = "c3c0fe19-3584-42b7-b9c6-b7b895bc179d";
 
-const SHARED_SECRET = "220dbc0a-8f57-4597-82a2-e70a36708cf6";
+const SHARED_SECRET = "73014f07-489f-4177-a488-c96a9743d541";
 
 /**
  * Creates a new Veriff verification session for a user

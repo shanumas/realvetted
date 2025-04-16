@@ -12,7 +12,7 @@ import {
   extractPropertyFromUrl,
 } from "./openai";
 import { lookupCaliforniaLicense } from "./license-lookup";
-import { createVeriffSession, checkVeriffSessionStatus } from "./veriff";
+import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
 import {
   propertySchema,
   agentLeadSchema,
