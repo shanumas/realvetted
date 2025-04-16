@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, FileText, Download, Check, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Check, RefreshCw } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
 
 interface AgencyDisclosureFormProps {
@@ -31,19 +31,24 @@ export function AgencyDisclosureForm({
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [signature, setSignature] = useState<string>('');
+  const [signature2, setSignature2] = useState<string>('');
   const [signatureDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [sigPad, setSigPad] = useState<SignatureCanvas | null>(null);
+  const [sigPad2, setSigPad2] = useState<SignatureCanvas | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   // Always set isEditable to true by default
   const [isEditable] = useState<boolean>(true);
+  // State to track which signature is active (1 or 2)
+  const [activeSignature, setActiveSignature] = useState<number>(1);
   
   // Determine if current user is agent or buyer
   const isAgent = user?.role === 'agent';
   
   // State to store existing agreements
   const [existingSignature, setExistingSignature] = useState<string | null>(null);
+  const [existingSignature2, setExistingSignature2] = useState<string | null>(null);
   
   // State to keep track of form field values that user enters in PDF
   const [formFieldValues, setFormFieldValues] = useState<Record<string, string>>({});
@@ -247,6 +252,7 @@ export function AgencyDisclosureForm({
     buyerName1: user?.firstName && user?.lastName 
       ? `${user.firstName} ${user.lastName}` 
       : user?.email || '',
+    buyerName2: '', // This can be filled in by the user in the PDF form
     
     // Property information
     propertyAddress: property.address,
@@ -267,21 +273,29 @@ export function AgencyDisclosureForm({
         } 
       : {
           buyerSignature1: signature,
-          buyerSignatureDate1: signatureDate
+          buyerSignatureDate1: signatureDate,
+          buyerSignature2: signature2,
+          buyerSignatureDate2: signatureDate
         }),
   };
 
   const clearSignature = () => {
-    if (sigPad) {
+    if (activeSignature === 1 && sigPad) {
       sigPad.clear();
       setSignature('');
+    } else if (activeSignature === 2 && sigPad2) {
+      sigPad2.clear();
+      setSignature2('');
     }
   };
 
   const handleSignEnd = () => {
-    if (sigPad) {
+    if (activeSignature === 1 && sigPad) {
       const signatureData = sigPad.toDataURL();
       setSignature(signatureData);
+    } else if (activeSignature === 2 && sigPad2) {
+      const signatureData = sigPad2.toDataURL();
+      setSignature2(signatureData);
     }
   };
 
@@ -387,6 +401,7 @@ export function AgencyDisclosureForm({
   const handleSave = async () => {
     // Use existing signature if it exists, otherwise require a new one
     const signatureToUse = existingSignature || signature;
+    const signature2ToUse = existingSignature2 || signature2;
     
     if (!signatureToUse) {
       toast({
@@ -405,7 +420,10 @@ export function AgencyDisclosureForm({
         // Override with the signature we're actually using
         ...(isAgent 
           ? { agentSignature: signatureToUse }
-          : { buyerSignature1: signatureToUse }
+          : { 
+              buyerSignature1: signatureToUse,
+              buyerSignature2: signature2ToUse 
+            }
         ),
         viewingRequestId
       };
@@ -448,35 +466,7 @@ export function AgencyDisclosureForm({
     }
   };
 
-  const handleDownload = async () => {
-    try {
-      // We need to ensure the downloaded PDF has the same form data as what's displayed
-      // First, reload the preview to make sure any edits are captured
-      await generatePdfPreview();
-      
-      // Then use the same URL for download by opening it in a new window
-      // This ensures the exact same PDF that's displayed is what gets downloaded
-      if (pdfUrl) {
-        // Create a link to trigger download from the existing PDF (already processed with form data)
-        const a = document.createElement('a');
-        a.href = pdfUrl;
-        const fileNameSuffix = isEditable ? '_editable' : '';
-        a.download = `Agency_Disclosure_${property.address.replace(/\s+/g, '_')}${fileNameSuffix}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } else {
-        throw new Error("PDF preview not available. Please try reloading the preview first.");
-      }
-    } catch (error) {
-      console.error("Error downloading preview:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to download preview",
-        variant: "destructive",
-      });
-    }
-  };
+  // Download functionality has been removed as per requirements
   
   // Clean up URLs when component unmounts
   useEffect(() => {
@@ -559,51 +549,124 @@ export function AgencyDisclosureForm({
           {/* Signature Area */}
           <div className="pt-4">
             <h3 className="text-lg font-medium mb-2">Your Signature</h3>
-            
-            {existingSignature ? (
-              <>
-                <div className="mt-2 p-4 border border-gray-300 rounded-md bg-gray-50">
-                  <p className="text-sm text-gray-600 mb-2">You have already signed this form:</p>
-                  <img 
-                    src={existingSignature} 
-                    alt="Your existing signature" 
-                    className="max-h-[100px] mx-auto"
-                  />
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Signed on {signatureDate}
-                  </p>
+
+            {!isAgent && (
+              <div className="mb-4">
+                <div className="flex border-b border-gray-200">
+                  <button
+                    className={`px-4 py-2 font-medium text-sm ${activeSignature === 1 ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+                    onClick={() => setActiveSignature(1)}
+                  >
+                    Primary Buyer Signature
+                  </button>
+                  <button
+                    className={`px-4 py-2 font-medium text-sm ${activeSignature === 2 ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'}`}
+                    onClick={() => setActiveSignature(2)}
+                  >
+                    Secondary Buyer Signature (Optional)
+                  </button>
                 </div>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => setExistingSignature(null)}
-                >
-                  Sign Again
-                </Button>
-              </>
-            ) : (
-              <div className="relative border border-gray-300 rounded-md mt-1 bg-white">
-                <SignatureCanvas
-                  ref={(ref) => setSigPad(ref)}
-                  canvasProps={{
-                    width: 600,
-                    height: 150,
-                    className: 'signature-canvas border rounded-md',
-                  }}
-                  onEnd={handleSignEnd}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm" 
-                  className="absolute top-2 right-2"
-                  onClick={clearSignature}
-                >
-                  Clear
-                </Button>
               </div>
+            )}
+            
+            {activeSignature === 1 && (
+              <>
+                {existingSignature ? (
+                  <>
+                    <div className="mt-2 p-4 border border-gray-300 rounded-md bg-gray-50">
+                      <p className="text-sm text-gray-600 mb-2">Your signature:</p>
+                      <img 
+                        src={existingSignature} 
+                        alt="Your existing signature" 
+                        className="max-h-[100px] mx-auto"
+                      />
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Signed on {signatureDate}
+                      </p>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setExistingSignature(null)}
+                    >
+                      Sign Again
+                    </Button>
+                  </>
+                ) : (
+                  <div className="relative border border-gray-300 rounded-md mt-1 bg-white">
+                    <SignatureCanvas
+                      ref={(ref) => setSigPad(ref)}
+                      canvasProps={{
+                        width: 600,
+                        height: 150,
+                        className: 'signature-canvas border rounded-md',
+                      }}
+                      onEnd={handleSignEnd}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="absolute top-2 right-2"
+                      onClick={clearSignature}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeSignature === 2 && !isAgent && (
+              <>
+                {existingSignature2 ? (
+                  <>
+                    <div className="mt-2 p-4 border border-gray-300 rounded-md bg-gray-50">
+                      <p className="text-sm text-gray-600 mb-2">Second buyer signature:</p>
+                      <img 
+                        src={existingSignature2} 
+                        alt="Second buyer signature" 
+                        className="max-h-[100px] mx-auto"
+                      />
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        Signed on {signatureDate}
+                      </p>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setExistingSignature2(null)}
+                    >
+                      Sign Again
+                    </Button>
+                  </>
+                ) : (
+                  <div className="relative border border-gray-300 rounded-md mt-1 bg-white">
+                    <SignatureCanvas
+                      ref={(ref) => setSigPad2(ref)}
+                      canvasProps={{
+                        width: 600,
+                        height: 150,
+                        className: 'signature-canvas border rounded-md',
+                      }}
+                      onEnd={handleSignEnd}
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="absolute top-2 right-2"
+                      onClick={clearSignature}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
             
             <p className="text-sm text-gray-600 mt-4">
@@ -613,31 +676,26 @@ export function AgencyDisclosureForm({
           </div>
         </div>
 
-        <DialogFooter className="flex justify-between space-x-2">
-          <div className="flex space-x-2">
-            <Button variant="outline" type="button" onClick={handleDownload}>
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </Button>
-          </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Sign & Submit
-                </>
-              )}
-            </Button>
-          </div>
+        <DialogFooter className="flex justify-end space-x-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSave} 
+            disabled={loading || (!signature && !existingSignature)}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Check className="mr-2 h-4 w-4" />
+                Sign & Submit
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
