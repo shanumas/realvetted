@@ -104,6 +104,7 @@ export default function AuthPage() {
       profilePhotoUrl: "",
       licenseNumber: "",
     },
+    mode: "onChange",
   });
 
   // Listen to the form state changes
@@ -138,32 +139,35 @@ export default function AuthPage() {
   const handleProfilePhotoUpload = async (file: File): Promise<string> => {
     try {
       setUploadingPhoto(true);
-      
+
       const formData = new FormData();
-      formData.append('profilePhoto', file);
-      
-      const response = await fetch('/api/uploads/profile-photo', {
-        method: 'POST',
+      formData.append("profilePhoto", file);
+
+      const response = await fetch("/api/uploads/profile-photo", {
+        method: "POST",
         body: formData,
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to upload profile photo');
+        throw new Error("Failed to upload profile photo");
       }
-      
+
       const data = await response.json();
-      
+
       if (!data.success) {
-        throw new Error(data.error || 'Failed to upload profile photo');
+        throw new Error(data.error || "Failed to upload profile photo");
       }
-      
+
       return data.profilePhotoUrl;
     } catch (error) {
-      console.error('Profile photo upload error:', error);
+      console.error("Profile photo upload error:", error);
       toast({
-        title: 'Upload Failed',
-        description: error instanceof Error ? error.message : 'Failed to upload profile photo',
-        variant: 'destructive'
+        title: "Upload Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to upload profile photo",
+        variant: "destructive",
       });
       throw error;
     } finally {
@@ -175,48 +179,53 @@ export default function AuthPage() {
   const handleLicenseLookup = async (licenseNumber: string) => {
     try {
       setLookingUpLicense(true);
-      
-      const response = await fetch(`/api/agent/license-lookup?licenseNumber=${encodeURIComponent(licenseNumber)}`);
-      
+
+      const response = await fetch(
+        `/api/agent/license-lookup?licenseNumber=${encodeURIComponent(licenseNumber)}`,
+      );
+
       if (!response.ok) {
-        throw new Error('Failed to look up license');
+        throw new Error("Failed to look up license");
       }
-      
+
       const data = await response.json();
-      
+
       if (!data.success) {
-        throw new Error(data.error || 'Failed to find license information');
+        throw new Error(data.error || "Failed to find license information");
       }
-      
+
       // Populate the form with the agent's details from the license lookup
       if (data.data) {
         const { name, address, city, state, zip } = data.data;
-        
+
         // Parse the full name into first and last name
         if (name) {
-          const nameParts = name.split(' ');
+          const nameParts = name.split(" ");
           if (nameParts.length >= 2) {
             const firstName = nameParts[0];
-            const lastName = nameParts.slice(1).join(' ');
-            registerForm.setValue('firstName', firstName);
-            registerForm.setValue('lastName', lastName);
+            const lastName = nameParts.slice(1).join(" ");
+            registerForm.setValue("firstName", firstName);
+            registerForm.setValue("lastName", lastName);
           } else {
-            registerForm.setValue('firstName', name);
+            registerForm.setValue("firstName", name);
           }
         }
-        
+
         toast({
           title: "License Information Found",
-          description: "Your name has been filled based on your license information.",
+          description:
+            "Your name has been filled based on your license information.",
         });
       }
-      
     } catch (error) {
-      console.error('License lookup error:', error);
+      console.error("License lookup error:", error);
       toast({
-        title: 'License Lookup Failed',
-        description: error instanceof Error ? error.message : 'Failed to look up license information',
-        variant: 'destructive'
+        title: "License Lookup Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to look up license information",
+        variant: "destructive",
       });
     } finally {
       setLookingUpLicense(false);
@@ -224,10 +233,12 @@ export default function AuthPage() {
   };
 
   // Handle file selection
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    
+
     try {
       // Preview the image
       const reader = new FileReader();
@@ -235,20 +246,20 @@ export default function AuthPage() {
         setPreviewImage(e.target?.result as string);
       };
       reader.readAsDataURL(file);
-      
+
       // Upload the image
       const photoUrl = await handleProfilePhotoUpload(file);
-      registerForm.setValue('profilePhotoUrl', photoUrl);
+      registerForm.setValue("profilePhotoUrl", photoUrl);
     } catch (error) {
-      console.error('Error handling file:', error);
+      console.error("Error handling file:", error);
     }
   };
 
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
-    
+
     // Agent profile photo and license number are now collected after signup
-    
+
     registerMutation.mutate({
       email: values.email,
       password: values.password,
@@ -419,44 +430,38 @@ export default function AuthPage() {
                     onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
                     className="space-y-4"
                   >
-                    <FormField
-                      control={registerForm.control}
-                      name="firstName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>First Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="John" 
-                              {...field} 
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="lastName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Last Name</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="Doe" 
-                              {...field} 
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div>
+                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                        First Name
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="firstName"
+                          name="firstName"
+                          type="text"
+                          placeholder="John"
+                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                          value={registerForm.watch('firstName')}
+                          onChange={(e) => registerForm.setValue('firstName', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                        Last Name
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="lastName"
+                          name="lastName"
+                          type="text"
+                          placeholder="Doe"
+                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                          value={registerForm.watch('lastName')}
+                          onChange={(e) => registerForm.setValue('lastName', e.target.value)}
+                        />
+                      </div>
+                    </div>
 
                     <FormField
                       control={registerForm.control}
@@ -496,16 +501,17 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    
+
                     {roleTab === "agent" && (
                       <>
                         {/* Additional agent fields will be collected after signup */}
                         <FormDescription className="text-center mt-2 mb-2">
-                          You will be asked to provide your license number and profile photo after creating your account.
+                          You will be asked to provide your license number and
+                          profile photo after creating your account.
                         </FormDescription>
                       </>
                     )}
-                    
+
                     <Button
                       type="submit"
                       className="w-full"
