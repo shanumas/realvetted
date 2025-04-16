@@ -154,7 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Redirect based on role
       if (user.role === "buyer") {
-        setLocation("/buyer/kyc");
+        // Send buyers directly to dashboard after signup
+        setLocation("/buyer/dashboard");
       } else if (user.role === "agent") {
         // For agents, redirect to referral agreement page immediately after signup
         setLocation("/agent/referral-agreement");
