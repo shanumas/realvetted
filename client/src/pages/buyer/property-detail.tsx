@@ -326,18 +326,19 @@ export default function BuyerPropertyDetail() {
     // Close the viewing modal
     setIsViewingModalOpen(false);
     
-    // Check if there are existing viewing requests or signed disclosure forms
-    if (viewingRequests && viewingRequests.length > 0) {
-      console.log("Existing viewing requests found, skipping disclosure form");
-      // User already has viewing requests for this property, skip disclosure form
-      requestViewingMutation.mutate({
-        ...requestData,
-        override: true // Allow override
-      });
+    // For first-time viewing requests, we show the disclosure form regardless
+    // For subsequent requests, we check if user has already signed a form
+    const isFirstViewingRequest = !(viewingRequests && viewingRequests.length > 0);
+    
+    if (isFirstViewingRequest) {
+      // This is the first viewing request - always show the disclosure form
+      console.log("First viewing request, showing disclosure form");
+      setIsDisclosureFormOpen(true);
       return;
     }
     
-    // Check if the user has already signed a disclosure for this property
+    // Not the first request - check if user already signed a disclosure
+    console.log("Not first viewing request, checking for existing disclosure form");
     apiRequest("GET", `/api/properties/${propertyId}/agreements`)
       .then(response => response.json())
       .then(data => {
@@ -360,7 +361,8 @@ export default function BuyerPropertyDetail() {
             return;
           }
           
-          // No previous disclosure form signed, show the form
+          // No previous disclosure form signed, show the form even for subsequent requests
+          console.log("No previous disclosure form signed, showing the form");
           setIsDisclosureFormOpen(true);
         } else {
           // If API call fails, just proceed to the form
