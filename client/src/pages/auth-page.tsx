@@ -426,7 +426,13 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" {...field} />
+                            <Input 
+                              placeholder="John" 
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e.target.value);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -439,7 +445,13 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" {...field} />
+                            <Input 
+                              placeholder="Doe" 
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e.target.value);
+                              }}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
