@@ -118,10 +118,18 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   // Cancel viewing request mutation
   const cancelRequestMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/viewing-requests/${id}`);
-      return response.json();
+      try {
+        console.log(`Attempting to cancel viewing request with ID: ${id}`);
+        const response = await apiRequest("DELETE", `/api/viewing-requests/${id}`);
+        console.log("Cancel request response status:", response.status);
+        return await response.json();
+      } catch (error) {
+        console.error("Error in cancel request mutation:", error);
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Successfully cancelled viewing request:", data);
       toast({
         title: "Viewing request cancelled",
         description: "Your viewing request has been cancelled successfully.",
@@ -129,8 +137,16 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: [endpoint] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Also invalidate property-specific viewing requests
+      if (viewingRequests && viewingRequests.length > 0) {
+        const propertyIds = new Set(viewingRequests.map(r => r.propertyId));
+        propertyIds.forEach(propId => {
+          queryClient.invalidateQueries({ queryKey: [`/api/properties/${propId}/viewing-requests`] });
+        });
+      }
     },
     onError: (error) => {
+      console.error("Error in cancel request:", error);
       toast({
         title: "Error cancelling viewing request",
         description: error instanceof Error ? error.message : "An error occurred",
@@ -145,7 +161,17 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   
   const handleCancelRequest = (id: number) => {
     if (confirm("Are you sure you want to cancel this viewing request?")) {
-      cancelRequestMutation.mutate(id);
+      try {
+        console.log(`Cancelling viewing request with ID: ${id}`);
+        cancelRequestMutation.mutate(id);
+      } catch (error) {
+        console.error("Error in handleCancelRequest:", error);
+        toast({
+          title: "Error cancelling request",
+          description: "There was a problem cancelling your viewing request. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

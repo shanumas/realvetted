@@ -886,19 +886,18 @@ export default function BuyerPropertyDetail() {
                       
                       {/* Viewing Request Button */}
                       <div className="mb-6">
-                        {/* Disable the button if there's already a pending viewing request */}
+                        {/* Always allow creating viewing requests, but show a note if there's a pending one */}
                         {viewingRequests.some(request => request.status === 'pending') ? (
                           <div className="flex flex-col gap-3">
                             <Button 
                               className="w-full flex items-center justify-center"
-                              variant="outline"
-                              disabled
+                              onClick={() => setIsViewingModalOpen(true)}
                             >
-                              <AlertTriangle className="mr-2 h-5 w-5 text-amber-500" /> 
-                              Pending Request Exists
+                              <Eye className="mr-2 h-5 w-5" /> Request Another Viewing
                             </Button>
                             <p className="text-sm text-center text-amber-600">
-                              You already have a pending viewing request for this property.
+                              <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                              Note: You already have a pending viewing request for this property.
                             </p>
                           </div>
                         ) : (
