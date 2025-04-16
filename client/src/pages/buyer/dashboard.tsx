@@ -31,6 +31,8 @@ export default function BuyerDashboard() {
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
+  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
+  const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   
   // Get stored verification session ID if it exists
   const storedSessionId = localStorage.getItem('veriffSessionId');
@@ -105,6 +107,69 @@ export default function BuyerDashboard() {
       setPropertyToDelete(null);
     },
   });
+  
+  // Start Veriff verification flow
+  const startVerification = async () => {
+    try {
+      setIsVerifyingIdentity(true);
+      
+      // Create a Veriff verification session
+      const sessionData = await createVeriffSession();
+      
+      // Store session ID in localStorage to allow background checking
+      localStorage.setItem('veriffSessionId', sessionData.sessionId);
+      
+      // Launch Veriff verification
+      launchVeriff(sessionData.url, handleVerificationComplete);
+      
+      // Update UI
+      setIsVerificationStarted(true);
+      
+      toast({
+        title: "Verification Started",
+        description: "Please complete the identity verification process in the new window.",
+      });
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast({
+        title: "Verification failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsVerifyingIdentity(false);
+    }
+  };
+  
+  // Handle the completion of Veriff verification
+  const handleVerificationComplete = async (status: 'completed' | 'canceled' | 'error') => {
+    if (status === 'completed') {
+      toast({
+        title: "Verification Submitted",
+        description: "Your identity verification has been submitted and is being processed.",
+      });
+      
+      // Refresh user data
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } else if (status === 'canceled') {
+      toast({
+        title: "Verification Canceled",
+        description: "You canceled the identity verification process. You can try again later.",
+        variant: "destructive",
+      });
+      
+      // Clear the session ID from localStorage as it's no longer valid
+      localStorage.removeItem('veriffSessionId');
+    } else {
+      toast({
+        title: "Verification Error",
+        description: "There was an error during the verification process. Please try again.",
+        variant: "destructive",
+      });
+    }
+    
+    setIsVerificationStarted(false);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -153,14 +218,39 @@ export default function BuyerDashboard() {
                       {user?.profileStatus === "verified" ? (
                         <p>Your identity has been verified successfully. You have full access to all platform features.</p>
                       ) : (
-                        <p>
-                          {storedSessionId 
-                            ? "We're checking your verification status in the background. " 
-                            : "Your identity verification is still pending. "}
-                          <Link href="/buyer/kyc" className="font-medium underline">
-                            {storedSessionId ? "Verify again" : "Complete verification"}
-                          </Link> to unlock all features.
-                        </p>
+                        <div className="space-y-2">
+                          <p>
+                            {storedSessionId 
+                              ? "We're checking your verification status in the background. " 
+                              : "Your identity verification is still pending. "}
+                            Complete verification to unlock all features.
+                          </p>
+                          <div className="flex">
+                            <Button 
+                              size="sm"
+                              className="text-xs h-8"
+                              onClick={startVerification}
+                              disabled={isVerifyingIdentity || isVerificationStarted}
+                            >
+                              {isVerifyingIdentity ? (
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                              ) : (
+                                <Shield className="mr-2 h-3 w-3" />
+                              )}
+                              {isVerificationStarted 
+                                ? "Verification in Progress..." 
+                                : isVerifyingIdentity 
+                                  ? "Starting..." 
+                                  : "Verify Identity"}
+                            </Button>
+                          </div>
+                          {isVerificationStarted && (
+                            <div className="p-2 bg-blue-50 text-blue-700 rounded-md flex items-center text-xs mt-2">
+                              <Loader2 className="h-3 w-3 animate-spin text-blue-500 mr-2" />
+                              <span>Please complete the verification process in the opened window.</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
