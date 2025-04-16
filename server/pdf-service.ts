@@ -313,20 +313,102 @@ export async function fillAgencyDisclosureForm(
     }
   }
 
-  // First, try to replace placeholder "1" with "uma" as requested
-  try {
-    pdfBuffer = await replacePlaceholderInPdf(pdfBuffer, "1", "uma");
-    console.log('Successfully applied text replacement for placeholder "1"');
-  } catch (error: any) {
-    console.log(
-      'Text replacement for placeholder "1" failed:',
-      error.message || "Unknown error",
-    );
-  }
-
   // Load the PDF document
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const form = pdfDoc.getForm();
+  
+  // Fill form fields based on the formData
+  try {
+    // Get current date for 'today' field
+    const today = new Date();
+    const formattedToday = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+    
+    // Calculate date 89 days from today for '3Months' field
+    const threeMonthsLater = new Date(today);
+    threeMonthsLater.setDate(today.getDate() + 89);
+    const formattedThreeMonths = `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
+    
+    // Extract initials from buyerName1 if available
+    let buyerInitials = "";
+    if (formData.buyerName1) {
+      // Split the name into parts and get the first letter of each part
+      buyerInitials = formData.buyerName1
+        .split(" ")
+        .map(part => part.charAt(0).toUpperCase())
+        .join("");
+    }
+    
+    // Set the buyer1 field (buyerName1)
+    if (formData.buyerName1) {
+      try {
+        form.getTextField('buyer1').setText(formData.buyerName1);
+        console.log(`Successfully filled 'buyer1' field with: ${formData.buyerName1}`);
+      } catch (error) {
+        console.warn("Could not set buyer1 field:", error);
+      }
+    }
+    
+    // Set the today field
+    try {
+      form.getTextField('today').setText(formattedToday);
+      console.log(`Successfully filled 'today' field with: ${formattedToday}`);
+    } catch (error) {
+      console.warn("Could not set today field:", error);
+    }
+    
+    // Set the 3Months field
+    try {
+      form.getTextField('3Months').setText(formattedThreeMonths);
+      console.log(`Successfully filled '3Months' field with: ${formattedThreeMonths}`);
+    } catch (error) {
+      console.warn("Could not set 3Months field:", error);
+    }
+    
+    // Set the initial1 field with buyer initials
+    if (buyerInitials) {
+      try {
+        form.getTextField('initial1').setText(buyerInitials);
+        console.log(`Successfully filled 'initial1' field with: ${buyerInitials}`);
+      } catch (error) {
+        console.warn("Could not set initial1 field:", error);
+      }
+    }
+    
+    // Fill in other fields from formData if provided
+    if (formData.buyerName2) {
+      try {
+        form.getTextField('buyer2').setText(formData.buyerName2);
+      } catch (error) {
+        console.warn("Could not set buyer2 field:", error);
+      }
+    }
+    
+    if (formData.agentName) {
+      try {
+        form.getTextField('agent').setText(formData.agentName);
+      } catch (error) {
+        console.warn("Could not set agent field:", error);
+      }
+    }
+    
+    if (formData.agentBrokerageName) {
+      try {
+        form.getTextField('brokerage').setText(formData.agentBrokerageName);
+      } catch (error) {
+        console.warn("Could not set brokerage field:", error);
+      }
+    }
+    
+    if (formData.propertyAddress) {
+      try {
+        form.getTextField('property').setText(formData.propertyAddress);
+      } catch (error) {
+        console.warn("Could not set property address field:", error);
+      }
+    }
+  } catch (error) {
+    console.error("Error filling agency disclosure form fields:", error);
+  }
   
   // Handle the editable flag
   if (formData.isEditable === true) {
