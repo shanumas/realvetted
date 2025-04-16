@@ -9,11 +9,12 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createVeriffSession, launchVeriff } from "@/lib/veriff";
 import {
   AlertDialog,
   AlertDialogAction,

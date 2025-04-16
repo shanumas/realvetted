@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from "./hooks/use-auth";
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
-import BuyerKYC from "@/pages/buyer/kyc-verification";
 import BuyerDashboard from "@/pages/buyer/dashboard";
 import BuyerPropertyDetail from "@/pages/buyer/property-detail";
 import AgentKYC from "@/pages/agent/kyc-verification";
@@ -25,7 +24,6 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       
       {/* Buyer Routes */}
-      <ProtectedRoute path="/buyer/kyc" component={BuyerKYC} allowedRoles={["buyer"]} />
       <ProtectedRoute path="/buyer/dashboard" component={BuyerDashboard} allowedRoles={["buyer"]} />
       <ProtectedRoute path="/buyer/property/:id" component={BuyerPropertyDetail} allowedRoles={["buyer"]} />
       
@@ -74,7 +72,7 @@ function HomePage() {
       const lastLocation = localStorage.getItem("lastLocation");
       
       // Only redirect if there's no saved location or the saved location is the root/auth page
-      if (!lastLocation || lastLocation === '/' || lastLocation === '/auth') {
+      if (!lastLocation || lastLocation === '/' || lastLocation === '/auth' || lastLocation === '/buyer/kyc') {
         // Default redirection based on role and verification status
         if (user.role === "buyer") {
           // Buyers go directly to dashboard regardless of verification status
