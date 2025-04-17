@@ -10,6 +10,7 @@ import {
   findAgentsForProperty,
   extractIDData,
   extractPropertyFromUrl,
+  validatePrequalificationDocument,
 } from "./openai";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
