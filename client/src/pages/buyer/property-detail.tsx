@@ -267,8 +267,8 @@ export default function BuyerPropertyDetail() {
                 // Need to create a new global BRBC
                 // Store the agent ID to create an agreement with
                 setSelectedAgentId(error.response.data.agentId);
-                // Show the agency disclosure form for now
-                setIsDisclosureFormOpen(true);
+                // Show the global BRBC form
+                setIsBrbcModalOpen(true);
               }
             }
           })
