@@ -23,53 +23,11 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
     }
   };
 
-  // Upload pre-qualification document mutation
-  const uploadMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      // Manual fetch to ensure FormData is sent correctly
-      const response = await fetch("/api/buyer/prequalification", {
-        method: "POST",
-        body: formData,
-        credentials: "include"
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `Upload failed with status: ${response.status}`);
-      }
-      
-      return response.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({
-          title: "Document uploaded",
-          description: "Your pre-qualification document has been uploaded and will be verified.",
-        });
-        // Invalidate user data so the verification status is updated
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-        onVerified();
-        onClose();
-      } else {
-        toast({
-          title: "Upload failed",
-          description: data.error || "There was an error uploading your document.",
-          variant: "destructive",
-        });
-      }
-    },
-    onError: (error) => {
-      console.error("Upload error:", error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "There was an error uploading your document.",
-        variant: "destructive",
-      });
-    },
-  });
+  // State for tracking the upload status
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  // Handle manual form submission with XMLHttpRequest for better FormData handling
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!selectedFile) {
@@ -81,17 +39,73 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
       return;
     }
 
-    // Create FormData and append the file with the correct field name expected by multer
+    setIsSubmitting(true);
+    
+    // Create FormData with the file
     const formData = new FormData();
-    formData.append("file", selectedFile, selectedFile.name);
+    formData.append("file", selectedFile);
     formData.append("verificationMethod", "prequalification");
     
     console.log("Uploading file:", selectedFile.name, "Size:", selectedFile.size, "Type:", selectedFile.type);
     
-    uploadMutation.mutate(formData);
+    // Use XMLHttpRequest for better FormData handling
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/buyer/prequalification");
+    
+    // Add event listeners
+    xhr.onload = function() {
+      setIsSubmitting(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const response = JSON.parse(xhr.responseText);
+        if (response.success) {
+          toast({
+            title: "Document uploaded",
+            description: "Your pre-qualification document has been uploaded and will be verified.",
+          });
+          // Invalidate user data so the verification status is updated
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+          onVerified();
+          onClose();
+        } else {
+          toast({
+            title: "Upload failed",
+            description: response.error || "There was an error uploading your document.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.error("Upload failed:", xhr.status, xhr.statusText, xhr.responseText);
+        toast({
+          title: "Upload failed",
+          description: xhr.responseText || `Error ${xhr.status}: ${xhr.statusText}`,
+          variant: "destructive",
+        });
+      }
+    };
+    
+    xhr.onerror = function() {
+      setIsSubmitting(false);
+      console.error("Network error during upload");
+      toast({
+        title: "Upload failed",
+        description: "Network error occurred during upload. Please try again.",
+        variant: "destructive",
+      });
+    };
+    
+    // Log upload progress
+    xhr.upload.onprogress = function(event) {
+      if (event.lengthComputable) {
+        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        console.log(`Upload progress: ${percentComplete}%`);
+      }
+    };
+    
+    // Send the FormData
+    xhr.send(formData);
   };
 
-  const isLoading = uploadMutation.isPending;
+  const isLoading = isSubmitting;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -103,7 +117,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} encType="multipart/form-data">
           <div className="space-y-4 py-4">
             <div className="border bg-gray-50 p-4 rounded-lg border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer relative">
               <input
