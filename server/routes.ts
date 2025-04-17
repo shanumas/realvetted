@@ -5065,6 +5065,105 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       });
     }
   });
+  
+  // API Endpoint to create a global BRBC agreement between a buyer and agent
+  app.post("/api/global-brbc", isAuthenticated, async (req, res) => {
+    try {
+      const { agentId, signatureData, details } = req.body;
+      
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+      
+      const buyerId = req.user.id;
+      
+      // Check if this buyer already has a global BRBC with this agent
+      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(buyerId, agentId);
+      
+      if (existingAgreement && existingAgreement.status === 'completed') {
+        return res.status(400).json({
+          success: false,
+          error: "A global BRBC agreement already exists between this buyer and agent",
+          agreementId: existingAgreement.id
+        });
+      }
+      
+      // Get the agent information
+      const agent = await storage.getUser(agentId);
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: "Agent not found",
+        });
+      }
+      
+      // Create a global BRBC agreement
+      const agreement = await storage.createAgreement({
+        agentId: agentId,
+        buyerId: buyerId,
+        type: "global_brbc",
+        agreementText: JSON.stringify(details || {}),
+        buyerSignature: signatureData,
+        date: new Date(),
+        status: "signed_by_buyer", // Buyer has signed, waiting for agent
+        isGlobal: true, // This is a global agreement
+      });
+      
+      res.json({
+        success: true,
+        data: agreement,
+      });
+    } catch (error) {
+      console.error("Error creating global BRBC agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create global BRBC agreement",
+      });
+    }
+  });
+  
+  // API Endpoint to check if a global BRBC agreement exists between buyer and agent
+  app.get("/api/global-brbc/:agentId", isAuthenticated, async (req, res) => {
+    try {
+      const agentId = parseInt(req.params.agentId);
+      
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+      
+      const buyerId = req.user.id;
+      
+      // Check if this buyer already has a global BRBC with this agent
+      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(buyerId, agentId);
+      
+      if (existingAgreement && (existingAgreement.status === 'completed' || existingAgreement.status === 'signed_by_buyer')) {
+        // Return the existing agreement
+        return res.json({
+          success: true,
+          exists: true,
+          agreement: existingAgreement,
+        });
+      }
+      
+      // No agreement exists
+      res.json({
+        success: true,
+        exists: false,
+      });
+    } catch (error) {
+      console.error("Error checking global BRBC agreement:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to check global BRBC agreement",
+      });
+    }
+  });
 
   return httpServer;
 }

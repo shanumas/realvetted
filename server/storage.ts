@@ -679,7 +679,10 @@ export class PgStorage implements IStorage {
     const latestAgreements = new Map<string, any>();
     
     buyerAgreements.forEach(item => {
-      const key = `${item.agreement.propertyId}_${item.agreement.type}`;
+      // For global agreements without propertyId, use the agreement type directly
+      const key = item.agreement.propertyId 
+        ? `${item.agreement.propertyId}_${item.agreement.type}` 
+        : `global_${item.agreement.type}_${item.agreement.agentId}`;
       
       // If this property+type combination doesn't exist in the map yet,
       // or the current agreement is newer, update the map
@@ -698,6 +701,24 @@ export class PgStorage implements IStorage {
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
   
+  async getGlobalBRBCForBuyerAgent(buyerId: number, agentId: number): Promise<Agreement | undefined> {
+    // Get the latest global BRBC agreement between this buyer and agent
+    const result = await this.db.select()
+      .from(agreements)
+      .where(
+        and(
+          eq(agreements.buyerId, buyerId),
+          eq(agreements.agentId, agentId),
+          eq(agreements.isGlobal, true),
+          eq(agreements.type, "global_brbc")
+        )
+      )
+      .orderBy(desc(agreements.createdAt))
+      .limit(1);
+      
+    return result[0];
+  }
+  
   async createAgreement(agreementData: InsertAgreement): Promise<Agreement> {
     const result = await this.db.insert(agreements).values({
       propertyId: agreementData.propertyId,
@@ -710,7 +731,10 @@ export class PgStorage implements IStorage {
       sellerSignature: agreementData.sellerSignature || null,
       date: agreementData.date,
       status: agreementData.status || "pending_buyer",
-      createdAt: new Date()
+      createdAt: new Date(),
+      documentUrl: agreementData.documentUrl,
+      editedPdfContent: agreementData.editedPdfContent,
+      isGlobal: agreementData.isGlobal || false
     }).returning();
     
     return result[0];
