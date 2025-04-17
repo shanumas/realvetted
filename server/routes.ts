@@ -158,11 +158,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user record with prequalification info
       const fileUrl = `/uploads/prequalification/${fileName}`;
       
-      // Convert storage to PgStorage type to access updateUser method
-      const pgStorage = storage as any;
-      
       try {
-        await pgStorage.updateUser(req.user!.id, {
+        await storage.updateUser(req.user!.id, {
           verificationMethod: "prequalification",
           prequalificationDocUrl: fileUrl,
           prequalificationValidated: false, // Will be validated via AI in the next step
@@ -177,8 +174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use OpenAI to extract information from the document for validation
       try {
         // Validate the document using AI
-        const storagePg = storage as any;
-        const user = await storagePg.getUser(req.user!.id);
+        const user = await storage.getUser(req.user!.id);
         if (!user) {
           throw new Error("User not found");
         }
@@ -192,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         
         // Update user record with validation result
-        await storagePg.updateUser(req.user!.id, {
+        await storage.updateUser(req.user!.id, {
           prequalificationValidated: validationResult.validated,
           profileStatus: validationResult.validated ? "verified" : "pending",
           prequalificationData: validationResult.data
@@ -210,7 +206,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Return success
-      const updatedUser = await (storage as any).getUser(req.user!.id);
+      const updatedUser = await storage.getUser(req.user!.id);
       res.json({
         success: true,
         data: updatedUser
