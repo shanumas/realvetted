@@ -12,7 +12,7 @@ import {
   extractPropertyFromUrl,
   validatePrequalificationDocument,
 } from "./openai";
-import { sendTourRequestEmail } from "./email-service";
+import { sendTourRequestEmail, sendPrequalificationApprovalEmail } from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
 import {

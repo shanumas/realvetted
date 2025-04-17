@@ -7,9 +7,9 @@ import { PropertyCard } from "@/components/property-card";
 import { AddPropertyModal } from "@/components/add-property-modal";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
-import { getQueryFn, queryClient } from "@/lib/queryClient";
+import { getQueryFn, queryClient, apiRequest } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File, Upload } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File, Upload, MailCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
@@ -35,6 +35,7 @@ export default function BuyerDashboard() {
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
   const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] = useState(false);
+  const [isRequestingApproval, setIsRequestingApproval] = useState(false);
   
   // Get stored verification session ID if it exists
   const storedSessionId = localStorage.getItem('veriffSessionId');
@@ -179,6 +180,32 @@ export default function BuyerDashboard() {
     
     setIsVerificationStarted(false);
   };
+  
+  // Handle pre-qualification approval request
+  const handleRequestApproval = async () => {
+    try {
+      setIsRequestingApproval(true);
+      
+      const response = await apiRequest("/api/buyer/request-prequalification-approval", "POST");
+      
+      toast({
+        title: "Approval Request Sent",
+        description: "Your pre-qualification approval request has been sent for manual review.",
+      });
+      
+      // Refresh user data
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (error) {
+      console.error("Pre-qualification approval request error:", error);
+      toast({
+        title: "Request Failed",
+        description: error instanceof Error ? error.message : "Failed to send pre-qualification approval request",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRequestingApproval(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -253,16 +280,35 @@ export default function BuyerDashboard() {
                                   : "Verify Identity"}
                             </Button>
                             
-                            <Button 
-                              size="sm"
-                              className="text-xs h-8"
-                              onClick={() => setIsPrequalificationModalOpen(true)}
-                              disabled={isVerificationStarted}
-                              variant="outline"
-                            >
-                              <Upload className="mr-2 h-3 w-3" />
-                              Upload Pre-qualification
-                            </Button>
+                            <div className="flex space-x-2">
+                              <Button 
+                                size="sm"
+                                className="text-xs h-8"
+                                onClick={() => setIsPrequalificationModalOpen(true)}
+                                disabled={isVerificationStarted}
+                                variant="outline"
+                              >
+                                <Upload className="mr-2 h-3 w-3" />
+                                Upload Pre-qualification
+                              </Button>
+                              
+                              {user?.prequalificationDocUrl && !user?.prequalificationValidated && (
+                                <Button 
+                                  size="sm"
+                                  className="text-xs h-8"
+                                  onClick={handleRequestApproval}
+                                  disabled={isRequestingApproval}
+                                  variant="outline"
+                                >
+                                  {isRequestingApproval ? (
+                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <MailCheck className="mr-2 h-3 w-3" />
+                                  )}
+                                  {isRequestingApproval ? "Sending..." : "Get Pre-Qualification Approval"}
+                                </Button>
+                              )}
+                            </div>
                           </div>
                           {isVerificationStarted && (
                             <div className="p-2 bg-blue-50 text-blue-700 rounded-md flex items-center text-xs mt-2">
