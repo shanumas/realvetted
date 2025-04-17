@@ -64,6 +64,7 @@ export interface IStorage {
   getAgreementsByProperty(propertyId: number): Promise<Agreement[]>;
   getAgreementsByAgent(agentId: number): Promise<Agreement[]>;
   getAgreementsByType(type: string): Promise<Agreement[]>;
+  getAgreementsByBuyer(buyerId: number): Promise<Agreement[]>;
   createAgreement(agreement: InsertAgreement): Promise<Agreement>;
   updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement>;
   

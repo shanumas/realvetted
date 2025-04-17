@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
@@ -79,6 +79,13 @@ export default function BuyerDashboard() {
   const { data: properties, isLoading, refetch } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
     queryFn: getQueryFn({ on401: "throw" }),
+  });
+  
+  // Fetch all agreements signed by the buyer
+  const { data: buyerAgreements, isLoading: isLoadingAgreements } = useQuery({
+    queryKey: ["/api/buyer/agreements"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!user, // Only run this query if we have a user
   });
 
   const handleAddPropertySuccess = () => {
@@ -268,7 +275,7 @@ export default function BuyerDashboard() {
         <div className="bg-white shadow rounded-lg">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-4 pt-4 border-b border-gray-200">
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-md grid-cols-3">
                 <TabsTrigger value="properties">
                   <PlusIcon className="h-4 w-4 mr-2" />
                   Properties
@@ -276,6 +283,10 @@ export default function BuyerDashboard() {
                 <TabsTrigger value="viewingRequests">
                   <CalendarRange className="h-4 w-4 mr-2" />
                   Viewing Requests
+                </TabsTrigger>
+                <TabsTrigger value="agreements">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Agreements
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -336,6 +347,102 @@ export default function BuyerDashboard() {
                   <ViewingRequestsList userId={user.id} role="buyer" />
                 </div>
               )}
+            </TabsContent>
+            
+            <TabsContent value="agreements" className="p-0">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">My Signed Agreements</h3>
+                <p className="mt-1 text-sm text-gray-500">Documents and agreements you've signed during your home buying journey</p>
+              </div>
+              
+              <div className="p-4">
+                {isLoadingAgreements ? (
+                  <div className="flex justify-center my-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : !buyerAgreements || buyerAgreements.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <File className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>No signed agreements yet.</p>
+                    <p className="text-sm mt-2">When you sign documents related to a property, they will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y">
+                    {buyerAgreements.map((agreement: any) => (
+                      <div
+                        key={agreement.id}
+                        className="py-4 flex items-center justify-between"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="bg-blue-50 p-2 rounded-lg">
+                            <FileText className="h-6 w-6 text-blue-500" />
+                          </div>
+                          <div>
+                            <span className="font-medium">
+                              {agreement.type === "agency_disclosure"
+                                ? "Agency Disclosure Form"
+                                : agreement.type === "representation_agreement"
+                                ? "Buyer Representation Agreement"
+                                : agreement.type === "standard"
+                                ? "Buyer Representation Agreement"
+                                : "Agreement Document"}
+                            </span>
+                            <div className="text-xs text-gray-500 mt-1">
+                              <div className="flex flex-col">
+                                <span>
+                                  Property: {agreement.property ? agreement.property.address : "Unknown"}
+                                </span>
+                                <span>
+                                  Signed: {new Date(agreement.date).toLocaleDateString()}
+                                </span>
+                                <span
+                                  className={`mt-1 inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
+                                    agreement.status === "signed_by_buyer"
+                                      ? "bg-green-100 text-green-800"
+                                      : agreement.status === "signed_by_all"
+                                      ? "bg-green-100 text-green-800"
+                                      : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
+                                  {agreement.status === "signed_by_buyer"
+                                    ? "Signed by You"
+                                    : agreement.status === "signed_by_all"
+                                    ? "Fully Signed"
+                                    : agreement.status}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            // Format the agreement document URL before viewing
+                            const documentUrl = agreement.documentUrl ? 
+                              (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
+                                agreement.documentUrl : 
+                                `/uploads/${agreement.documentUrl}`) : 
+                              null;
+                              
+                            if (documentUrl) {
+                              window.open(documentUrl, '_blank');
+                            } else {
+                              toast({
+                                title: "Error",
+                                description: "Document not available",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          View Document
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         </div>
