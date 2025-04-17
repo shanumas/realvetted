@@ -251,29 +251,22 @@ export default function BuyerDashboard() {
       <SiteHeader />
 
       <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
-        {/* Welcome Banner */}
-        <div className="px-6 py-6 sm:px-8 bg-white shadow-sm rounded-lg mb-8 border border-gray-100">
+        {/* Welcome Banner - 50% less height */}
+        <div className="px-4 py-3 sm:px-6 bg-white shadow-sm rounded-lg mb-6 border border-gray-100">
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl leading-6 font-semibold text-gray-900">
-                Welcome, {user?.firstName || "Buyer"}!
-              </h3>
-              <p className="mt-2 max-w-2xl text-sm text-gray-500">
-                Start your property search by adding a new property address
-                below.
-              </p>
-
-              {/* Verification Status Banner - Always shown */}
-              <div
-                className={`mt-4 p-3 ${user?.profileStatus === "verified" ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"} rounded-md`}
-              >
-                <div className="flex">
-                  <div className="flex-shrink-0">
+            <div className="flex items-center space-x-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Welcome, {user?.firstName || "Buyer"}!
+                </h3>
+                
+                <div className="flex items-center mt-1">
+                  <div className={`flex items-center ${user?.profileStatus === "verified" ? "text-green-600" : "text-yellow-600"} text-xs font-medium`}>
                     {checking ? (
-                      <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+                      <RefreshCw className="h-3.5 w-3.5 text-blue-400 animate-spin mr-1" />
                     ) : user?.profileStatus === "verified" ? (
                       <svg
-                        className="h-5 w-5 text-green-500"
+                        className="h-3.5 w-3.5 mr-1"
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
                         fill="currentColor"
@@ -286,11 +279,10 @@ export default function BuyerDashboard() {
                       </svg>
                     ) : (
                       <svg
-                        className="h-5 w-5 text-yellow-400"
+                        className="h-3.5 w-3.5 mr-1"
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
                         fill="currentColor"
-                        aria-hidden="true"
                       >
                         <path
                           fillRule="evenodd"
@@ -299,137 +291,130 @@ export default function BuyerDashboard() {
                         />
                       </svg>
                     )}
+                    <span>
+                      Status: <span className="font-semibold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
+                    </span>
+                    
+                    {storedSessionId && user?.profileStatus !== "verified" && (
+                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full text-[10px]">
+                        {checking ? "Checking..." : "Auto-checking"}
+                      </span>
+                    )}
                   </div>
-                  <div className="ml-3 flex-grow">
-                    <div className="flex justify-between items-start">
-                      <h3
-                        className={`text-sm font-medium ${user?.profileStatus === "verified" ? "text-green-800" : "text-yellow-800"}`}
-                      >
-                        Verification Status:{" "}
-                        <span className="font-bold">
-                          {user?.profileStatus === "verified"
-                            ? "Verified"
-                            : "Pending"}
-                        </span>
-                      </h3>
-                      {storedSessionId &&
-                        user?.profileStatus !== "verified" && (
-                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                            {checking
-                              ? "Checking status..."
-                              : "Auto-checking enabled"}
-                          </span>
-                        )}
+                  
+                  {isVerificationStarted && (
+                    <div className="ml-3 text-blue-600 text-xs flex items-center">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      <span>Verification in progress...</span>
                     </div>
-                    <div className="mt-1 text-xs text-gray-700">
-                      {user?.profileStatus === "verified" ? (
-                        <p>
-                          Your identity has been verified successfully. You have
-                          full access to all platform features.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          <p>
-                            {storedSessionId
-                              ? "We're checking your verification status in the background. "
-                              : "Your identity verification is still pending. "}
-                            Complete verification to unlock all features.
-                          </p>
-
-                          {isVerificationStarted && (
-                            <div className="p-2 bg-blue-50 text-blue-700 rounded-md flex items-center text-xs mt-2">
-                              <Loader2 className="h-3 w-3 animate-spin text-blue-500 mr-2" />
-                              <span>
-                                Please complete the verification process in the
-                                opened window.
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
-            <Button onClick={() => setIsModalOpen(true)}>
-              <PlusIcon className="mr-2 h-4 w-4" />
+            
+            <Button onClick={() => setIsModalOpen(true)} size="sm">
+              <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
               Add Property
             </Button>
           </div>
         </div>
 
-        {/* Verification Options */}
-        <div className="mt-6 bg-white p-5 rounded-lg border border-gray-100 shadow-sm">
-          <h4 className="text-lg font-medium mb-3 text-gray-800">Verification Options</h4>
-          <div className="grid md:grid-cols-3 gap-4">
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex flex-col h-full">
-              <div className="flex items-center mb-2">
-                <div className="bg-blue-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
-                  <Shield className="h-4 w-4 text-blue-700" />
-                </div>
-                <h5 className="font-medium text-blue-800">Verify Identity</h5>
+        {/* Verification Options - 50% less height, dimmed when verified */}
+        <div className="mt-5 bg-white px-4 py-3 rounded-lg border border-gray-100 shadow-sm">
+          <div className="flex justify-between items-center mb-2">
+            <h4 className="text-base font-medium text-gray-800">Verification Options</h4>
+            {user?.profileStatus === "verified" && (
+              <div className="bg-green-50 px-2 py-1 rounded-full text-xs font-medium text-green-700 border border-green-100 flex items-center">
+                <svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Verification Complete
               </div>
-              <p className="text-sm text-gray-600 mb-4 flex-grow">Complete online ID verification through our secure identity verification partner.</p>
-              <Button
-                className="w-full"
-                onClick={startVerification}
-                disabled={isVerifyingIdentity || isVerificationStarted}
-              >
-                {isVerifyingIdentity ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Shield className="mr-2 h-4 w-4" />
-                )}
-                {isVerificationStarted
-                  ? "Verification in Progress..."
-                  : isVerifyingIdentity
-                    ? "Starting..."
-                    : "Verify Identity"}
-              </Button>
+            )}
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-3">
+            {/* Apply dimming effect with overlay when verification is successful */}
+            <div className={`relative rounded-lg ${user?.profileStatus === "verified" ? "overflow-hidden" : ""}`}>
+              {user?.profileStatus === "verified" && (
+                <div className="absolute inset-0 bg-white/70 z-10 pointer-events-none"></div>
+              )}
+              
+              <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
+                <div className="flex items-center mb-1.5">
+                  <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                    <Shield className="h-3 w-3 text-blue-700" />
+                  </div>
+                  <h5 className="font-medium text-blue-800 text-sm">Verify Identity</h5>
+                </div>
+                <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Complete online ID verification through our secure identity verification partner.</p>
+                <Button
+                  className="w-full py-1.5 px-2 h-auto text-xs"
+                  onClick={startVerification}
+                  disabled={isVerifyingIdentity || isVerificationStarted || user?.profileStatus === "verified"}
+                >
+                  {isVerifyingIdentity ? (
+                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Shield className="mr-1.5 h-3 w-3" />
+                  )}
+                  {isVerificationStarted
+                    ? "In Progress..."
+                    : isVerifyingIdentity
+                      ? "Starting..."
+                      : "Verify Now"}
+                </Button>
+              </div>
             </div>
 
-            <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 flex flex-col h-full">
-              <div className="flex items-center mb-2">
-                <div className="bg-purple-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
-                  <Upload className="h-4 w-4 text-purple-700" />
+            <div className={`relative rounded-lg ${user?.profileStatus === "verified" ? "overflow-hidden" : ""}`}>
+              {user?.profileStatus === "verified" && (
+                <div className="absolute inset-0 bg-white/70 z-10 pointer-events-none"></div>
+              )}
+              
+              <div className="h-full bg-purple-50 rounded-lg border border-purple-100 p-3 flex flex-col">
+                <div className="flex items-center mb-1.5">
+                  <div className="bg-purple-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                    <Upload className="h-3 w-3 text-purple-700" />
+                  </div>
+                  <h5 className="font-medium text-purple-800 text-sm">Upload Pre-qualification</h5>
                 </div>
-                <h5 className="font-medium text-purple-800">Upload Pre-qualification</h5>
+                <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Upload your lender pre-qualification document as an alternative verification method.</p>
+                <Button
+                  className="w-full py-1.5 px-2 h-auto text-xs"
+                  onClick={() => setIsPrequalificationModalOpen(true)}
+                  disabled={isVerificationStarted || user?.profileStatus === "verified"}
+                  variant="outline"
+                >
+                  <Upload className="mr-1.5 h-3 w-3" />
+                  Upload Document
+                </Button>
               </div>
-              <p className="text-sm text-gray-600 mb-4 flex-grow">Upload your lender pre-qualification document as an alternative verification method.</p>
-              <Button
-                className="w-full"
-                onClick={() => setIsPrequalificationModalOpen(true)}
-                disabled={isVerificationStarted}
-                variant="outline"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Document
-              </Button>
             </div>
 
-            <div className="p-4 bg-green-50 rounded-lg border border-green-100 flex flex-col h-full">
-              <div className="flex items-center mb-2">
-                <div className="bg-green-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
-                  <MailCheck className="h-4 w-4 text-green-700" />
+            {/* Request Manual Approval - always visible/active */}
+            <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
+              <div className="flex items-center mb-1.5">
+                <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                  <MailCheck className="h-3 w-3 text-green-700" />
                 </div>
-                <h5 className="font-medium text-green-800">Request Manual Approval</h5>
+                <h5 className="font-medium text-green-800 text-sm">Request Manual Approval</h5>
               </div>
-              <p className="text-sm text-gray-600 mb-4 flex-grow">
+              <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
                 {user?.prequalificationDocUrl
                   ? "Request manual approval of your pre-qualification document."
                   : "Upload a pre-qualification document first to enable this option."}
               </p>
               <Button
-                className="w-full"
+                className="w-full py-1.5 px-2 h-auto text-xs"
                 onClick={handleRequestApproval}
                 disabled={isRequestingApproval || !user?.prequalificationDocUrl || user?.prequalificationValidated === true}
                 variant="outline"
               >
                 {isRequestingApproval ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
                 ) : (
-                  <MailCheck className="mr-2 h-4 w-4" />
+                  <MailCheck className="mr-1.5 h-3 w-3" />
                 )}
                 {isRequestingApproval
                   ? "Sending..."

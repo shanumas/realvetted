@@ -22,8 +22,6 @@ export function SiteHeader() {
     if (user?.role === "buyer") {
       return [
         { href: "/buyer/dashboard", label: "Dashboard", active: location === "/buyer/dashboard" },
-        { href: "#", label: "My Properties", active: location.startsWith("/buyer/property") },
-        { href: "#", label: "Messages", active: false },
       ];
     } else if (user?.role === "agent") {
       return [
