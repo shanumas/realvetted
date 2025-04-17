@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 import { Property, User } from "@shared/schema";
 import { storage } from "./storage";
+import fs from "fs";
 
 // Initialize the OpenAI client
 const openai = new OpenAI({ 
@@ -189,7 +190,6 @@ export async function validatePrequalificationDocument(
     }
     
     // In production, read file and convert to base64
-    const fs = require('fs');
     const fileBuffer = fs.readFileSync(filePath);
     const base64Image = fileBuffer.toString('base64');
     
