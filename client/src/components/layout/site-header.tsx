@@ -73,24 +73,24 @@ export function SiteHeader() {
   };
 
   return (
-    <nav className="bg-white shadow">
+    <nav className="bg-white border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href={`/${user?.role}/dashboard`}>
-                <h1 className="text-xl font-bold text-primary-600 cursor-pointer">PropertyMatch</h1>
+                <h1 className="text-xl font-bold text-primary cursor-pointer">PropertyMatch</h1>
               </Link>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+            <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
               {navLinks.map((link, i) => (
                 <Link key={i} href={link.href}>
                   <a
                     className={`${
                       link.active
-                        ? "border-primary-500 text-gray-900"
+                        ? "border-primary text-gray-900 font-medium"
                         : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                    } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium h-full`}
+                    } inline-flex items-center px-3 pt-1 border-b-2 text-sm h-full transition-colors duration-150`}
                   >
                     {link.label}
                   </a>
@@ -98,46 +98,66 @@ export function SiteHeader() {
               ))}
             </div>
           </div>
-          <div className="hidden sm:ml-6 sm:flex sm:items-center">
-            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-500">
+          <div className="hidden sm:ml-6 sm:flex sm:items-center space-x-3">
+            <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-500 rounded-full w-9 h-9">
               <Bell className="h-5 w-5" />
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="ml-3">
-                  <Avatar className={`h-8 w-8 ${getRoleColor()}`}>
-                    <AvatarFallback>{getInitials()}</AvatarFallback>
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2 rounded-full pl-2 pr-3 py-1.5 border border-gray-200 hover:bg-gray-50">
+                  <Avatar className={`h-7 w-7 border border-gray-200 ${getRoleColor()}`}>
+                    <AvatarFallback className="text-sm">{getInitials()}</AvatarFallback>
                   </Avatar>
+                  <span className="text-sm font-medium text-gray-700">
+                    {user?.firstName || user?.email?.split('@')[0] || "User"}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <div className="px-2 py-1.5 text-sm font-medium">
-                  {user?.email}
-                  <div className="text-xs text-muted-foreground">
-                    Role: <span className="capitalize">{user?.role}</span>
+              <DropdownMenuContent align="end" className="w-64">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-900">
+                    {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {user?.email}
+                  </p>
+                  <div className="mt-2 flex items-center">
+                    <span className="inline-flex items-center rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-800 capitalize">
+                      {user?.role}
+                    </span>
+                    
+                    {user?.profileStatus === "verified" && (
+                      <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                        Verified
+                      </span>
+                    )}
                   </div>
                 </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={`/${user?.role}/dashboard`}>
-                    <div className="flex items-center cursor-pointer w-full">
-                      <Home className="mr-2 h-4 w-4" />
-                      <span>Dashboard</span>
+                
+                <div className="py-1">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/${user?.role}/dashboard`}>
+                      <div className="flex items-center cursor-pointer w-full text-gray-700">
+                        <Home className="mr-2 h-4 w-4" />
+                        <span>Dashboard</span>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <div className="flex items-center cursor-pointer text-gray-700">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>My Profile</span>
                     </div>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <div className="flex items-center cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Logout</span>
-                </DropdownMenuItem>
+                  </DropdownMenuItem>
+                </div>
+                
+                <div className="py-1 border-t border-gray-100">
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Sign out</span>
+                  </DropdownMenuItem>
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -150,40 +170,50 @@ export function SiteHeader() {
                   <Menu className="h-6 w-6" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="sm:max-w-sm">
-                <div className="px-4 pt-5 pb-6 flex flex-col h-full">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-lg font-medium">Menu</h2>
-                      <p className="text-sm text-gray-500">PropertyMatch</p>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileNavOpen(false)}>
-                      <X className="h-5 w-5" />
+              <SheetContent side="right" className="sm:max-w-sm p-0">
+                <div className="flex flex-col h-full">
+                  <div className="p-4 border-b flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-primary">PropertyMatch</h2>
+                    <Button variant="ghost" size="icon" onClick={() => setMobileNavOpen(false)} className="rounded-full h-8 w-8">
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                   
-                  <div className="mt-6 flex flex-col space-y-1">
-                    <div className="flex items-center p-3 rounded-md">
-                      <Avatar className={`h-10 w-10 mr-3 ${getRoleColor()}`}>
+                  <div className="p-4 border-b bg-gray-50">
+                    <div className="flex items-center">
+                      <Avatar className={`h-12 w-12 mr-3 border ${getRoleColor()}`}>
                         <AvatarFallback>{getInitials()}</AvatarFallback>
                       </Avatar>
                       <div>
-                        <div className="font-medium">{user?.firstName || user?.email}</div>
-                        <div className="text-xs text-gray-500 capitalize">{user?.role}</div>
+                        <div className="font-semibold text-gray-900">{user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email?.split('@')[0]}</div>
+                        <div className="text-sm text-gray-500">{user?.email}</div>
+                        
+                        <div className="mt-2 flex items-center space-x-2">
+                          <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700 capitalize">
+                            {user?.role}
+                          </span>
+                          
+                          {user?.profileStatus === "verified" && (
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                              Verified
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
                   
-                  <nav className="mt-6 flex-1">
+                  <nav className="flex-1 p-4">
+                    <p className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2">Navigation</p>
                     <div className="space-y-1">
                       {navLinks.map((link, i) => (
                         <Link key={i} href={link.href}>
                           <a
                             className={`${
                               link.active
-                                ? "bg-gray-100 text-gray-900"
-                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                            } group flex items-center px-3 py-2 text-base font-medium rounded-md`}
+                                ? "bg-gray-100 text-primary font-medium"
+                                : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                            } group flex items-center px-4 py-2 text-sm rounded-md transition-colors duration-150`}
                             onClick={() => setMobileNavOpen(false)}
                           >
                             {link.label}
@@ -193,14 +223,14 @@ export function SiteHeader() {
                     </div>
                   </nav>
                   
-                  <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div className="p-4 border-t border-gray-200">
                     <Button
                       onClick={handleLogout}
-                      className="w-full justify-start text-red-600"
-                      variant="ghost"
+                      className="w-full justify-center text-red-600 border border-red-200 hover:bg-red-50"
+                      variant="outline"
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      Logout
+                      Sign out
                     </Button>
                   </div>
                 </div>
