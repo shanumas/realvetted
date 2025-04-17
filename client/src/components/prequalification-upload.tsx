@@ -139,36 +139,78 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
           </DialogDescription>
         </DialogHeader>
 
+        <div className="mb-4 bg-yellow-50 p-3 rounded-md border border-yellow-100">
+          <p className="text-sm text-yellow-800 font-medium">
+            You have two options to proceed with your verification:
+          </p>
+          <ul className="text-sm text-yellow-700 mt-1 ml-4 list-disc">
+            <li>Upload a pre-qualification document from any lender (fastest option)</li>
+            <li>Verify your identity through our secure verification partner</li>
+          </ul>
+          <p className="text-xs text-yellow-600 mt-2">
+            Choose the option that works best for you. Only one is required.
+          </p>
+        </div>
+
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "upload" | "verification")}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upload">Upload Pre-qualification</TabsTrigger>
-            <TabsTrigger value="verification">Verify Identity</TabsTrigger>
+            <TabsTrigger value="upload" className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              <span>Upload Document</span>
+            </TabsTrigger>
+            <TabsTrigger value="verification" className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4" />
+              <span>Verify Identity</span>
+            </TabsTrigger>
           </TabsList>
 
           <form onSubmit={handleSubmit}>
             <TabsContent value="upload" className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="document">Pre-qualification Document</Label>
-                <Input 
-                  id="document" 
-                  type="file" 
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={handleFileChange}
-                  disabled={isLoading}
-                />
-                <p className="text-sm text-gray-500">
-                  Upload a pre-qualification letter from any lender (PDF, JPG, or PNG format).
-                </p>
-              </div>
-
-              {selectedFile && (
-                <div className="bg-green-50 p-2 rounded border border-green-100 flex items-center">
-                  <FileText className="h-4 w-4 text-green-500 mr-2" />
-                  <span className="text-sm text-green-700">
-                    {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
-                  </span>
+              <div className="space-y-4">
+                <div className="border bg-gray-50 p-4 rounded-lg border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer relative">
+                  <input
+                    id="document"
+                    type="file"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={handleFileChange}
+                    disabled={isLoading}
+                  />
+                  <div className="text-center">
+                    <FileText className="h-8 w-8 text-blue-500 mx-auto mb-2" />
+                    <p className="text-sm font-medium text-gray-700">
+                      {selectedFile ? 'Change document' : 'Upload pre-qualification document'}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Drag and drop or click to select a file (PDF, JPG, PNG)
+                    </p>
+                  </div>
                 </div>
-              )}
+
+                {selectedFile && (
+                  <div className="bg-green-50 p-3 rounded-md border border-green-100 flex items-center">
+                    <FileText className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
+                    <div className="overflow-hidden">
+                      <p className="text-sm font-medium text-green-700 truncate">
+                        {selectedFile.name}
+                      </p>
+                      <p className="text-xs text-green-600">
+                        {Math.round(selectedFile.size / 1024)} KB • Selected for upload
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
+                  <h4 className="text-sm font-medium text-gray-700">What types of documents work?</h4>
+                  <ul className="mt-1 space-y-1 text-xs text-gray-600 ml-4 list-disc">
+                    <li>Pre-qualification letter from any lender or bank</li>
+                    <li>Pre-approval letter for a mortgage</li>
+                    <li>Proof of funds letter from a financial institution</li>
+                    <li>Bank statement showing sufficient funds (with sensitive information redacted)</li>
+                  </ul>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="verification" className="space-y-4 py-4">

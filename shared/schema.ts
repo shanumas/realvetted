@@ -57,7 +57,17 @@ export const properties = pgTable("properties", {
   sellerPhone: text("seller_phone"),
   sellerCompany: text("seller_company"),
   sellerLicenseNo: text("seller_license_no"),
-  propertyUrl: text("property_url"),
+  // Property source information
+  propertyUrl: text("property_url"), // Listing page URL that was extracted
+  sourceUrl: text("source_url"), // Original URL entered by the user
+  sourceSite: text("source_site"), // Source website name (e.g., "zillow", "redfin")
+  // Listing agent details
+  listingAgentName: text("listing_agent_name"),
+  listingAgentEmail: text("listing_agent_email"),
+  listingAgentPhone: text("listing_agent_phone"),
+  listingAgentCompany: text("listing_agent_company"),
+  listingAgentLicenseNo: text("listing_agent_license_no"),
+  // Property details
   features: text("features").array(),
   imageUrls: text("image_urls").array(),
   emailSent: boolean("email_sent").default(false),

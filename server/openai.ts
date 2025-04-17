@@ -349,12 +349,15 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     // If no SerpApi key available, return placeholder data
     if (!process.env.SERPAPI_KEY) {
       console.log("Using mock data for property URL extraction (no SERPAPI_KEY)");
-      return generateMockPropertyData(url);
+      const mockData = generateMockPropertyData(url);
+      // Save the original URL entered by the user
+      mockData.sourceUrl = url;
+      return mockData;
     }
     
     // Extract property details from URL directly with a single search
     // By using the housing website URL directly we leverage structured data
-    const propertySearchQuery = `${url} real estate listing details property type bedrooms bathrooms price square feet address`;
+    const propertySearchQuery = `${url} real estate listing details property type bedrooms bathrooms price square feet address listing agent email contact information`;
     console.log(`Searching for property information using query: ${propertySearchQuery}`);
     
     let propertySearchResults;
@@ -368,7 +371,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         engine: "google",
         q: propertySearchQuery,
         api_key: process.env.SERPAPI_KEY,
-        num: 8, // Get more results to increase chances of finding details
+        num: 12, // Increased to get more results with agent info
         gl: "us", // Explicitly set country to US
       });
       
