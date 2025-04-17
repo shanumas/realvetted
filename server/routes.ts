@@ -126,6 +126,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   
   // Pre-qualification approval request endpoint
+  // Endpoint to set manual approval requested status
+  app.post("/api/buyer/set-manual-approval-requested", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(400).json({ error: "User not found" });
+      }
+      
+      const { manualApprovalRequested } = req.body;
+      
+      // Update the user's manualApprovalRequested status
+      await storage.updateUser(userId, { manualApprovalRequested: !!manualApprovalRequested });
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error setting manual approval requested status:", error);
+      return res.status(500).json({ 
+        error: "Failed to update manual approval status", 
+        details: error.message 
+      });
+    }
+  });
+
   app.post("/api/buyer/prequalification-approval", isAuthenticated, hasRole(["buyer"]), upload.any(), async (req, res) => {
     try {
       console.log("Received manual approval request");

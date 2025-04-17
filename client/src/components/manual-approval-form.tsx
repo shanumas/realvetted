@@ -108,10 +108,16 @@ export function ManualApprovalForm({ isOpen, onClose, onSubmitted }: ManualAppro
             title: "Approval request sent",
             description: "Your request has been submitted and will be reviewed.",
           });
-          // Invalidate user data so the verification status is updated
-          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-          onSubmitted();
-          onClose();
+          // Also update the user to indicate they've requested manual approval
+          apiRequest('/api/buyer/set-manual-approval-requested', 
+            'POST', 
+            { manualApprovalRequested: true }
+          ).then(() => {
+            // Invalidate user data so the verification status is updated
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            onSubmitted();
+            onClose();
+          });
         } else {
           toast({
             title: "Request failed",

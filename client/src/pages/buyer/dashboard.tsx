@@ -391,16 +391,45 @@ export default function BuyerDashboard() {
                   </div>
                   <h5 className="font-medium text-purple-800 text-sm">Upload Pre-qualification</h5>
                 </div>
-                <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Upload your lender pre-qualification document as an alternative verification method.</p>
-                <Button
-                  className="w-full py-1.5 px-2 h-auto text-xs"
-                  onClick={() => setIsPrequalificationModalOpen(true)}
-                  disabled={isVerificationStarted || user?.profileStatus === "verified"}
-                  variant="outline"
-                >
-                  <Upload className="mr-1.5 h-3 w-3" />
-                  Upload Document
-                </Button>
+                
+                {user?.prequalificationDocUrl ? (
+                  <>
+                    <div className="mb-2 flex-grow">
+                      <div className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}>
+                        {user?.prequalificationValidated 
+                          ? "✓ Document validated successfully" 
+                          : "⚠️ Document validation pending"}
+                      </div>
+                      {user?.prequalificationMessage && !user?.prequalificationValidated && (
+                        <p className="text-xs text-red-500 mt-1">{user.prequalificationMessage}</p>
+                      )}
+                    </div>
+                    <Button
+                      className="w-full py-1.5 px-2 h-auto text-xs"
+                      onClick={() => setIsPrequalificationModalOpen(true)}
+                      disabled={isVerificationStarted || user?.profileStatus === "verified"}
+                      variant="outline"
+                    >
+                      <Upload className="mr-1.5 h-3 w-3" />
+                      Upload New Document
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
+                      Upload your lender pre-qualification document as an alternative verification method.
+                    </p>
+                    <Button
+                      className="w-full py-1.5 px-2 h-auto text-xs"
+                      onClick={() => setIsPrequalificationModalOpen(true)}
+                      disabled={isVerificationStarted || user?.profileStatus === "verified"}
+                      variant="outline"
+                    >
+                      <Upload className="mr-1.5 h-3 w-3" />
+                      Upload Document
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
 
@@ -412,19 +441,38 @@ export default function BuyerDashboard() {
                 </div>
                 <h5 className="font-medium text-green-800 text-sm">Request Manual Approval</h5>
               </div>
-              <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                {user?.prequalificationDocUrl
-                  ? "Request manual approval of your pre-qualification document."
-                  : "Upload a pre-qualification document first to enable this option."}
-              </p>
-              <Button
-                className="w-full py-1.5 px-2 h-auto text-xs"
-                onClick={() => setIsManualApprovalFormOpen(true)}
-                variant="outline"
-              >
-                <MailCheck className="mr-1.5 h-3 w-3" />
-                Request Manual Approval
-              </Button>
+              
+              {user?.manualApprovalRequested ? (
+                <div className="flex-grow">
+                  <div className="text-xs font-medium text-green-600 mb-2">
+                    ✓ Manual approval requested
+                  </div>
+                  <Button
+                    className="w-full py-1.5 px-2 h-auto text-xs"
+                    onClick={() => setIsManualApprovalFormOpen(true)}
+                    variant="outline"
+                  >
+                    <MailCheck className="mr-1.5 h-3 w-3" />
+                    Submit Additional Information
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
+                    {user?.prequalificationDocUrl
+                      ? "Request manual approval of your pre-qualification document."
+                      : "Upload a pre-qualification document first to enable this option."}
+                  </p>
+                  <Button
+                    className="w-full py-1.5 px-2 h-auto text-xs"
+                    onClick={() => setIsManualApprovalFormOpen(true)}
+                    variant="outline"
+                  >
+                    <MailCheck className="mr-1.5 h-3 w-3" />
+                    Request Manual Approval
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

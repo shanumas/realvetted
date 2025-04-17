@@ -31,6 +31,7 @@ export const users = pgTable("users", {
   prequalificationValidated: boolean("prequalification_validated").default(false), // Whether the pre-qualification has been validated by AI
   prequalificationData: json("prequalification_data"), // Extracted data from pre-qualification document
   prequalificationMessage: text("prequalification_message"), // Validation message or rejection reason
+  manualApprovalRequested: boolean("manual_approval_requested").default(false), // Whether the user has requested manual approval
 });
 
 // Property listings
