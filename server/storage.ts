@@ -600,17 +600,59 @@ export class PgStorage implements IStorage {
   }
   
   async getAgreementsByProperty(propertyId: number): Promise<Agreement[]> {
-    return await this.db.select()
+    const propertyAgreements = await this.db.select()
       .from(agreements)
       .where(eq(agreements.propertyId, propertyId))
       .orderBy(agreements.createdAt, "desc");
+      
+    // Process agreements to deduplicate by agreement type
+    // So we only show the latest version of each agreement type
+    const latestAgreementsByType = new Map<string, Agreement>();
+    
+    propertyAgreements.forEach(agreement => {
+      if (!latestAgreementsByType.has(agreement.type) || 
+          new Date(agreement.createdAt || 0) > new Date(latestAgreementsByType.get(agreement.type)?.createdAt || 0)) {
+        latestAgreementsByType.set(agreement.type, agreement);
+      }
+    });
+    
+    // Convert the map values back to an array and sort by creation date (newest first)
+    return Array.from(latestAgreementsByType.values())
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
   
   async getAgreementsByAgent(agentId: number): Promise<Agreement[]> {
-    return await this.db.select()
-      .from(agreements)
-      .where(eq(agreements.agentId, agentId))
-      .orderBy(agreements.createdAt, "desc");
+    const agentAgreements = await this.db.select({
+      agreement: agreements,
+      property: properties
+    })
+    .from(agreements)
+    .leftJoin(properties, eq(agreements.propertyId, properties.id))
+    .where(eq(agreements.agentId, agentId))
+    .orderBy(agreements.createdAt, "desc");
+    
+    // Process agreements to deduplicate by property and agreement type
+    // So we only show the latest version of each agreement type for a property
+    const latestAgreements = new Map<string, any>();
+    
+    agentAgreements.forEach(item => {
+      const key = `${item.agreement.propertyId}_${item.agreement.type}`;
+      
+      // If this property+type combination doesn't exist in the map yet,
+      // or the current agreement is newer, update the map
+      if (!latestAgreements.has(key) || 
+          new Date(item.agreement.createdAt || 0) > new Date(latestAgreements.get(key).agreement.createdAt || 0)) {
+        latestAgreements.set(key, item);
+      }
+    });
+    
+    // Convert the map values back to an array and format the result
+    return Array.from(latestAgreements.values())
+      .map(item => ({
+        ...item.agreement,
+        property: item.property
+      }))
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
   
   async getAgreementsByType(type: string): Promise<Agreement[]> {
@@ -631,11 +673,28 @@ export class PgStorage implements IStorage {
     .where(eq(agreements.buyerId, buyerId))
     .orderBy(agreements.createdAt, "desc");
     
-    // Format the result to include the property details
-    return buyerAgreements.map(item => ({
-      ...item.agreement,
-      property: item.property
-    }));
+    // Process agreements to deduplicate by property and agreement type
+    // So we only show the latest version of each agreement type for a property
+    const latestAgreements = new Map<string, any>();
+    
+    buyerAgreements.forEach(item => {
+      const key = `${item.agreement.propertyId}_${item.agreement.type}`;
+      
+      // If this property+type combination doesn't exist in the map yet,
+      // or the current agreement is newer, update the map
+      if (!latestAgreements.has(key) || 
+          new Date(item.agreement.createdAt || 0) > new Date(latestAgreements.get(key).agreement.createdAt || 0)) {
+        latestAgreements.set(key, item);
+      }
+    });
+    
+    // Convert the map values back to an array and format the result
+    return Array.from(latestAgreements.values())
+      .map(item => ({
+        ...item.agreement,
+        property: item.property
+      }))
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }
   
   async createAgreement(agreementData: InsertAgreement): Promise<Agreement> {
