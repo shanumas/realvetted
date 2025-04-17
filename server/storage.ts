@@ -195,18 +195,55 @@ export class PgStorage implements IStorage {
   // Property methods
   async getProperty(id: number): Promise<Property | undefined> {
     try {
-      // Ensure the emailSent column exists
-      await this.pool.query(`
-        ALTER TABLE properties 
-        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
-      `);
+      // Use only the explicitly specified columns to avoid schema issues with new columns
+      const result = await this.db.select({
+        id: properties.id,
+        address: properties.address,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
+        price: properties.price,
+        bedrooms: properties.bedrooms,
+        bathrooms: properties.bathrooms,
+        squareFeet: properties.squareFeet,
+        propertyType: properties.propertyType,
+        yearBuilt: properties.yearBuilt,
+        description: properties.description,
+        createdAt: properties.createdAt,
+        createdBy: properties.createdBy,
+        sellerEmail: properties.sellerEmail,
+        sellerId: properties.sellerId,
+        agentId: properties.agentId,
+        status: properties.status,
+        sellerName: properties.sellerName,
+        sellerPhone: properties.sellerPhone,
+        sellerCompany: properties.sellerCompany,
+        sellerLicenseNo: properties.sellerLicenseNo,
+        propertyUrl: properties.propertyUrl,
+        features: properties.features,
+        imageUrls: properties.imageUrls,
+        emailSent: properties.emailSent
+      })
+      .from(properties)
+      .where(eq(properties.id, id));
       
-      const result = await this.db.select().from(properties).where(eq(properties.id, id));
       return result[0];
     } catch (error) {
       console.error("Error in getProperty:", error);
       // Fallback to raw query if there's a schema issue
-      const result = await this.pool.query(`SELECT * FROM properties WHERE id = $1`, [id]);
+      const result = await this.pool.query(`
+        SELECT id, address, city, state, zip, price, bedrooms, bathrooms, 
+               square_feet as "squareFeet", property_type as "propertyType", 
+               year_built as "yearBuilt", description, created_at as "createdAt", 
+               created_by as "createdBy", seller_email as "sellerEmail", 
+               seller_id as "sellerId", agent_id as "agentId", status, 
+               seller_name as "sellerName", seller_phone as "sellerPhone", 
+               seller_company as "sellerCompany", seller_license_no as "sellerLicenseNo", 
+               property_url as "propertyUrl", features, image_urls as "imageUrls", 
+               email_sent as "emailSent" 
+        FROM properties 
+        WHERE id = $1
+      `, [id]);
       return result.rows[0];
     }
   }
@@ -253,17 +290,55 @@ export class PgStorage implements IStorage {
 
   async getPropertiesByBuyer(buyerId: number): Promise<Property[]> {
     try {
-      // Ensure the emailSent column exists
-      await this.pool.query(`
-        ALTER TABLE properties 
-        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
-      `);
+      // Use only the explicitly specified columns to avoid schema issues
+      const result = await this.db.select({
+        id: properties.id,
+        address: properties.address,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
+        price: properties.price,
+        bedrooms: properties.bedrooms,
+        bathrooms: properties.bathrooms,
+        squareFeet: properties.squareFeet,
+        propertyType: properties.propertyType,
+        yearBuilt: properties.yearBuilt,
+        description: properties.description,
+        createdAt: properties.createdAt,
+        createdBy: properties.createdBy,
+        sellerEmail: properties.sellerEmail,
+        sellerId: properties.sellerId,
+        agentId: properties.agentId,
+        status: properties.status,
+        sellerName: properties.sellerName,
+        sellerPhone: properties.sellerPhone,
+        sellerCompany: properties.sellerCompany,
+        sellerLicenseNo: properties.sellerLicenseNo,
+        propertyUrl: properties.propertyUrl,
+        features: properties.features,
+        imageUrls: properties.imageUrls,
+        emailSent: properties.emailSent
+      })
+      .from(properties)
+      .where(eq(properties.createdBy, buyerId));
       
-      return await this.db.select().from(properties).where(eq(properties.createdBy, buyerId));
+      return result;
     } catch (error) {
       console.error("Error in getPropertiesByBuyer:", error);
       // Fallback to raw query if there's a schema issue
-      const result = await this.pool.query(`SELECT * FROM properties WHERE created_by = $1`, [buyerId]);
+      const result = await this.pool.query(`
+        SELECT id, address, city, state, zip, price, bedrooms, bathrooms, 
+               square_feet as "squareFeet", property_type as "propertyType", 
+               year_built as "yearBuilt", description, created_at as "createdAt", 
+               created_by as "createdBy", seller_email as "sellerEmail", 
+               seller_id as "sellerId", agent_id as "agentId", status, 
+               seller_name as "sellerName", seller_phone as "sellerPhone", 
+               seller_company as "sellerCompany", seller_license_no as "sellerLicenseNo", 
+               property_url as "propertyUrl", features, image_urls as "imageUrls", 
+               email_sent as "emailSent" 
+        FROM properties 
+        WHERE created_by = $1
+      `, [buyerId]);
       return result.rows;
     }
   }
@@ -303,38 +378,154 @@ export class PgStorage implements IStorage {
   }
 
   async createProperty(propertyData: InsertProperty): Promise<Property> {
-    // Let's first run a raw query to add the email_sent column if it doesn't exist
     try {
-      await this.pool.query(`
-        ALTER TABLE properties 
-        ADD COLUMN IF NOT EXISTS email_sent BOOLEAN DEFAULT FALSE
-      `);
+      // Create a safe property object with only the existing columns
+      const propertyValues: any = {
+        address: propertyData.address,
+        city: propertyData.city || null,
+        state: propertyData.state || null,
+        zip: propertyData.zip || null,
+        price: propertyData.price || null,
+        bedrooms: propertyData.bedrooms || null,
+        bathrooms: propertyData.bathrooms || null,
+        squareFeet: propertyData.squareFeet || null,
+        propertyType: propertyData.propertyType || null,
+        yearBuilt: propertyData.yearBuilt || null,
+        description: propertyData.description || null,
+        createdAt: new Date(),
+        createdBy: propertyData.createdBy,
+        sellerEmail: propertyData.sellerEmail || null,
+        sellerId: propertyData.sellerId || null,
+        agentId: propertyData.agentId || null,
+        status: propertyData.status || "active",
+        sellerName: propertyData.sellerName || null,
+        sellerPhone: propertyData.sellerPhone || null,
+        sellerCompany: propertyData.sellerCompany || null,
+        sellerLicenseNo: propertyData.sellerLicenseNo || null,
+        propertyUrl: propertyData.propertyUrl || null,
+        features: propertyData.features || null,
+        imageUrls: propertyData.imageUrls || null,
+        emailSent: propertyData.emailSent || false
+      };
+      
+      // Add the new fields if they exist in the data
+      if ('sourceUrl' in propertyData) {
+        propertyValues.source_url = propertyData.sourceUrl;
+      }
+      
+      if ('sourceSite' in propertyData) {
+        propertyValues.source_site = propertyData.sourceSite;
+      }
+      
+      if ('listingAgentName' in propertyData) {
+        propertyValues.listing_agent_name = propertyData.listingAgentName;
+      }
+      
+      if ('listingAgentEmail' in propertyData) {
+        propertyValues.listing_agent_email = propertyData.listingAgentEmail;
+      }
+      
+      if ('listingAgentPhone' in propertyData) {
+        propertyValues.listing_agent_phone = propertyData.listingAgentPhone;
+      }
+      
+      if ('listingAgentCompany' in propertyData) {
+        propertyValues.listing_agent_company = propertyData.listingAgentCompany;
+      }
+      
+      if ('listingAgentLicenseNo' in propertyData) {
+        propertyValues.listing_agent_license_no = propertyData.listingAgentLicenseNo;
+      }
+      
+      // Insert using a raw query to support dynamic columns
+      const insertResult = await this.pool.query(`
+        INSERT INTO properties (
+          address, city, state, zip, price, bedrooms, bathrooms, 
+          square_feet, property_type, year_built, description, 
+          created_at, created_by, seller_email, seller_id, agent_id, 
+          status, seller_name, seller_phone, seller_company, 
+          seller_license_no, property_url, features, image_urls, 
+          email_sent
+          ${propertyValues.source_url ? ', source_url' : ''}
+          ${propertyValues.source_site ? ', source_site' : ''}
+          ${propertyValues.listing_agent_name ? ', listing_agent_name' : ''}
+          ${propertyValues.listing_agent_email ? ', listing_agent_email' : ''}
+          ${propertyValues.listing_agent_phone ? ', listing_agent_phone' : ''}
+          ${propertyValues.listing_agent_company ? ', listing_agent_company' : ''}
+          ${propertyValues.listing_agent_license_no ? ', listing_agent_license_no' : ''}
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 
+          $17, $18, $19, $20, $21, $22, $23, $24, $25
+          ${propertyValues.source_url ? ', $26' : ''}
+          ${propertyValues.source_site ? ', $' + (26 + (propertyValues.source_url ? 1 : 0)) : ''}
+          ${propertyValues.listing_agent_name ? ', $' + (26 + (propertyValues.source_url ? 1 : 0) + (propertyValues.source_site ? 1 : 0)) : ''}
+          ${propertyValues.listing_agent_email ? ', $' + (26 + (propertyValues.source_url ? 1 : 0) + (propertyValues.source_site ? 1 : 0) + (propertyValues.listing_agent_name ? 1 : 0)) : ''}
+          ${propertyValues.listing_agent_phone ? ', $' + (26 + (propertyValues.source_url ? 1 : 0) + (propertyValues.source_site ? 1 : 0) + (propertyValues.listing_agent_name ? 1 : 0) + (propertyValues.listing_agent_email ? 1 : 0)) : ''}
+          ${propertyValues.listing_agent_company ? ', $' + (26 + (propertyValues.source_url ? 1 : 0) + (propertyValues.source_site ? 1 : 0) + (propertyValues.listing_agent_name ? 1 : 0) + (propertyValues.listing_agent_email ? 1 : 0) + (propertyValues.listing_agent_phone ? 1 : 0)) : ''}
+          ${propertyValues.listing_agent_license_no ? ', $' + (26 + (propertyValues.source_url ? 1 : 0) + (propertyValues.source_site ? 1 : 0) + (propertyValues.listing_agent_name ? 1 : 0) + (propertyValues.listing_agent_email ? 1 : 0) + (propertyValues.listing_agent_phone ? 1 : 0) + (propertyValues.listing_agent_company ? 1 : 0)) : ''}
+        ) RETURNING *
+      `, [
+        propertyValues.address,
+        propertyValues.city,
+        propertyValues.state,
+        propertyValues.zip,
+        propertyValues.price,
+        propertyValues.bedrooms,
+        propertyValues.bathrooms,
+        propertyValues.squareFeet,
+        propertyValues.propertyType,
+        propertyValues.yearBuilt,
+        propertyValues.description,
+        propertyValues.createdAt,
+        propertyValues.createdBy,
+        propertyValues.sellerEmail,
+        propertyValues.sellerId,
+        propertyValues.agentId,
+        propertyValues.status,
+        propertyValues.sellerName,
+        propertyValues.sellerPhone,
+        propertyValues.sellerCompany,
+        propertyValues.sellerLicenseNo,
+        propertyValues.propertyUrl,
+        propertyValues.features,
+        propertyValues.imageUrls,
+        propertyValues.emailSent,
+        ...(propertyValues.source_url ? [propertyValues.source_url] : []),
+        ...(propertyValues.source_site ? [propertyValues.source_site] : []),
+        ...(propertyValues.listing_agent_name ? [propertyValues.listing_agent_name] : []),
+        ...(propertyValues.listing_agent_email ? [propertyValues.listing_agent_email] : []),
+        ...(propertyValues.listing_agent_phone ? [propertyValues.listing_agent_phone] : []),
+        ...(propertyValues.listing_agent_company ? [propertyValues.listing_agent_company] : []),
+        ...(propertyValues.listing_agent_license_no ? [propertyValues.listing_agent_license_no] : [])
+      ]);
+      
+      return insertResult.rows[0];
     } catch (error) {
-      console.error("Error adding email_sent column:", error);
+      console.error("Error creating property:", error);
+      // Fallback to simple insert without the new columns
+      const result = await this.db.insert(properties).values({
+        address: propertyData.address,
+        city: propertyData.city || null,
+        state: propertyData.state || null,
+        zip: propertyData.zip || null,
+        price: propertyData.price || null,
+        bedrooms: propertyData.bedrooms || null,
+        bathrooms: propertyData.bathrooms || null,
+        squareFeet: propertyData.squareFeet || null,
+        propertyType: propertyData.propertyType || null,
+        yearBuilt: propertyData.yearBuilt || null,
+        description: propertyData.description || null,
+        createdAt: new Date(),
+        createdBy: propertyData.createdBy,
+        sellerEmail: propertyData.sellerEmail || null,
+        sellerId: propertyData.sellerId || null,
+        agentId: propertyData.agentId || null,
+        status: propertyData.status || "active",
+        emailSent: propertyData.emailSent || false
+      }).returning();
+      
+      return result[0];
     }
-    
-    const result = await this.db.insert(properties).values({
-      address: propertyData.address,
-      city: propertyData.city || null,
-      state: propertyData.state || null,
-      zip: propertyData.zip || null,
-      price: propertyData.price || null,
-      bedrooms: propertyData.bedrooms || null,
-      bathrooms: propertyData.bathrooms || null,
-      squareFeet: propertyData.squareFeet || null,
-      propertyType: propertyData.propertyType || null,
-      yearBuilt: propertyData.yearBuilt || null,
-      description: propertyData.description || null,
-      createdAt: new Date(),
-      createdBy: propertyData.createdBy,
-      sellerEmail: propertyData.sellerEmail || null,
-      sellerId: propertyData.sellerId || null,
-      agentId: propertyData.agentId || null,
-      status: propertyData.status || "active",
-      emailSent: propertyData.emailSent || false
-    }).returning();
-    
-    return result[0];
   }
 
   async updateProperty(id: number, data: Partial<Property>): Promise<Property> {
