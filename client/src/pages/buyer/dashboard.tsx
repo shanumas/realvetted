@@ -49,6 +49,7 @@ export default function BuyerDashboard() {
   const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] =
     useState(false);
   const [isRequestingApproval, setIsRequestingApproval] = useState(false);
+  const [isManualApprovalFormOpen, setIsManualApprovalFormOpen] = useState(false);
 
   // Get stored verification session ID if it exists
   const storedSessionId = localStorage.getItem("veriffSessionId");
@@ -418,18 +419,11 @@ export default function BuyerDashboard() {
               </p>
               <Button
                 className="w-full py-1.5 px-2 h-auto text-xs"
-                onClick={handleRequestApproval}
-                disabled={isRequestingApproval || !user?.prequalificationDocUrl || user?.prequalificationValidated === true}
+                onClick={() => setIsManualApprovalFormOpen(true)}
                 variant="outline"
               >
-                {isRequestingApproval ? (
-                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
-                ) : (
-                  <MailCheck className="mr-1.5 h-3 w-3" />
-                )}
-                {isRequestingApproval
-                  ? "Sending..."
-                  : "Request Manual Approval"}
+                <MailCheck className="mr-1.5 h-3 w-3" />
+                Request Manual Approval
               </Button>
             </div>
           </div>
@@ -707,6 +701,16 @@ export default function BuyerDashboard() {
         onClose={() => setIsPrequalificationModalOpen(false)}
         onVerified={() => {
           // Refresh user data to update verification status
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        }}
+      />
+
+      {/* Manual Approval Form */}
+      <ManualApprovalForm
+        isOpen={isManualApprovalFormOpen}
+        onClose={() => setIsManualApprovalFormOpen(false)}
+        onSubmitted={() => {
+          // Refresh user data
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
         }}
       />
