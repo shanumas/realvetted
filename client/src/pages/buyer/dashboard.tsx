@@ -9,12 +9,13 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File } from "lucide-react";
+import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createVeriffSession, launchVeriff } from "@/lib/veriff";
+import { PrequalificationUpload } from "@/components/prequalification-upload";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +34,7 @@ export default function BuyerDashboard() {
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
+  const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] = useState(false);
   
   // Get stored verification session ID if it exists
   const storedSessionId = localStorage.getItem('veriffSessionId');
@@ -232,7 +234,7 @@ export default function BuyerDashboard() {
                               : "Your identity verification is still pending. "}
                             Complete verification to unlock all features.
                           </p>
-                          <div className="flex">
+                          <div className="flex space-x-2">
                             <Button 
                               size="sm"
                               className="text-xs h-8"
@@ -249,6 +251,17 @@ export default function BuyerDashboard() {
                                 : isVerifyingIdentity 
                                   ? "Starting..." 
                                   : "Verify Identity"}
+                            </Button>
+                            
+                            <Button 
+                              size="sm"
+                              className="text-xs h-8"
+                              onClick={() => setIsPrequalificationModalOpen(true)}
+                              disabled={isVerificationStarted}
+                              variant="outline"
+                            >
+                              <Upload className="mr-2 h-3 w-3" />
+                              Upload Pre-qualification
                             </Button>
                           </div>
                           {isVerificationStarted && (
@@ -493,6 +506,16 @@ export default function BuyerDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Prequalification Document Upload Modal */}
+      <PrequalificationUpload
+        isOpen={isPrequalificationModalOpen}
+        onClose={() => setIsPrequalificationModalOpen(false)}
+        onVerified={() => {
+          // Refresh user data to update verification status
+          queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+        }}
+      />
     </div>
   );
 }
