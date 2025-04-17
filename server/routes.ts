@@ -49,6 +49,8 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 const pdfDir = path.join(uploadsDir, "pdf");
 const imagesDir = path.join(uploadsDir, "images");
 const idDir = path.join(uploadsDir, "id");
+const agreementsDir = path.join(uploadsDir, "agreements");
+const prequalificationDir = path.join(uploadsDir, "prequalification");
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
@@ -61,6 +63,12 @@ if (!fs.existsSync(imagesDir)) {
 }
 if (!fs.existsSync(idDir)) {
   fs.mkdirSync(idDir, { recursive: true });
+}
+if (!fs.existsSync(agreementsDir)) {
+  fs.mkdirSync(agreementsDir, { recursive: true });
+}
+if (!fs.existsSync(prequalificationDir)) {
+  fs.mkdirSync(prequalificationDir, { recursive: true });
 }
 
 const scryptAsync = promisify(scrypt);
