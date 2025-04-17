@@ -186,7 +186,7 @@ export default function BuyerDashboard() {
     try {
       setIsRequestingApproval(true);
       
-      const response = await apiRequest("/api/buyer/request-prequalification-approval", "POST");
+      const response = await apiRequest("/api/buyer/prequalification-approval", "POST");
       
       toast({
         title: "Approval Request Sent",

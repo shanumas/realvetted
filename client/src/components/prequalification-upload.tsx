@@ -31,7 +31,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
   // Request pre-qualification approval
   const requestApprovalMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("/api/buyer/request-prequalification-approval", "POST");
+      return await apiRequest("/api/buyer/prequalification-approval", "POST");
     },
     onSuccess: () => {
       toast({

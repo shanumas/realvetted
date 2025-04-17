@@ -126,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   
   // Pre-qualification approval request endpoint
-  app.post("/api/buyer/request-prequalification-approval", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+  app.post("/api/buyer/prequalification-approval", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
       // Get user information
       const user = await storage.getUser(req.user!.id);
