@@ -109,6 +109,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User routes
   
+  // Pre-qualification document upload
+  app.post("/api/buyer/prequalification", isAuthenticated, hasRole(["buyer"]), upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "No file uploaded"
+        });
+      }
+
+      // Get the uploaded file
+      const file = req.file;
+      
+      // Generate a unique filename
+      const fileName = `prequalification_${req.user!.id}_${Date.now()}.${file.originalname.split('.').pop()}`;
+      
+      // Save the file to disk
+      const filePath = path.join(prequalificationDir, fileName);
+      fs.writeFileSync(filePath, file.buffer);
+      
+      // Update user record with prequalification info
+      const fileUrl = `/uploads/prequalification/${fileName}`;
+      await storage.updateUser(req.user!.id, {
+        verification_method: "prequalification",
+        prequalification_doc_url: fileUrl,
+        prequalification_validated: false, // Will be validated via AI in the next step
+        profileStatus: "pending" // Set to pending until validated
+      });
+      
+      // Use OpenAI to extract information from the document for validation
+      try {
+        // In a production app, we'd call an AI service to validate the document
+        // This would extract data from the document and compare it against user data
+        // For now, we'll simulate validation by automatically marking it as validated
+        
+        // Update user record with validated status
+        await storage.updateUser(req.user!.id, {
+          prequalification_validated: true,
+          profileStatus: "verified" // Auto-verify for now
+        });
+        
+        // Log the verification
+        console.log(`User ID ${req.user!.id} verified through pre-qualification document.`);
+      } catch (validationError) {
+        console.error("Error validating pre-qualification document:", validationError);
+        // Don't fail the request, just leave as pending for manual review
+      }
+      
+      // Return success
+      const updatedUser = await storage.getUser(req.user!.id);
+      res.json({
+        success: true,
+        data: updatedUser
+      });
+    } catch (error) {
+      console.error("Pre-qualification upload error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to upload pre-qualification document"
+      });
+    }
+  });
+  
+  // Buyer identity verification endpoint
+  app.post("/api/buyer/verify-identity", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      // Update user's verification method
+      await storage.updateUser(req.user!.id, {
+        verification_method: "kyc"
+      });
+      
+      // Create a Veriff session for the user
+      const sessionData = await createVeriffSession(req.user!);
+      
+      res.json({
+        success: true,
+        redirectUrl: sessionData.url,
+        sessionId: sessionData.sessionId
+      });
+    } catch (error) {
+      console.error("Verification initiation error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to start verification process"
+      });
+    }
+  });
+  
   // Look up agent license
   app.get("/api/agent/license-lookup", async (req, res) => {
     try {
