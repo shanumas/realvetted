@@ -9,7 +9,18 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Property } from "@shared/schema";
 import { getQueryFn, queryClient, apiRequest } from "@/lib/queryClient";
 import { deleteProperty } from "@/lib/ai";
-import { Loader2, PlusIcon, Trash2, CalendarRange, RefreshCw, Shield, FileText, File, Upload, MailCheck } from "lucide-react";
+import {
+  Loader2,
+  PlusIcon,
+  Trash2,
+  CalendarRange,
+  RefreshCw,
+  Shield,
+  FileText,
+  File,
+  Upload,
+  MailCheck,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
 import { ViewingRequestsList } from "@/components/viewing-requests-list";
@@ -34,36 +45,42 @@ export default function BuyerDashboard() {
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
   const [isVerificationStarted, setIsVerificationStarted] = useState(false);
-  const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] = useState(false);
+  const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] =
+    useState(false);
   const [isRequestingApproval, setIsRequestingApproval] = useState(false);
-  
+
   // Get stored verification session ID if it exists
-  const storedSessionId = localStorage.getItem('veriffSessionId');
-  
+  const storedSessionId = localStorage.getItem("veriffSessionId");
+
   // Use the verification status hook
-  const { checking, isVerified, lastChecked } = useVerificationStatus(storedSessionId);
-  
+  const { checking, isVerified, lastChecked } =
+    useVerificationStatus(storedSessionId);
+
   // Check if there's a tab preference stored in localStorage
   const [activeTab, setActiveTab] = useState(() => {
     // Read from localStorage or default to properties
-    const savedTab = localStorage.getItem('buyerDashboardActiveTab');
+    const savedTab = localStorage.getItem("buyerDashboardActiveTab");
     // Clear the localStorage preference after reading it
     if (savedTab) {
-      localStorage.removeItem('buyerDashboardActiveTab');
+      localStorage.removeItem("buyerDashboardActiveTab");
     }
     return savedTab || "properties";
   });
-  
+
   // Setup WebSocket for real-time updates
   useEffect(() => {
     // Set up WebSocket listener for property updates and viewing request changes
     const onMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'notification' || data.type === 'property_update') {
+        if (data.type === "notification" || data.type === "property_update") {
           // Refresh property data and viewing requests
-          queryClient.invalidateQueries({ queryKey: ["/api/properties/by-buyer"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
+          queryClient.invalidateQueries({
+            queryKey: ["/api/properties/by-buyer"],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["/api/viewing-requests/buyer"],
+          });
         }
       } catch (e) {
         console.error("Error parsing WebSocket message:", e);
@@ -71,21 +88,27 @@ export default function BuyerDashboard() {
     };
 
     // Connect event listener
-    window.addEventListener('message', onMessage);
-    
+    window.addEventListener("message", onMessage);
+
     // Clean up
     return () => {
-      window.removeEventListener('message', onMessage);
+      window.removeEventListener("message", onMessage);
     };
   }, []);
 
-  const { data: properties, isLoading, refetch } = useQuery<Property[]>({
+  const {
+    data: properties,
+    isLoading,
+    refetch,
+  } = useQuery<Property[]>({
     queryKey: ["/api/properties/by-buyer"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
-  
+
   // Fetch all agreements signed by the buyer
-  const { data: buyerAgreements, isLoading: isLoadingAgreements } = useQuery<any[]>({
+  const { data: buyerAgreements, isLoading: isLoadingAgreements } = useQuery<
+    any[]
+  >({
     queryKey: ["/api/buyer/agreements"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user, // Only run this query if we have a user
@@ -95,7 +118,7 @@ export default function BuyerDashboard() {
     setIsModalOpen(false);
     refetch();
   };
-  
+
   const deleteMutation = useMutation({
     mutationFn: (propertyId: number) => {
       return deleteProperty(propertyId);
@@ -117,89 +140,105 @@ export default function BuyerDashboard() {
       setPropertyToDelete(null);
     },
   });
-  
+
   // Start Veriff verification flow
   const startVerification = async () => {
     try {
       setIsVerifyingIdentity(true);
-      
+
       // Create a Veriff verification session
       const sessionData = await createVeriffSession();
-      
+
       // Store session ID in localStorage to allow background checking
-      localStorage.setItem('veriffSessionId', sessionData.sessionId);
-      
+      localStorage.setItem("veriffSessionId", sessionData.sessionId);
+
       // Launch Veriff verification
       launchVeriff(sessionData.url, handleVerificationComplete);
-      
+
       // Update UI
       setIsVerificationStarted(true);
-      
+
       toast({
         title: "Verification Started",
-        description: "Please complete the identity verification process in the new window.",
+        description:
+          "Please complete the identity verification process in the new window.",
       });
     } catch (error) {
       console.error("Verification error:", error);
       toast({
         title: "Verification failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
       setIsVerifyingIdentity(false);
     }
   };
-  
+
   // Handle the completion of Veriff verification
-  const handleVerificationComplete = async (status: 'completed' | 'canceled' | 'error') => {
-    if (status === 'completed') {
+  const handleVerificationComplete = async (
+    status: "completed" | "canceled" | "error",
+  ) => {
+    if (status === "completed") {
       toast({
         title: "Verification Submitted",
-        description: "Your identity verification has been submitted and is being processed.",
+        description:
+          "Your identity verification has been submitted and is being processed.",
       });
-      
+
       // Refresh user data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    } else if (status === 'canceled') {
+    } else if (status === "canceled") {
       toast({
         title: "Verification Canceled",
-        description: "You canceled the identity verification process. You can try again later.",
+        description:
+          "You canceled the identity verification process. You can try again later.",
         variant: "destructive",
       });
-      
+
       // Clear the session ID from localStorage as it's no longer valid
-      localStorage.removeItem('veriffSessionId');
+      localStorage.removeItem("veriffSessionId");
     } else {
       toast({
         title: "Verification Error",
-        description: "There was an error during the verification process. Please try again.",
+        description:
+          "There was an error during the verification process. Please try again.",
         variant: "destructive",
       });
     }
-    
+
     setIsVerificationStarted(false);
   };
-  
+
   // Handle pre-qualification approval request
   const handleRequestApproval = async () => {
     try {
       setIsRequestingApproval(true);
-      
-      const response = await apiRequest("/api/buyer/prequalification-approval", "POST");
-      
+
+      const response = await apiRequest(
+        "/api/buyer/prequalification-approval",
+        "POST",
+      );
+
       toast({
         title: "Approval Request Sent",
-        description: "Your pre-qualification approval request has been sent for manual review.",
+        description:
+          "Your pre-qualification approval request has been sent for manual review.",
       });
-      
+
       // Refresh user data
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     } catch (error) {
       console.error("Pre-qualification approval request error:", error);
       toast({
         title: "Request Failed",
-        description: error instanceof Error ? error.message : "Failed to send pre-qualification approval request",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to send pre-qualification approval request",
         variant: "destructive",
       });
     } finally {
@@ -210,120 +249,100 @@ export default function BuyerDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader />
-      
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+
+      <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
         {/* Welcome Banner */}
-        <div className="px-4 py-5 sm:px-6 bg-white shadow rounded-lg mb-6">
+        <div className="px-6 py-6 sm:px-8 bg-white shadow-sm rounded-lg mb-8 border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Welcome, {user?.firstName || 'Buyer'}!
+              <h3 className="text-xl leading-6 font-semibold text-gray-900">
+                Welcome, {user?.firstName || "Buyer"}!
               </h3>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                Start your property search by adding a new property address below.
+              <p className="mt-2 max-w-2xl text-sm text-gray-500">
+                Start your property search by adding a new property address
+                below.
               </p>
-              
+
               {/* Verification Status Banner - Always shown */}
-              <div className={`mt-3 p-2 ${user?.profileStatus === "verified" ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"} rounded-md`}>
+              <div
+                className={`mt-4 p-3 ${user?.profileStatus === "verified" ? "bg-green-50 border border-green-200" : "bg-yellow-50 border border-yellow-200"} rounded-md`}
+              >
                 <div className="flex">
                   <div className="flex-shrink-0">
                     {checking ? (
                       <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
                     ) : user?.profileStatus === "verified" ? (
-                      <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      <svg
+                        className="h-5 w-5 text-green-500"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     ) : (
-                      <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      <svg
+                        className="h-5 w-5 text-yellow-400"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
                       </svg>
                     )}
                   </div>
                   <div className="ml-3 flex-grow">
                     <div className="flex justify-between items-start">
-                      <h3 className={`text-sm font-medium ${user?.profileStatus === "verified" ? "text-green-800" : "text-yellow-800"}`}>
-                        Verification Status: <span className="font-bold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
-                      </h3>
-                      {storedSessionId && user?.profileStatus !== "verified" && (
-                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                          {checking ? "Checking status..." : "Auto-checking enabled"}
+                      <h3
+                        className={`text-sm font-medium ${user?.profileStatus === "verified" ? "text-green-800" : "text-yellow-800"}`}
+                      >
+                        Verification Status:{" "}
+                        <span className="font-bold">
+                          {user?.profileStatus === "verified"
+                            ? "Verified"
+                            : "Pending"}
                         </span>
-                      )}
+                      </h3>
+                      {storedSessionId &&
+                        user?.profileStatus !== "verified" && (
+                          <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                            {checking
+                              ? "Checking status..."
+                              : "Auto-checking enabled"}
+                          </span>
+                        )}
                     </div>
                     <div className="mt-1 text-xs text-gray-700">
                       {user?.profileStatus === "verified" ? (
-                        <p>Your identity has been verified successfully. You have full access to all platform features.</p>
+                        <p>
+                          Your identity has been verified successfully. You have
+                          full access to all platform features.
+                        </p>
                       ) : (
                         <div className="space-y-2">
                           <p>
-                            {storedSessionId 
-                              ? "We're checking your verification status in the background. " 
+                            {storedSessionId
+                              ? "We're checking your verification status in the background. "
                               : "Your identity verification is still pending. "}
                             Complete verification to unlock all features.
                           </p>
-                          
-                          <div className="bg-blue-50 p-3 rounded-md border border-blue-100 mb-2">
-                            <h4 className="text-sm font-medium text-blue-700">Verification Options:</h4>
-                            <ul className="mt-1 text-xs text-blue-600 list-disc pl-5">
-                              <li>Verify your identity using our secure online verification process, or</li>
-                              <li>Upload a pre-qualification document from your lender, or</li>
-                              <li>After uploading, request manual approval of your pre-qualification document</li>
-                            </ul>
-                          </div>
-                          
-                          <div className="flex space-x-2">
-                            <Button 
-                              size="sm"
-                              className="text-xs h-8"
-                              onClick={startVerification}
-                              disabled={isVerifyingIdentity || isVerificationStarted}
-                            >
-                              {isVerifyingIdentity ? (
-                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              ) : (
-                                <Shield className="mr-2 h-3 w-3" />
-                              )}
-                              {isVerificationStarted 
-                                ? "Verification in Progress..." 
-                                : isVerifyingIdentity 
-                                  ? "Starting..." 
-                                  : "Verify Identity"}
-                            </Button>
-                            
-                            <div className="flex space-x-2">
-                              <Button 
-                                size="sm"
-                                className="text-xs h-8"
-                                onClick={() => setIsPrequalificationModalOpen(true)}
-                                disabled={isVerificationStarted}
-                                variant="outline"
-                              >
-                                <Upload className="mr-2 h-3 w-3" />
-                                Upload Pre-qualification
-                              </Button>
-                              
-                              {user?.prequalificationDocUrl && !user?.prequalificationValidated && (
-                                <Button 
-                                  size="sm"
-                                  className="text-xs h-8"
-                                  onClick={handleRequestApproval}
-                                  disabled={isRequestingApproval}
-                                  variant="outline"
-                                >
-                                  {isRequestingApproval ? (
-                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <MailCheck className="mr-2 h-3 w-3" />
-                                  )}
-                                  {isRequestingApproval ? "Sending..." : "Request Manual Approval"}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+
                           {isVerificationStarted && (
                             <div className="p-2 bg-blue-50 text-blue-700 rounded-md flex items-center text-xs mt-2">
                               <Loader2 className="h-3 w-3 animate-spin text-blue-500 mr-2" />
-                              <span>Please complete the verification process in the opened window.</span>
+                              <span>
+                                Please complete the verification process in the
+                                opened window.
+                              </span>
                             </div>
                           )}
                         </div>
@@ -339,33 +358,130 @@ export default function BuyerDashboard() {
             </Button>
           </div>
         </div>
-        
+
+        {/* Verification Options */}
+        <div className="mt-6 bg-white p-5 rounded-lg border border-gray-100 shadow-sm">
+          <h4 className="text-lg font-medium mb-3 text-gray-800">Verification Options</h4>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-100 flex flex-col h-full">
+              <div className="flex items-center mb-2">
+                <div className="bg-blue-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
+                  <Shield className="h-4 w-4 text-blue-700" />
+                </div>
+                <h5 className="font-medium text-blue-800">Verify Identity</h5>
+              </div>
+              <p className="text-sm text-gray-600 mb-4 flex-grow">Complete online ID verification through our secure identity verification partner.</p>
+              <Button
+                className="w-full"
+                onClick={startVerification}
+                disabled={isVerifyingIdentity || isVerificationStarted}
+              >
+                {isVerifyingIdentity ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Shield className="mr-2 h-4 w-4" />
+                )}
+                {isVerificationStarted
+                  ? "Verification in Progress..."
+                  : isVerifyingIdentity
+                    ? "Starting..."
+                    : "Verify Identity"}
+              </Button>
+            </div>
+
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-100 flex flex-col h-full">
+              <div className="flex items-center mb-2">
+                <div className="bg-purple-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
+                  <Upload className="h-4 w-4 text-purple-700" />
+                </div>
+                <h5 className="font-medium text-purple-800">Upload Pre-qualification</h5>
+              </div>
+              <p className="text-sm text-gray-600 mb-4 flex-grow">Upload your lender pre-qualification document as an alternative verification method.</p>
+              <Button
+                className="w-full"
+                onClick={() => setIsPrequalificationModalOpen(true)}
+                disabled={isVerificationStarted}
+                variant="outline"
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Document
+              </Button>
+            </div>
+
+            <div className="p-4 bg-green-50 rounded-lg border border-green-100 flex flex-col h-full">
+              <div className="flex items-center mb-2">
+                <div className="bg-green-100 rounded-full w-8 h-8 flex items-center justify-center mr-2">
+                  <MailCheck className="h-4 w-4 text-green-700" />
+                </div>
+                <h5 className="font-medium text-green-800">Request Manual Approval</h5>
+              </div>
+              <p className="text-sm text-gray-600 mb-4 flex-grow">
+                {user?.prequalificationDocUrl
+                  ? "Request manual approval of your pre-qualification document."
+                  : "Upload a pre-qualification document first to enable this option."}
+              </p>
+              <Button
+                className="w-full"
+                onClick={handleRequestApproval}
+                disabled={isRequestingApproval || !user?.prequalificationDocUrl || user?.prequalificationValidated === true}
+                variant="outline"
+              >
+                {isRequestingApproval ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <MailCheck className="mr-2 h-4 w-4" />
+                )}
+                {isRequestingApproval
+                  ? "Sending..."
+                  : "Request Manual Approval"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Main Content Tabs */}
-        <div className="bg-white shadow rounded-lg">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="px-4 pt-4 border-b border-gray-200">
-              <TabsList className="grid w-full max-w-md grid-cols-3">
-                <TabsTrigger value="properties">
+        <div className="bg-white shadow-sm rounded-lg border border-gray-100 mt-6">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <div className="px-6 pt-4 border-b border-gray-200">
+              <TabsList className="grid w-full max-w-2xl grid-cols-3 gap-4">
+                <TabsTrigger 
+                  value="properties"
+                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
+                >
                   <PlusIcon className="h-4 w-4 mr-2" />
                   Properties
                 </TabsTrigger>
-                <TabsTrigger value="viewingRequests">
+                <TabsTrigger 
+                  value="viewingRequests"
+                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
+                >
                   <CalendarRange className="h-4 w-4 mr-2" />
                   Viewing Requests
                 </TabsTrigger>
-                <TabsTrigger value="agreements">
+                <TabsTrigger 
+                  value="agreements"
+                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Agreements
                 </TabsTrigger>
               </TabsList>
             </div>
-            
+
             <TabsContent value="properties" className="p-0">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">My Properties</h3>
-                <p className="mt-1 text-sm text-gray-500">Properties you've added to track</p>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  My Properties
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Properties you've added to track
+                </p>
               </div>
-              
+
               {isLoading ? (
                 <div className="p-8 flex justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -383,12 +499,20 @@ export default function BuyerDashboard() {
                               View Details
                             </Button>
                           </Link>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             size="sm"
-                            className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            onClick={() => property.agentId ? null : setPropertyToDelete(property.id)}
-                            title={property.agentId ? "Cannot delete after agent has accepted" : "Delete property"}
+                            className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? "opacity-50 cursor-not-allowed" : ""}`}
+                            onClick={() =>
+                              property.agentId
+                                ? null
+                                : setPropertyToDelete(property.id)
+                            }
+                            title={
+                              property.agentId
+                                ? "Cannot delete after agent has accepted"
+                                : "Delete property"
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -400,16 +524,21 @@ export default function BuyerDashboard() {
               ) : (
                 <div className="px-4 sm:px-6 py-10">
                   <p className="text-center text-gray-500">
-                    You haven't added any properties yet. Add your first property to get started.
+                    You haven't added any properties yet. Add your first
+                    property to get started.
                   </p>
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="viewingRequests" className="p-0">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">My Viewing Requests</h3>
-                <p className="mt-1 text-sm text-gray-500">Track the status of your property viewing requests</p>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  My Viewing Requests
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Track the status of your property viewing requests
+                </p>
               </div>
               {user && (
                 <div className="p-4">
@@ -417,13 +546,18 @@ export default function BuyerDashboard() {
                 </div>
               )}
             </TabsContent>
-            
+
             <TabsContent value="agreements" className="p-0">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">My Signed Agreements</h3>
-                <p className="mt-1 text-sm text-gray-500">Documents and agreements you've signed during your home buying journey</p>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  My Signed Agreements
+                </h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Documents and agreements you've signed during your home buying
+                  journey
+                </p>
               </div>
-              
+
               <div className="p-4">
                 {isLoadingAgreements ? (
                   <div className="flex justify-center my-8">
@@ -433,7 +567,10 @@ export default function BuyerDashboard() {
                   <div className="text-center py-8 text-gray-500">
                     <File className="h-12 w-12 mx-auto mb-2 text-gray-300" />
                     <p>No signed agreements yet.</p>
-                    <p className="text-sm mt-2">When you sign documents related to a property, they will appear here.</p>
+                    <p className="text-sm mt-2">
+                      When you sign documents related to a property, they will
+                      appear here.
+                    </p>
                   </div>
                 ) : (
                   <div className="divide-y">
@@ -451,18 +588,18 @@ export default function BuyerDashboard() {
                               {agreement.type === "agency_disclosure"
                                 ? "Agency Disclosure Form"
                                 : agreement.type === "representation_agreement"
-                                ? "Buyer Representation Agreement"
-                                : agreement.type === "standard"
-                                ? "Buyer Representation Agreement"
-                                : agreement.type === "global_brbc"
-                                ? "Global Buyer Representation Agreement"
-                                : "Agreement Document"}
+                                  ? "Buyer Representation Agreement"
+                                  : agreement.type === "standard"
+                                    ? "Buyer Representation Agreement"
+                                    : agreement.type === "global_brbc"
+                                      ? "Global Buyer Representation Agreement"
+                                      : "Agreement Document"}
                             </span>
                             <div className="text-xs text-gray-500 mt-1">
                               <div className="flex flex-col">
                                 <span>
-                                  {agreement.isGlobal 
-                                    ? "Type: Global (All Properties)" 
+                                  {agreement.isGlobal
+                                    ? "Type: Global (All Properties)"
                                     : `Property: ${agreement.property ? agreement.property.address : "Unknown"}`}
                                 </span>
                                 {agreement.isGlobal && (
@@ -471,22 +608,25 @@ export default function BuyerDashboard() {
                                   </span>
                                 )}
                                 <span>
-                                  Signed: {new Date(agreement.date).toLocaleDateString()}
+                                  Signed:{" "}
+                                  {new Date(
+                                    agreement.date,
+                                  ).toLocaleDateString()}
                                 </span>
                                 <span
                                   className={`mt-1 inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
                                     agreement.status === "signed_by_buyer"
                                       ? "bg-green-100 text-green-800"
                                       : agreement.status === "signed_by_all"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-blue-100 text-blue-800"
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-blue-100 text-blue-800"
                                   }`}
                                 >
                                   {agreement.status === "signed_by_buyer"
                                     ? "Signed by You"
                                     : agreement.status === "signed_by_all"
-                                    ? "Fully Signed"
-                                    : agreement.status}
+                                      ? "Fully Signed"
+                                      : agreement.status}
                                 </span>
                               </div>
                             </div>
@@ -497,14 +637,15 @@ export default function BuyerDashboard() {
                           variant="outline"
                           onClick={() => {
                             // Format the agreement document URL before viewing
-                            const documentUrl = agreement.documentUrl ? 
-                              (agreement.documentUrl.startsWith('/uploads') || agreement.documentUrl.startsWith('http') ? 
-                                agreement.documentUrl : 
-                                `/uploads/${agreement.documentUrl}`) : 
-                              null;
-                              
+                            const documentUrl = agreement.documentUrl
+                              ? agreement.documentUrl.startsWith("/uploads") ||
+                                agreement.documentUrl.startsWith("http")
+                                ? agreement.documentUrl
+                                : `/uploads/${agreement.documentUrl}`
+                              : null;
+
                             if (documentUrl) {
-                              window.open(documentUrl, '_blank');
+                              window.open(documentUrl, "_blank");
                             } else {
                               toast({
                                 title: "Error",
@@ -525,20 +666,21 @@ export default function BuyerDashboard() {
           </Tabs>
         </div>
       </main>
-      
+
       <AddPropertyModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleAddPropertySuccess}
       />
-      
+
       {/* Confirmation Dialog for Property Deletion */}
       <AlertDialog open={propertyToDelete !== null}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Property</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this property? This action cannot be undone.
+              Are you sure you want to delete this property? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -562,7 +704,7 @@ export default function BuyerDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
+
       {/* Prequalification Document Upload Modal */}
       <PrequalificationUpload
         isOpen={isPrequalificationModalOpen}
