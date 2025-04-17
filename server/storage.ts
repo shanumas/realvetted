@@ -65,6 +65,7 @@ export interface IStorage {
   getAgreementsByAgent(agentId: number): Promise<Agreement[]>;
   getAgreementsByType(type: string): Promise<Agreement[]>;
   getAgreementsByBuyer(buyerId: number): Promise<Agreement[]>;
+  getGlobalBRBCForBuyerAgent(buyerId: number, agentId: number): Promise<Agreement | undefined>;
   createAgreement(agreement: InsertAgreement): Promise<Agreement>;
   updateAgreement(id: number, data: Partial<Agreement>): Promise<Agreement>;
   

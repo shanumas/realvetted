@@ -91,10 +91,10 @@ export const propertyActivityLogs = pgTable("property_activity_logs", {
 // Buyer representation agreements
 export const agreements = pgTable("agreements", {
   id: serial("id").primaryKey(),
-  propertyId: integer("property_id").notNull(),
+  propertyId: integer("property_id"), // Made optional to support global agreements
   agentId: integer("agent_id").notNull(),
   buyerId: integer("buyer_id").notNull(),
-  type: text("type").notNull().default("standard"), // standard, agency_disclosure, agent_referral
+  type: text("type").notNull().default("standard"), // standard, agency_disclosure, agent_referral, global_brbc
   agreementText: text("agreement_text").notNull(),
   agentSignature: text("agent_signature"),
   buyerSignature: text("buyer_signature"),
@@ -104,6 +104,7 @@ export const agreements = pgTable("agreements", {
   createdAt: timestamp("created_at").defaultNow(),
   documentUrl: text("document_url"), // URL to the PDF document
   editedPdfContent: text("edited_pdf_content"), // Store the binary content of the edited PDF
+  isGlobal: boolean("is_global").default(false), // Flag to indicate if this is a global agreement applicable for all properties
 });
 
 // Property viewing requests
