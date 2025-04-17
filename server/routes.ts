@@ -4027,6 +4027,22 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             error: "This property doesn't have a seller or agent assigned yet",
           });
         }
+        
+        // If the property has an agent, verify that the buyer has signed a BRBC with this agent
+        if (property.agentId) {
+          // Check if there's a global BRBC agreement between the buyer and agent
+          const globalBrbc = await storage.getGlobalBRBCForBuyerAgent(req.user!.id, property.agentId);
+          
+          // If no global BRBC exists or it's not completed, return an error
+          if (!globalBrbc || (globalBrbc.status !== 'completed' && globalBrbc.status !== 'signed_by_buyer')) {
+            return res.status(403).json({
+              success: false,
+              error: "You must sign a Buyer Representation and Brokerage Confirmation (BRBC) with this agent before requesting a viewing",
+              requiresBrbc: true,
+              agentId: property.agentId
+            });
+          }
+        }
 
         // Allow multiple viewing requests from the same buyer
         // Only handle explicit override requests
