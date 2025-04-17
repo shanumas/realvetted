@@ -126,8 +126,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   
   // Pre-qualification approval request endpoint
-  app.post("/api/buyer/prequalification-approval", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+  app.post("/api/buyer/prequalification-approval", isAuthenticated, hasRole(["buyer"]), upload.any(), async (req, res) => {
     try {
+      console.log("Received manual approval request");
+      
       // Get user information
       const user = await storage.getUser(req.user!.id);
       
@@ -138,20 +140,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Ensure user has uploaded a pre-qualification document
-      if (!user.prequalificationDocUrl) {
-        return res.status(400).json({
-          success: false,
-          error: "You must upload a pre-qualification document first"
-        });
+      // Ensure user has uploaded a pre-qualification document previously
+      // (This is optional - we can allow manual approvals even without a document)
+      const hasPrequalDocument = !!user.prequalificationDocUrl;
+      const prequalDocUrl = user.prequalificationDocUrl || "";
+      
+      console.log("Form data:", req.body);
+      console.log("Files:", req.files);
+      
+      // Extract form data
+      const approvalFormData = {
+        desiredLoanAmount: req.body.desiredLoanAmount,
+        monthlyIncome: req.body.monthlyIncome,
+        employmentStatus: req.body.employmentStatus,
+        creditScore: req.body.creditScore,
+        downPaymentAmount: req.body.downPaymentAmount,
+        additionalNotes: req.body.additionalNotes
+      };
+      
+      // Process supporting documents if any
+      const supportingDocs = req.files as Express.Multer.File[];
+      const supportingDocsUrls: string[] = [];
+      
+      if (supportingDocs && supportingDocs.length > 0) {
+        // Create directory if it doesn't exist
+        await fs.promises.mkdir(
+          path.join(process.cwd(), "uploads", "supporting_docs"),
+          { recursive: true }
+        );
+        
+        // Process each uploaded supporting document
+        for (const file of supportingDocs) {
+          const fileName = `supporting_${req.user!.id}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${file.originalname.split('.').pop()}`;
+          const filePath = path.join(process.cwd(), "uploads", "supporting_docs", fileName);
+          
+          // Save file to disk
+          await fs.promises.writeFile(filePath, file.buffer);
+          
+          // Add URL to array
+          const fileUrl = `/uploads/supporting_docs/${fileName}`;
+          supportingDocsUrls.push(fileUrl);
+        }
       }
       
-      // Send approval request email
-      await sendPrequalificationApprovalEmail(user, user.prequalificationDocUrl);
+      // Send approval request email with form data and supporting docs
+      await sendPrequalificationApprovalEmail(
+        user, 
+        prequalDocUrl,
+        approvalFormData,
+        supportingDocsUrls
+      );
       
       res.json({
         success: true,
-        message: "Pre-qualification approval request sent"
+        message: "Pre-qualification approval request sent",
+        supportingDocsCount: supportingDocsUrls.length
       });
     } catch (error) {
       console.error("Error requesting pre-qualification approval:", error);

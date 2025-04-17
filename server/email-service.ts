@@ -165,21 +165,41 @@ export function getSentEmailsForUser(userId: number): SentEmail[] {
 }
 
 /**
+ * Generate a unique identifier
+ * @returns A unique string ID
+ */
+function generateUUID(): string {
+  return `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
+}
+
+/**
  * Send a pre-qualification approval request email
  * @param buyer The buyer user object
  * @param prequalificationDocUrl URL to the pre-qualification document
+ * @param approvalFormData Optional form data with additional buyer information
+ * @param supportingDocsUrls Optional array of supporting document URLs
  * @returns The sent email record
  */
 export async function sendPrequalificationApprovalEmail(
   buyer: User,
-  prequalificationDocUrl: string
+  prequalificationDocUrl: string,
+  approvalFormData?: {
+    desiredLoanAmount?: string;
+    monthlyIncome?: string;
+    employmentStatus?: string;
+    creditScore?: string;
+    downPaymentAmount?: string;
+    additionalNotes?: string;
+  },
+  supportingDocsUrls?: string[]
 ): Promise<SentEmail> {
   // Prepare recipient email
   const to = ["shanumas@gmail.com"];
   
   // Construct the email body
   const subject = `Pre-qualification Approval Request - ${buyer.firstName} ${buyer.lastName}`;
-  const body = `
+  
+  let body = `
 Dear Admin,
 
 A buyer has requested manual approval for their pre-qualification document.
@@ -191,13 +211,44 @@ Buyer Details:
 - Address: ${buyer.addressLine1 || "Not provided"}${buyer.city && buyer.state ? `, ${buyer.city}, ${buyer.state}` : ""}
 
 The buyer has uploaded a pre-qualification document that requires manual verification.
-Document URL: ${prequalificationDocUrl}
+Main Document URL: ${prequalificationDocUrl}
+`;
 
-Please review the document and update the user's verification status accordingly.
+  // Add form data if provided
+  if (approvalFormData) {
+    body += `
+--- Additional Financial Information ---
+- Desired Loan Amount: ${approvalFormData.desiredLoanAmount || "Not provided"}
+- Monthly Income: ${approvalFormData.monthlyIncome || "Not provided"}
+- Employment Status: ${approvalFormData.employmentStatus || "Not provided"}
+- Credit Score Range: ${approvalFormData.creditScore || "Not provided"}
+- Down Payment Amount: ${approvalFormData.downPaymentAmount || "Not provided"}
+
+Additional Notes:
+${approvalFormData.additionalNotes || "None provided"}
+`;
+  }
+  
+  // Add supporting documents if provided
+  if (supportingDocsUrls && supportingDocsUrls.length > 0) {
+    body += `
+--- Supporting Documents ---
+The buyer has provided ${supportingDocsUrls.length} supporting document(s):
+`;
+    
+    supportingDocsUrls.forEach((url, index) => {
+      body += `
+Document ${index + 1}: ${url}`;
+    });
+  }
+  
+  body += `
+
+Please review the document(s) and update the user's verification status accordingly.
 
 Thank you,
 REALVetted - Real Estate, Verified and Simplified
-  `;
+`;
 
   // In a production app, this would connect to an email service like SendGrid or Mailgun
   // For now, we'll just log the email and store it in our in-memory array
@@ -211,7 +262,7 @@ ${body}
   `);
 
   // Create a sent email record
-  const emailId = `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
+  const emailId = generateUUID();
   const sentEmail: SentEmail = {
     id: emailId,
     to,

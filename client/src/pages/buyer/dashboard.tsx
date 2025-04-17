@@ -27,6 +27,7 @@ import { ViewingRequestsList } from "@/components/viewing-requests-list";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createVeriffSession, launchVeriff } from "@/lib/veriff";
 import { PrequalificationUpload } from "@/components/prequalification-upload";
+import { ManualApprovalForm } from "@/components/manual-approval-form";
 import {
   AlertDialog,
   AlertDialogAction,
