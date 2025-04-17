@@ -109,11 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/auth/user"], user);
       
       // Redirect based on role and verification status
-      if (user.role === "buyer" && user.profileStatus !== "verified") {
-        setLocation("/buyer/kyc");
-      } else if (user.role === "agent" && user.profileStatus !== "verified") {
+      if (user.role === "agent" && user.profileStatus !== "verified") {
         setLocation("/agent/kyc");
       } else if (user.role === "buyer") {
+        // Always redirect buyers to dashboard regardless of verification status
+        // Buyers can still use the platform and will see a verification banner on the dashboard
         setLocation("/buyer/dashboard");
       } else if (user.role === "seller") {
         setLocation("/seller/dashboard");
