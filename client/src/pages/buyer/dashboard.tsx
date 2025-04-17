@@ -82,7 +82,7 @@ export default function BuyerDashboard() {
   });
   
   // Fetch all agreements signed by the buyer
-  const { data: buyerAgreements, isLoading: isLoadingAgreements } = useQuery({
+  const { data: buyerAgreements, isLoading: isLoadingAgreements } = useQuery<any[]>({
     queryKey: ["/api/buyer/agreements"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user, // Only run this query if we have a user

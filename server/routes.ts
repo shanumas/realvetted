@@ -4933,6 +4933,31 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       }
     },
   );
+  
+  // API Endpoint to get all agreements for a buyer
+  app.get("/api/buyer/agreements", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const buyerId = req.user?.id;
+      
+      if (!buyerId) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+      
+      // Get all agreements where the current user is the buyer
+      const agreements = await storage.getAgreementsByBuyer(buyerId);
+      
+      res.json(agreements);
+    } catch (error) {
+      console.error("Error getting buyer agreements:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get buyer agreements",
+      });
+    }
+  });
 
   return httpServer;
 }
