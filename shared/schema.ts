@@ -25,6 +25,11 @@ export const users = pgTable("users", {
   licenseNumber: text("license_number"), // Real estate license number for agents
   brokerageName: text("brokerage_name"), // Brokerage name for agents
   isBlocked: boolean("is_blocked").default(false),
+  // New fields for verification
+  verificationMethod: text("verification_method"), // "kyc" or "prequalification"
+  prequalificationDocUrl: text("prequalification_doc_url"), // URL to pre-qualification document
+  prequalificationValidated: boolean("prequalification_validated").default(false), // Whether the pre-qualification has been validated by AI
+  prequalificationData: json("prequalification_data"), // Extracted data from pre-qualification document
 });
 
 // Property listings
@@ -107,8 +112,8 @@ export const agreements = pgTable("agreements", {
   isGlobal: boolean("is_global").default(false), // Flag to indicate if this is a global agreement applicable for all properties
 });
 
-// Property viewing requests
-export const viewingRequests = pgTable("viewing_requests", {
+// Property tour requests
+export const tourRequests = pgTable("viewing_requests", { // Keeping the DB table name to avoid migration issues
   id: serial("id").primaryKey(),
   propertyId: integer("property_id").notNull(),
   buyerId: integer("buyer_id").notNull(),
@@ -120,7 +125,7 @@ export const viewingRequests = pgTable("viewing_requests", {
   confirmedEndDate: timestamp("confirmed_end_date"),
   status: text("status").notNull().default("pending"), // pending, accepted, rejected, rescheduled, completed, cancelled
   notes: text("notes"),
-  confirmedById: integer("confirmed_by_id"), // ID of the agent who confirmed the viewing
+  confirmedById: integer("confirmed_by_id"), // ID of the agent who confirmed the tour
   responseMessage: text("response_message"), // Message from the confirming agent with any changes
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -189,7 +194,7 @@ export const agreementSchema = createInsertSchema(agreements).omit({
   createdAt: true,
 });
 
-export const viewingRequestSchema = createInsertSchema(viewingRequests)
+export const tourRequestSchema = createInsertSchema(tourRequests)
   .omit({
     id: true,
     createdAt: true,
@@ -202,6 +207,12 @@ export const viewingRequestSchema = createInsertSchema(viewingRequests)
     // Override flag (not stored in DB, used for API logic)
     override: z.boolean().optional(),
   });
+
+// Create schema for pre-qualification document upload
+export const prequalificationDocSchema = z.object({
+  file: z.any(), // This will be the file upload
+  verificationMethod: z.literal("prequalification"), // Set this method
+});
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -216,5 +227,10 @@ export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
 export type InsertPropertyActivityLog = z.infer<typeof propertyActivityLogSchema>;
 export type Agreement = typeof agreements.$inferSelect;
 export type InsertAgreement = z.infer<typeof agreementSchema>;
-export type ViewingRequest = typeof viewingRequests.$inferSelect;
-export type InsertViewingRequest = z.infer<typeof viewingRequestSchema>;
+export type TourRequest = typeof tourRequests.$inferSelect;
+export type InsertTourRequest = z.infer<typeof tourRequestSchema>;
+
+// For backward compatibility during transition
+export type ViewingRequest = TourRequest;
+export type InsertViewingRequest = InsertTourRequest;
+export const viewingRequestSchema = tourRequestSchema;

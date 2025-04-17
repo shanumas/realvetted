@@ -3,8 +3,8 @@ import {
   Message, InsertMessage, AgentLead, InsertAgentLead,
   PropertyActivityLog, InsertPropertyActivityLog,
   Agreement, InsertAgreement,
-  ViewingRequest, InsertViewingRequest,
-  users, properties, messages, agentLeads, propertyActivityLogs, agreements, viewingRequests
+  ViewingRequest, InsertViewingRequest, // Keep for backward compatibility
+  users, properties, messages, agentLeads, propertyActivityLogs, agreements, tourRequests
 } from "@shared/schema";
 import { 
   LeadWithProperty, PropertyWithParticipants, PropertyActivityLogWithUser, 
@@ -755,7 +755,7 @@ export class PgStorage implements IStorage {
   
   // Viewing request methods
   async getViewingRequest(id: number): Promise<ViewingRequest | undefined> {
-    const result = await this.db.select().from(viewingRequests).where(eq(viewingRequests.id, id));
+    const result = await this.db.select().from(tourRequests).where(eq(tourRequests.id, id));
     return result[0];
   }
   
@@ -781,39 +781,39 @@ export class PgStorage implements IStorage {
   
   async getViewingRequestsByProperty(propertyId: number, getAllRequests: boolean = false): Promise<ViewingRequest[]> {
     if (getAllRequests) {
-      // Return all viewing requests across all properties
+      // Return all tour requests across all properties
       return await this.db.select()
-        .from(viewingRequests)
-        .orderBy(desc(viewingRequests.requestedDate));
+        .from(tourRequests)
+        .orderBy(desc(tourRequests.requestedDate));
     }
     
     return await this.db.select()
-      .from(viewingRequests)
-      .where(eq(viewingRequests.propertyId, propertyId))
-      .orderBy(desc(viewingRequests.requestedDate));
+      .from(tourRequests)
+      .where(eq(tourRequests.propertyId, propertyId))
+      .orderBy(desc(tourRequests.requestedDate));
   }
   
   async getViewingRequestsByBuyer(buyerId: number): Promise<ViewingRequest[]> {
     return await this.db.select()
-      .from(viewingRequests)
-      .where(eq(viewingRequests.buyerId, buyerId))
-      .orderBy(desc(viewingRequests.requestedDate));
+      .from(tourRequests)
+      .where(eq(tourRequests.buyerId, buyerId))
+      .orderBy(desc(tourRequests.requestedDate));
   }
   
   async getViewingRequestsByAgent(agentId: number): Promise<ViewingRequest[]> {
     return await this.db.select()
-      .from(viewingRequests)
+      .from(tourRequests)
       .where(
         or(
-          eq(viewingRequests.buyerAgentId, agentId),
-          eq(viewingRequests.sellerAgentId, agentId)
+          eq(tourRequests.buyerAgentId, agentId),
+          eq(tourRequests.sellerAgentId, agentId)
         )
       )
-      .orderBy(desc(viewingRequests.requestedDate));
+      .orderBy(desc(tourRequests.requestedDate));
   }
   
   async createViewingRequest(request: InsertViewingRequest): Promise<ViewingRequest> {
-    const result = await this.db.insert(viewingRequests).values({
+    const result = await this.db.insert(tourRequests).values({
       propertyId: request.propertyId,
       buyerId: request.buyerId,
       buyerAgentId: request.buyerAgentId || null,
@@ -829,28 +829,28 @@ export class PgStorage implements IStorage {
   }
   
   async updateViewingRequest(id: number, data: Partial<ViewingRequest>): Promise<ViewingRequest> {
-    const result = await this.db.update(viewingRequests)
+    const result = await this.db.update(tourRequests)
       .set(data)
-      .where(eq(viewingRequests.id, id))
+      .where(eq(tourRequests.id, id))
       .returning();
     
     if (result.length === 0) {
-      throw new Error(`Viewing request with ID ${id} not found`);
+      throw new Error(`Tour request with ID ${id} not found`);
     }
     
     return result[0];
   }
   
   async deleteViewingRequest(id: number): Promise<void> {
-    // First check if viewing request exists
+    // First check if tour request exists
     const viewingRequest = await this.getViewingRequest(id);
     if (!viewingRequest) {
-      throw new Error(`Viewing request with ID ${id} not found`);
+      throw new Error(`Tour request with ID ${id} not found`);
     }
     
-    // Delete the viewing request
-    await this.db.delete(viewingRequests)
-      .where(eq(viewingRequests.id, id));
+    // Delete the tour request
+    await this.db.delete(tourRequests)
+      .where(eq(tourRequests.id, id));
   }
 }
 
