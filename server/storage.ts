@@ -620,6 +620,24 @@ export class PgStorage implements IStorage {
       .orderBy(agreements.createdAt, "desc");
   }
   
+  async getAgreementsByBuyer(buyerId: number): Promise<Agreement[]> {
+    // Get all agreements where the current user is the buyer
+    const buyerAgreements = await this.db.select({
+      agreement: agreements,
+      property: properties
+    })
+    .from(agreements)
+    .leftJoin(properties, eq(agreements.propertyId, properties.id))
+    .where(eq(agreements.buyerId, buyerId))
+    .orderBy(agreements.createdAt, "desc");
+    
+    // Format the result to include the property details
+    return buyerAgreements.map(item => ({
+      ...item.agreement,
+      property: item.property
+    }));
+  }
+  
   async createAgreement(agreementData: InsertAgreement): Promise<Agreement> {
     const result = await this.db.insert(agreements).values({
       propertyId: agreementData.propertyId,
