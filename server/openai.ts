@@ -352,24 +352,126 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       return generateMockPropertyData(url);
     }
     
-    // First search - Property details search
-    const propertySearchQuery = `${url} real estate listing details bedrooms bathrooms price square feet address`;
+    // Extract property details from URL directly with a single search
+    // By using the housing website URL directly we leverage structured data
+    const propertySearchQuery = `${url} real estate listing details property type bedrooms bathrooms price square feet address`;
     console.log(`Searching for property information using query: ${propertySearchQuery}`);
     
-    const propertySearchResults = await getJson({
-      engine: "google",
-      q: propertySearchQuery,
-      api_key: process.env.SERPAPI_KEY,
-      num: 6, // Get property details
-    });
+    let propertySearchResults;
+    try {
+      // Add 30 second timeout for the API request
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("SerpAPI request timed out after 30 seconds")), 30000);
+      });
+      
+      const searchPromise = getJson({
+        engine: "google",
+        q: propertySearchQuery,
+        api_key: process.env.SERPAPI_KEY,
+        num: 8, // Get more results to increase chances of finding details
+        gl: "us", // Explicitly set country to US
+      });
+      
+      propertySearchResults = await Promise.race([searchPromise, timeoutPromise]);
+    } catch (searchError) {
+      console.error("Error with property search API:", searchError);
+      // Basic property data with just the URL
+      const basicPropertyData: PropertyAIData = {
+        address: "Address from URL",
+        city: "",
+        state: "",
+        zip: "",
+        propertyType: "Single Family", // Default assumption
+        bedrooms: 0,
+        bathrooms: 0,
+        squareFeet: 0,
+        price: 0,
+        yearBuilt: 0,
+        description: "Property details could not be extracted",
+        features: [],
+        propertyUrl: url
+      };
+      
+      // Try to extract minimal information from the URL itself
+      try {
+        // Extract address from URL
+        const urlObj = new URL(url);
+        const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+        
+        // Different extraction patterns based on common real estate sites
+        if (urlObj.hostname.includes('zillow.com')) {
+          // Example: https://www.zillow.com/homedetails/1033-Girard-St-San-Francisco-CA-94134/15172734_zpid/
+          const addressPart = pathSegments[1] || "";
+          const addressSegments = addressPart.split('-');
+          
+          if (addressSegments.length >= 4) {
+            // Extract city and state from URL segments
+            const stateIndex = addressSegments.findIndex(seg => seg.length === 2 && seg === seg.toUpperCase());
+            if (stateIndex > 0) {
+              basicPropertyData.state = addressSegments[stateIndex];
+              basicPropertyData.city = addressSegments.slice(stateIndex - 1, stateIndex).join(' ');
+              basicPropertyData.address = addressSegments.slice(0, stateIndex - 1).join(' ');
+              
+              // Extract zip if available
+              if (addressSegments.length > stateIndex + 1) {
+                basicPropertyData.zip = addressSegments[stateIndex + 1];
+              }
+            }
+          }
+        } else if (urlObj.hostname.includes('realtor.com')) {
+          // Example: https://www.realtor.com/realestateandhomes-detail/1033-Girard-St_San-Francisco_CA_94134
+          if (pathSegments.length >= 1) {
+            const addressParts = pathSegments[pathSegments.length - 1].split('_');
+            if (addressParts.length >= 3) {
+              basicPropertyData.address = addressParts[0].replace(/-/g, ' ');
+              basicPropertyData.city = addressParts[1].replace(/-/g, ' ');
+              basicPropertyData.state = addressParts[2];
+              if (addressParts.length > 3) {
+                basicPropertyData.zip = addressParts[3];
+              }
+            }
+          }
+        } else if (urlObj.hostname.includes('redfin.com')) {
+          // Extract what we can from Redfin URLs
+          if (pathSegments.length >= 1) {
+            const locationParts = pathSegments[0].split('-');
+            if (locationParts.length >= 2) {
+              basicPropertyData.city = locationParts[0].replace(/-/g, ' ');
+              basicPropertyData.state = locationParts[1].toUpperCase();
+            }
+            if (pathSegments.length >= 3) {
+              basicPropertyData.address = pathSegments[2].replace(/-/g, ' ');
+            }
+          }
+        }
+      } catch (urlParseError) {
+        console.error("Error parsing URL for basic info:", urlParseError);
+      }
+      
+      return basicPropertyData;
+    }
     
     // Extract property search results
-    const propertyOrganicResults = propertySearchResults.organic_results || [];
+    const propertyOrganicResults = propertySearchResults?.organic_results || [];
     
     // No search results found
     if (propertyOrganicResults.length === 0) {
       console.log("No search results found for property URL");
-      return generateMockPropertyData(url);
+      return {
+        address: "Unknown",
+        city: "",
+        state: "",
+        zip: "",
+        propertyType: "Unknown",
+        bedrooms: 0,
+        bathrooms: 0,
+        squareFeet: 0,
+        price: 0,
+        yearBuilt: 0,
+        description: "No property data found",
+        features: [],
+        propertyUrl: url
+      };
     }
     
     // Get property result snippets
@@ -381,57 +483,22 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       };
     });
     
-    // Second search - Specifically for listing agent information
-    const agentSearchQuery = `${url} "listed by" OR "listing agent" OR "listing provided by" real estate agent contact`;
-    console.log(`Searching for listing agent information using query: ${agentSearchQuery}`);
-    
-    const agentSearchResults = await getJson({
-      engine: "google",
-      q: agentSearchQuery,
-      api_key: process.env.SERPAPI_KEY,
-      num: 5, // Focus on agent details
-    });
-    
-    // Extract agent search results
-    const agentOrganicResults = agentSearchResults.organic_results || [];
-    
-    // Get agent result snippets
-    const agentSnippets = agentOrganicResults.map(result => {
-      return {
-        title: result.title || "",
-        snippet: result.snippet || "",
-        link: result.link || ""
-      };
-    });
-    
     // Use OpenAI to extract structured data from the search results
     const prompt = `
       I have search results for a real estate listing at URL: "${url}"
       
-      First, here are results from a search specifically for "listing agent" information:
-      ${agentSnippets.map((item, index) => `
-        Agent Result ${index + 1}:
-        Title: ${item.title}
-        Snippet: ${item.snippet}
-        Link: ${item.link}
-      `).join('\n')}
-      
-      And here are general property search results:
+      Here are search results for the property:
       ${propertySnippets.map((item, index) => `
-        Property Result ${index + 1}:
+        Result ${index + 1}:
         Title: ${item.title}
         Snippet: ${item.snippet}
         Link: ${item.link}
       `).join('\n')}
       
-      Based on these search results, extract the property details with a primary focus on finding the listing agent information.
+      Based on these search results, extract as many property details as possible. Look for property type, address, price, 
+      number of bedrooms and bathrooms, square footage, year built, and any other relevant information.
       
-      CRITICAL: You MUST look specifically for information about the "Listed by" or "listing agent" details.
-      This is the real estate agent who has listed the property for sale, not the property owner.
-      Look for phrases like "Listed by", "Listing Agent", "Listing provided by", "Contact agent", etc.
-      
-      Pay special attention to finding the listing agent's name, phone number, email, and real estate company.
-      The listing agent information is the most important part of this extraction.
+      Also look for the listing agent information if available (name, company, etc.).
       
       Format your response as a JSON object with these fields: 
       {
@@ -451,118 +518,73 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         "sellerPhone": "Listing agent's phone",
         "sellerEmail": "Listing agent's email",
         "sellerCompany": "Listing agent's real estate company",
-        "sellerLicenseNo": "Listing agent's license number if available",
-        "propertyUrl": "${url}"
+        "sellerLicenseNo": "Listing agent's license number if available"
       }
       
-      Return ONLY the JSON with no additional text.
+      If any field information is not available, leave it as null or 0 for numbers. Return ONLY the JSON with no additional text.
     `;
     
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        {
-          role: "system",
-          content: "You are a real estate data extraction expert specializing in finding 'Listed by' information. Your primary task is to identify the listing agent who has listed the property for sale. Always look specifically for 'Listed by', 'Listing Agent', or 'Listing provided by' sections in real estate listings. This is the real estate professional who is representing the seller, not the property owner."
-        },
-        { role: "user", content: prompt }
-      ],
-      response_format: { type: "json_object" }
-    });
-    
-    const propertyData = JSON.parse(response.choices[0].message.content || "{}");
-    
-    // If seller name is available but email is not, try to find email with a second search
-    if (propertyData.sellerName && !propertyData.sellerEmail) {
-      console.log(`Found seller name "${propertyData.sellerName}" but no email. Searching for email...`);
-      
-      // Create search query specifically for finding the agent's email
-      const agentQuery = `${propertyData.sellerName} ${propertyData.sellerCompany || ''} real estate agent email contact`;
-      
-      // Perform a second search to find the agent's email
-      const agentSearchResults = await getJson({
-        engine: "google",
-        q: agentQuery,
-        api_key: process.env.SERPAPI_KEY,
-        num: 5,
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: "You are a real estate data extraction expert. Extract as much property data as possible from search results."
+          },
+          { role: "user", content: prompt }
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+        temperature: 0.3
       });
       
-      const agentResults = agentSearchResults.organic_results || [];
+      const propertyData = JSON.parse(response.choices[0].message.content || "{}");
       
-      if (agentResults.length > 0) {
-        const agentSnippets = agentResults.map(result => {
-          return {
-            title: result.title || "",
-            snippet: result.snippet || "",
-            link: result.link || ""
-          };
-        });
-        
-        // Use OpenAI to extract the agent's email from the search results
-        const emailPrompt = `
-          I need to find the email address for a real estate agent.
-          
-          Agent Name: ${propertyData.sellerName}
-          Company: ${propertyData.sellerCompany || 'Unknown'}
-          
-          Here are search results that might contain their email:
-          ${agentSnippets.map((item, index) => `
-            Result ${index + 1}:
-            Title: ${item.title}
-            Snippet: ${item.snippet}
-            Link: ${item.link}
-          `).join('\n')}
-          
-          Extract the agent's email address if present in these results. Look for patterns like "name@domain.com" or "contact: email@example.com".
-          Return ONLY the email address, or "not found" if you cannot find an email.
-        `;
-        
-        const emailResponse = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: "You are an expert at finding contact information. Extract only the email address from the search results."
-            },
-            { role: "user", content: emailPrompt }
-          ]
-        });
-        
-        const extractedEmail = emailResponse.choices[0].message.content?.trim();
-        
-        // If a valid email was found, add it to the property data
-        if (extractedEmail && extractedEmail !== "not found" && extractedEmail.includes("@")) {
-          console.log(`Found email for agent: ${extractedEmail}`);
-          propertyData.sellerEmail = extractedEmail;
-        } else {
-          console.log("No valid email found for agent");
-          // Generate a placeholder email based on agent name if none was found
-          const nameParts = propertyData.sellerName.split(' ');
-          if (nameParts.length > 0) {
-            const firstName = nameParts[0].toLowerCase();
-            const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
-            
-            if (propertyData.sellerCompany) {
-              const companyDomain = propertyData.sellerCompany.toLowerCase()
-                .replace(/[^a-z0-9]/g, '')
-                .substring(0, 10);
-              propertyData.sellerEmail = `${firstName}.${lastName}@${companyDomain}.com`;
-            } else {
-              propertyData.sellerEmail = `${firstName}.${lastName}@realestate.com`;
-            }
-          }
-        }
-      }
+      // Ensure the original URL is preserved
+      return {
+        ...propertyData,
+        propertyUrl: url
+      };
+    } catch (openaiError) {
+      console.error("Error with OpenAI property data extraction:", openaiError);
+      
+      // Return basic data if OpenAI processing fails
+      return {
+        address: propertyOrganicResults[0]?.title?.split(' - ')[0] || "Address unavailable",
+        city: "",
+        state: "",
+        zip: "",
+        propertyType: "Single Family",
+        bedrooms: 0,
+        bathrooms: 0,
+        squareFeet: 0,
+        price: 0,
+        yearBuilt: 0,
+        description: propertyOrganicResults[0]?.snippet || "Description unavailable",
+        features: [],
+        propertyUrl: url
+      };
     }
     
-    // Ensure the original URL is preserved
-    return {
-      ...propertyData,
-      propertyUrl: url
-    };
   } catch (error) {
     console.error("Error extracting property data from URL with web search:", error);
-    throw new Error("Failed to extract property data from URL. Please try again later.");
+    // Return a minimal property object rather than throwing an error
+    return {
+      address: "Address unavailable",
+      city: "",
+      state: "",
+      zip: "",
+      propertyType: "Unknown",
+      bedrooms: 0,
+      bathrooms: 0,
+      squareFeet: 0,
+      price: 0,
+      yearBuilt: 0,
+      description: "Could not extract property data. Please try again later.",
+      features: [],
+      propertyUrl: url
+    };
   }
 }
 
