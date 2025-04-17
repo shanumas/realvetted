@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AgencyDisclosureForm } from "@/components/agency-disclosure-form";
+import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
@@ -63,6 +64,7 @@ export default function BuyerPropertyDetail() {
   const [viewingEndTime, setViewingEndTime] = useState<string>("");
   const [viewingNotes, setViewingNotes] = useState<string>("");
   const [isDisclosureFormOpen, setIsDisclosureFormOpen] = useState<boolean>(false);
+  const [isBrbcModalOpen, setIsBrbcModalOpen] = useState<boolean>(false);
   const [viewingRequestData, setViewingRequestData] = useState<{ date: string; time: string; endTime: string; notes: string } | null>(null);
   
   // State for override confirmation dialog
@@ -1268,6 +1270,46 @@ export default function BuyerPropertyDetail() {
             // We'll detect which scenario occurred in useEffect by checking for agreements
             setIsDisclosureFormOpen(false);
           }}
+        />
+      )}
+      
+      {/* Buyer Representation Agreement Dialog */}
+      {selectedAgentId && (
+        <BuyerRepresentationAgreement
+          agentId={selectedAgentId}
+          isOpen={isBrbcModalOpen}
+          onClose={() => {
+            setIsBrbcModalOpen(false);
+            // After closing the BRBC modal, refresh agreements
+            queryClient.invalidateQueries({ queryKey: ['/api/buyer/agreements'] });
+            
+            // If we have a pending viewing request, retry it
+            if (viewingRequestData) {
+              // Check if the user has now signed a global BRBC
+              apiRequest("GET", `/api/global-brbc/${selectedAgentId}`)
+                .then(res => res.json())
+                .then(data => {
+                  if (data.success && data.exists && data.agreement.status === "signed_by_buyer") {
+                    console.log("Global BRBC now signed, retrying viewing request");
+                    // The global BRBC has been signed, retry the viewing request
+                    requestViewingMutation.mutate({
+                      date: viewingRequestData.date,
+                      time: viewingRequestData.time,
+                      endTime: viewingRequestData.endTime,
+                      notes: viewingRequestData.notes,
+                      override: true // Allow override since we have permission now
+                    });
+                    
+                    // Clear the stored data
+                    setViewingRequestData(null);
+                  }
+                })
+                .catch(err => {
+                  console.error("Error checking for updated global BRBC:", err);
+                });
+            }
+          }}
+          isGlobal={true}
         />
       )}
       

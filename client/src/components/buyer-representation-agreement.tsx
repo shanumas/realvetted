@@ -180,7 +180,7 @@ By signing below, Buyer acknowledges understanding and accepting the terms of th
       
       // Close the dialog
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving BRBC agreement:", error);
       toast({
         title: "Error",
