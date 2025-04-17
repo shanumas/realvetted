@@ -30,6 +30,7 @@ export const users = pgTable("users", {
   prequalificationDocUrl: text("prequalification_doc_url"), // URL to pre-qualification document
   prequalificationValidated: boolean("prequalification_validated").default(false), // Whether the pre-qualification has been validated by AI
   prequalificationData: json("prequalification_data"), // Extracted data from pre-qualification document
+  prequalificationMessage: text("prequalification_message"), // Validation message or rejection reason
 });
 
 // Property listings

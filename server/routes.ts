@@ -228,7 +228,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUser(req.user!.id, {
           prequalificationValidated: validationResult.validated,
           profileStatus: validationResult.validated ? "verified" : "pending",
-          prequalificationData: validationResult.data
+          prequalificationData: validationResult.data,
+          prequalificationMessage: validationResult.message // Store the validation message (success or rejection reason)
         });
         
         // Log the verification result

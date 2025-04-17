@@ -295,6 +295,16 @@ export default function BuyerDashboard() {
                       Status: <span className="font-semibold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
                     </span>
                     
+                    {/* Show pre-qualification validation message/rejection reason if applicable */}
+                    {!user?.prequalificationValidated && 
+                     user?.prequalificationDocUrl && 
+                     user?.prequalificationMessage && 
+                     user?.prequalificationMessage !== "Document validated successfully" && (
+                      <span className="ml-2 text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
+                        {user.prequalificationMessage}
+                      </span>
+                    )}
+                    
                     {storedSessionId && user?.profileStatus !== "verified" && (
                       <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full text-[10px]">
                         {checking ? "Checking..." : "Auto-checking"}
