@@ -26,12 +26,18 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
   // Upload pre-qualification document mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Using FormData directly as the request body
-      const response = await apiRequest(
-        "POST", 
-        "/api/buyer/prequalification", 
-        formData // Pass FormData directly (it will be detected and not JSON stringified)
-      );
+      // Manual fetch to ensure FormData is sent correctly
+      const response = await fetch("/api/buyer/prequalification", {
+        method: "POST",
+        body: formData,
+        credentials: "include"
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Upload failed with status: ${response.status}`);
+      }
+      
       return response.json();
     },
     onSuccess: (data) => {

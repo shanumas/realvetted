@@ -100,11 +100,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/attached_assets",
     express.static(path.join(process.cwd(), "attached_assets")),
   );
+  
+  // Ensure upload directory is accessible
+  console.log("Upload directories:");
+  console.log(" - Uploads dir path:", uploadsDir);
+  console.log(" - Prequalification dir path:", prequalificationDir);
 
   // Configure multer for file uploads
+  const storage = multer.memoryStorage();
   const upload = multer({
-    storage: multer.memoryStorage(),
+    storage: storage,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    fileFilter: (req, file, cb) => {
+      // Accept images and PDF files
+      if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(null, false);
+      }
+    }
   });
 
   // -------- API Routes --------
