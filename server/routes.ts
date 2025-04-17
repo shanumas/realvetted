@@ -12,6 +12,7 @@ import {
   extractPropertyFromUrl,
   validatePrequalificationDocument,
 } from "./openai";
+import { sendTourRequestEmail } from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
 import {
@@ -4264,6 +4265,39 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             viewingRequestId: viewingRequest.id,
           },
         });
+
+        // Send email notification to the listing agent
+        try {
+          // Get buyer data
+          const buyer = await storage.getUser(req.user!.id);
+          
+          // Get buyer's agent data (if assigned)
+          let agent = undefined;
+          if (property.agentId) {
+            agent = await storage.getUser(property.agentId);
+          }
+          
+          // Determine the listing agent's email
+          const listingAgentEmail = property.listingAgentEmail || property.sellerEmail;
+          
+          if (buyer && listingAgentEmail) {
+            // Send the email notification
+            await sendTourRequestEmail(
+              viewingRequest, 
+              property, 
+              buyer, 
+              agent, 
+              listingAgentEmail
+            );
+            
+            console.log(`Sent tour request notification email to: ${listingAgentEmail}`);
+          } else {
+            console.warn("Could not send tour request email - missing buyer or listing agent email");
+          }
+        } catch (emailError) {
+          console.error("Failed to send tour request email notification:", emailError);
+          // Continue without failing the whole request
+        }
 
         res.status(201).json({
           success: true,
