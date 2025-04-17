@@ -186,7 +186,7 @@ export function AgencyDisclosureForm({
   
   // Check for existing agreement when the modal opens
   useEffect(() => {
-    if (isOpen && property?.id && user?.id) {
+    if (isOpen && property?.id && viewingRequestId) {
       const fetchExistingAgreement = async () => {
         try {
           // Get agreements for this property
@@ -200,59 +200,16 @@ export function AgencyDisclosureForm({
             );
             
             if (agencyAgreements.length > 0) {
-              // Use most recent agreement where the current user has signed
-              const userAgreements = agencyAgreements.filter(agreement => {
-                if (isAgent && agreement.agentId === user.id) {
-                  return true;
-                } else if (!isAgent && agreement.buyerId === user.id) {
-                  return true;
-                }
-                return false;
-              });
+              // Use most recent agreement
+              const latestAgreement = agencyAgreements[agencyAgreements.length - 1];
               
-              // If we found agreements for this user, use the most recent one
-              if (userAgreements.length > 0) {
-                const latestAgreement = userAgreements[userAgreements.length - 1];
-                console.log("Found existing agreement signed by user:", latestAgreement);
-                
-                // Store signature
-                if (isAgent && latestAgreement.agentSignature) {
-                  setExistingSignature(latestAgreement.agentSignature);
-                } else if (!isAgent && latestAgreement.buyerSignature) {
-                  setExistingSignature(latestAgreement.buyerSignature);
-                }
-                
-                // If there's a documentUrl, fetch the PDF and display it instead of generating a new one
-                if (latestAgreement.documentUrl && latestAgreement.id) {
-                  console.log("Loading previously signed PDF from agreement:", latestAgreement.id);
-                  
-                  try {
-                    // We'll use the view-pdf endpoint to get the document
-                    const pdfResponse = await apiRequest('GET', `/api/agreements/${latestAgreement.id}/view-pdf`);
-                    
-                    if (pdfResponse.ok) {
-                      // Get the PDF as a blob
-                      const blob = await pdfResponse.blob();
-                      
-                      // Create a temporary URL for the blob
-                      const url = window.URL.createObjectURL(blob);
-                      setPdfUrl(url);
-                      
-                      // Alert the user they're viewing a previously signed document
-                      toast({
-                        title: "Previously Signed Document",
-                        description: "You are viewing a document you've already signed.",
-                      });
-                      
-                      // No need to generate a new preview since we've loaded the existing document
-                      return;
-                    } else {
-                      console.error("Error fetching existing PDF:", await pdfResponse.text());
-                    }
-                  } catch (pdfError) {
-                    console.error("Error loading existing PDF:", pdfError);
-                  }
-                }
+              // If the current user is an agent, check for existing agent signature
+              if (isAgent && latestAgreement.agentSignature) {
+                setExistingSignature(latestAgreement.agentSignature);
+              }
+              // If the user is a buyer, check for existing buyer signature
+              else if (!isAgent && latestAgreement.buyerSignature) {
+                setExistingSignature(latestAgreement.buyerSignature);
               }
             }
           }
@@ -263,7 +220,7 @@ export function AgencyDisclosureForm({
       
       fetchExistingAgreement();
     }
-  }, [isOpen, property?.id, user?.id, isAgent, toast]);
+  }, [isOpen, property?.id, viewingRequestId, isAgent]);
 
   // Show an error message if property or agent is missing
   if (!property || !agent) {
@@ -400,12 +357,6 @@ export function AgencyDisclosureForm({
   const generatePdfPreview = async () => {
     try {
       if (!property?.id) return;
-      
-      // Skip generating a new preview if we're already displaying an existing signed PDF
-      if (pdfUrl && existingSignature) {
-        console.log("Using existing signed PDF, skipping new preview generation");
-        return pdfUrl;
-      }
       
       // Revoke any existing object URLs to prevent memory leaks
       if (pdfUrl) {
