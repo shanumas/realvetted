@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
@@ -36,10 +36,13 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
     defaultValues: {
       url: "",
     },
+    mode: "onChange", // Enable onChange validation mode
   });
 
   // Extract property data from URL
   const searchPropertyByUrl = async (url: string) => {
+    if (!url || isSearching) return;
+    
     setIsSearching(true);
     try {
       // Use our client function to extract property details from URL
@@ -92,6 +95,31 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
       addPropertyMutation.mutate(propertyData);
     }
   };
+  
+  // Watch for URL changes and auto-search
+  const urlValue = useWatch({
+    control: urlForm.control,
+    name: "url",
+  });
+  
+  // Auto-search effect that triggers when URL field changes
+  useEffect(() => {
+    // Only proceed if there's a valid URL
+    if (!urlValue || typeof urlValue !== 'string' || urlForm.formState.errors.url) {
+      return; // Skip if URL is invalid
+    }
+    
+    // Don't search for very short URLs (still being typed)
+    if (urlValue.length < 10) return;
+    
+    // Add delay to prevent searching on every keystroke
+    const timer = setTimeout(() => {
+      searchPropertyByUrl(urlValue);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlValue, urlForm.formState.errors.url]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
