@@ -7,17 +7,50 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+interface RequestOptions {
+  body?: any;
+  customHeaders?: Record<string, string>;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: RequestOptions,
   retries = 1
 ): Promise<Response> {
   try {
+    // Set up headers based on request data type
+    let headers: Record<string, string> = {};
+    let body: any = undefined;
+
+    // If we have options with customHeaders, use those
+    if (options?.customHeaders) {
+      headers = { ...options.customHeaders };
+    } 
+    // Otherwise use default Content-Type for JSON
+    else if (data && !(data instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    // Set the body based on data type
+    if (options?.body) {
+      body = options.body; // Use the custom body from options
+    } else if (data instanceof FormData) {
+      body = data; // Use FormData directly
+    } else if (data) {
+      body = JSON.stringify(data); // JSON stringify regular data
+    }
+
+    console.log("Making request to:", url, "Method:", method, "Headers:", headers);
+    if (body instanceof FormData) {
+      console.log("Sending FormData");
+    }
+
     const res = await fetch(url, {
       method,
-      headers: data ? { "Content-Type": "application/json" } : {},
-      body: data ? JSON.stringify(data) : undefined,
+      headers,
+      body,
       credentials: "include", // Always include credentials for session cookies
       cache: "no-cache", // Prevent caching issues with authentication state
     });
@@ -25,13 +58,14 @@ export async function apiRequest(
     await throwIfResNotOk(res);
     return res;
   } catch (error) {
+    console.error("API request error:", error);
     // Only retry for network errors or 5xx server errors, but not for 4xx client errors
     if (retries > 0 && (error instanceof TypeError || 
         (error instanceof Error && error.message.includes("5")))) {
       console.log(`Retrying request to ${url}. Retries left: ${retries - 1}`);
       // Wait 1 second before retrying
       await new Promise(resolve => setTimeout(resolve, 1000));
-      return apiRequest(method, url, data, retries - 1);
+      return apiRequest(method, url, data, options, retries - 1);
     }
     throw error;
   }

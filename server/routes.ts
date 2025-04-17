@@ -112,8 +112,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User routes
   
   // Pre-qualification document upload
-  app.post("/api/buyer/prequalification", isAuthenticated, hasRole(["buyer"]), upload.single("file"), async (req, res) => {
+  app.post("/api/buyer/prequalification", isAuthenticated, hasRole(["buyer"]), (req, res, next) => {
+    console.log("Received prequalification upload request");
+    console.log("Content-Type:", req.headers['content-type']);
+    console.log("Request body:", req.body);
+    console.log("Request has files?", !!req.files);
+    next();
+  }, upload.single("file"), async (req, res) => {
     try {
+      console.log("After multer middleware");
+      console.log("req.file:", req.file);
+      console.log("req.body:", req.body);
+      
       if (!req.file) {
         return res.status(400).json({
           success: false,

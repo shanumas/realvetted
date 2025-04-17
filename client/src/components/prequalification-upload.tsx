@@ -26,12 +26,12 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
   // Upload pre-qualification document mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await apiRequest("POST", "/api/buyer/prequalification", undefined, {
-        body: formData,
-        customHeaders: {
-          // No Content-Type header needed, browser sets it with boundary
-        },
-      });
+      // Using FormData directly as the request body
+      const response = await apiRequest(
+        "POST", 
+        "/api/buyer/prequalification", 
+        formData // Pass FormData directly (it will be detected and not JSON stringified)
+      );
       return response.json();
     },
     onSuccess: (data) => {
@@ -53,6 +53,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
       }
     },
     onError: (error) => {
+      console.error("Upload error:", error);
       toast({
         title: "Upload failed",
         description: error instanceof Error ? error.message : "There was an error uploading your document.",
@@ -74,9 +75,12 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
       return;
     }
 
+    // Create FormData and append the file with the correct field name expected by multer
     const formData = new FormData();
-    formData.append("file", selectedFile);
+    formData.append("file", selectedFile, selectedFile.name);
     formData.append("verificationMethod", "prequalification");
+    
+    console.log("Uploading file:", selectedFile.name, "Size:", selectedFile.size, "Type:", selectedFile.type);
     
     uploadMutation.mutate(formData);
   };
