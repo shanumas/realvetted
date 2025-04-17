@@ -12,12 +12,23 @@ export interface PropertyAIData {
   squareFeet?: number;
   propertyType?: string;
   yearBuilt?: number;
+  // Original property source information
+  propertyUrl?: string;      // Property listing page URL that was extracted from
+  sourceUrl?: string;        // Original URL entered by the user
+  sourceSite?: string;       // Source website name (e.g., "zillow.com", "redfin.com")
+  // Listing agent information
   sellerName?: string;       // Name of the seller/listing agent
   sellerPhone?: string;      // Phone number of the seller/listing agent
   sellerEmail?: string;      // Email of the seller/listing agent
   sellerCompany?: string;    // Real estate company of the seller/listing agent
   sellerLicenseNo?: string;  // License number of the seller/listing agent
-  propertyUrl?: string;      // Original property listing URL
+  // Enhanced listing agent information
+  listingAgentName?: string;     // Name of the listing agent
+  listingAgentEmail?: string;    // Email of the listing agent
+  listingAgentPhone?: string;    // Phone number of the listing agent
+  listingAgentCompany?: string;  // Real estate company of the listing agent
+  listingAgentLicenseNo?: string; // License number of the listing agent
+  // Property details
   description?: string;      // Property description
   features?: string[];       // Property features/amenities
   imageUrls?: string[];      // Property image URLs

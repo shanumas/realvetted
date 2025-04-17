@@ -667,7 +667,34 @@ export class PgStorage implements IStorage {
     // Get all agreements where the current user is the buyer
     const buyerAgreements = await this.db.select({
       agreement: agreements,
-      property: properties
+      property: {
+        id: properties.id,
+        address: properties.address,
+        city: properties.city,
+        state: properties.state,
+        zip: properties.zip,
+        price: properties.price,
+        bedrooms: properties.bedrooms,
+        bathrooms: properties.bathrooms,
+        squareFeet: properties.squareFeet,
+        propertyType: properties.propertyType,
+        yearBuilt: properties.yearBuilt,
+        description: properties.description,
+        createdAt: properties.createdAt,
+        createdBy: properties.createdBy,
+        sellerEmail: properties.sellerEmail,
+        sellerId: properties.sellerId,
+        agentId: properties.agentId,
+        status: properties.status,
+        sellerName: properties.sellerName,
+        sellerPhone: properties.sellerPhone,
+        sellerCompany: properties.sellerCompany,
+        sellerLicenseNo: properties.sellerLicenseNo,
+        propertyUrl: properties.propertyUrl,
+        features: properties.features,
+        imageUrls: properties.imageUrls,
+        emailSent: properties.emailSent
+      }
     })
     .from(agreements)
     .leftJoin(properties, eq(agreements.propertyId, properties.id))

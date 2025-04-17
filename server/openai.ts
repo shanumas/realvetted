@@ -544,10 +544,12 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       
       const propertyData = JSON.parse(response.choices[0].message.content || "{}");
       
-      // Ensure the original URL is preserved
+      // Ensure the original URL and source information is preserved
       return {
         ...propertyData,
-        propertyUrl: url
+        propertyUrl: url,
+        sourceUrl: url,  // Store the original URL entered by the user
+        sourceSite: new URL(url).hostname.replace('www.', '')  // Extract the source website (e.g., zillow.com, realtor.com)
       };
     } catch (openaiError) {
       console.error("Error with OpenAI property data extraction:", openaiError);
@@ -566,7 +568,9 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
         yearBuilt: 0,
         description: propertyOrganicResults[0]?.snippet || "Description unavailable",
         features: [],
-        propertyUrl: url
+        propertyUrl: url,
+        sourceUrl: url,
+        sourceSite: new URL(url).hostname.replace('www.', '')
       };
     }
     
@@ -586,15 +590,30 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       yearBuilt: 0,
       description: "Could not extract property data. Please try again later.",
       features: [],
-      propertyUrl: url
+      propertyUrl: url,
+      sourceUrl: url,
+      sourceSite: url.includes('://') ? new URL(url).hostname.replace('www.', '') : "unknown"
     };
   }
 }
 
 // Helper function to generate mock property data for development
 function generateMockPropertyData(address: string): PropertyAIData {
+  // Determine if the input is a URL
+  const isUrl = address.includes("http");
+  
+  // Extract domain if it's a URL
+  let sourceSite = "unknown";
+  if (isUrl) {
+    try {
+      sourceSite = new URL(address).hostname.replace('www.', '');
+    } catch (e) {
+      console.error("Error parsing URL:", e);
+    }
+  }
+  
   const mockData: PropertyAIData = {
-    address: address,
+    address: isUrl ? "1234 Main Street" : address,
     city: "Boston",
     state: "MA",
     zip: "02108",
@@ -604,12 +623,23 @@ function generateMockPropertyData(address: string): PropertyAIData {
     squareFeet: 1800,
     price: 750000,
     yearBuilt: 1998,
+    // Source information
+    propertyUrl: isUrl ? address : "",
+    sourceUrl: isUrl ? address : "",
+    sourceSite: sourceSite,
+    // Legacy listing agent info
     sellerName: "Jane Realtor",
     sellerPhone: "555-123-4567",
     sellerEmail: `agent_${Math.floor(Math.random() * 1000)}@example.com`,
     sellerCompany: "Boston Properties",
     sellerLicenseNo: "MA-REA-12345",
-    propertyUrl: address.includes("http") ? address : "",
+    // Enhanced listing agent info
+    listingAgentName: "Jane Realtor",
+    listingAgentEmail: `agent_${Math.floor(Math.random() * 1000)}@example.com`,
+    listingAgentPhone: "555-123-4567",
+    listingAgentCompany: "Boston Properties",
+    listingAgentLicenseNo: "MA-REA-12345",
+    // Property details
     description: "Beautiful single-family home in a great neighborhood with modern amenities and convenient location.",
     features: [
       "Hardwood floors",
