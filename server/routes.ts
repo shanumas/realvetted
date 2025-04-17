@@ -140,18 +140,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Use OpenAI to extract information from the document for validation
       try {
-        // In a production app, we'd call an AI service to validate the document
-        // This would extract data from the document and compare it against user data
-        // For now, we'll simulate validation by automatically marking it as validated
+        // Validate the document using AI
+        const user = await storage.getUser(req.user!.id);
+        if (!user) {
+          throw new Error("User not found");
+        }
+
+        const validationResult = await validatePrequalificationDocument(
+          filePath,
+          {
+            firstName: user.firstName,
+            lastName: user.lastName
+          }
+        );
         
-        // Update user record with validated status
+        // Update user record with validation result
         await storage.updateUser(req.user!.id, {
-          prequalificationValidated: true,
-          profileStatus: "verified" // Auto-verify for now
+          prequalificationValidated: validationResult.validated,
+          profileStatus: validationResult.validated ? "verified" : "pending",
+          prequalificationData: validationResult.data
         });
         
-        // Log the verification
-        console.log(`User ID ${req.user!.id} verified through pre-qualification document.`);
+        // Log the verification result
+        if (validationResult.validated) {
+          console.log(`User ID ${req.user!.id} verified through pre-qualification document.`);
+        } else {
+          console.log(`User ID ${req.user!.id} pre-qualification document failed validation: ${validationResult.message}`);
+        }
       } catch (validationError) {
         console.error("Error validating pre-qualification document:", validationError);
         // Don't fail the request, just leave as pending for manual review

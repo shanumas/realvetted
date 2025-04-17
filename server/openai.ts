@@ -67,6 +67,18 @@ export interface ExtractedIDData {
   expirationDate?: string;
 }
 
+export interface PrequalificationData {
+  documentType?: string;
+  buyerName?: string;
+  firstName?: string;
+  lastName?: string;
+  lenderName?: string;
+  loanAmount?: string;
+  loanType?: string;
+  approvalDate?: string;
+  expirationDate?: string;
+}
+
 // Extract data from ID documents using OpenAI Vision
 export async function extractIDData(idFrontBase64: string, idBackBase64: string): Promise<ExtractedIDData> {
   try {
@@ -146,6 +158,136 @@ export async function extractIDData(idFrontBase64: string, idBackBase64: string)
 }
 
 // Verify KYC documents
+export async function validatePrequalificationDocument(
+  filePath: string,
+  userData: {
+    firstName: string | null;
+    lastName: string | null;
+  }
+): Promise<{ validated: boolean; data: PrequalificationData; message: string }> {
+  try {
+    // If there's no API key, return simulated validation for development
+    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+      console.log("Using mock validation for prequalification document (no API key)");
+      const mockData: PrequalificationData = {
+        documentType: "Pre-Approval Letter",
+        buyerName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+        firstName: userData.firstName || undefined,
+        lastName: userData.lastName || undefined,
+        lenderName: "Sample Bank",
+        loanAmount: "$500,000",
+        loanType: "Conventional",
+        approvalDate: new Date().toISOString().split('T')[0],
+        expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      };
+      
+      return { 
+        validated: true, 
+        data: mockData,
+        message: "Document validated successfully" 
+      };
+    }
+    
+    // In production, read file and convert to base64
+    const fs = require('fs');
+    const fileBuffer = fs.readFileSync(filePath);
+    const base64Image = fileBuffer.toString('base64');
+    
+    // Extract document data using OpenAI Vision
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+      messages: [
+        {
+          role: "system",
+          content: "You are a financial document parser specialized in pre-qualification and pre-approval letters. Extract all relevant information from these documents."
+        },
+        {
+          role: "user",
+          content: [
+            { 
+              type: "text", 
+              text: "Extract all information from this pre-qualification or pre-approval document. I need to know:\n" +
+                    "1. The buyer's full name (and separate first/last name if possible)\n" +
+                    "2. The document type (Pre-qualification, Pre-approval, etc.)\n" +
+                    "3. The lender name\n" +
+                    "4. Loan amount\n" +
+                    "5. Loan type (if specified)\n" +
+                    "6. Approval/qualification date\n" +
+                    "7. Expiration date (if any)\n" +
+                    "Return the information in a JSON format." 
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" }
+    });
+    
+    const extractedData = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Format the extracted data to match our PrequalificationData interface
+    const formattedData: PrequalificationData = {
+      documentType: extractedData.documentType || extractedData.document_type,
+      buyerName: extractedData.buyerName || extractedData.buyer_name || extractedData.name,
+      firstName: extractedData.firstName || extractedData.first_name,
+      lastName: extractedData.lastName || extractedData.last_name,
+      lenderName: extractedData.lenderName || extractedData.lender_name || extractedData.lender,
+      loanAmount: extractedData.loanAmount || extractedData.loan_amount || extractedData.amount,
+      loanType: extractedData.loanType || extractedData.loan_type,
+      approvalDate: extractedData.approvalDate || extractedData.approval_date || extractedData.date,
+      expirationDate: extractedData.expirationDate || extractedData.expiration_date
+    };
+    
+    // If buyerName exists but first/last name don't, try to extract them
+    if (formattedData.buyerName && (!formattedData.firstName || !formattedData.lastName)) {
+      const nameParts = formattedData.buyerName.trim().split(/\s+/);
+      if (nameParts.length >= 2) {
+        if (!formattedData.firstName) formattedData.firstName = nameParts[0];
+        if (!formattedData.lastName) formattedData.lastName = nameParts[nameParts.length - 1];
+      }
+    }
+    
+    // Validate the extracted data against user data
+    const userFullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim().toLowerCase();
+    const extractedFullName = (formattedData.buyerName || '').toLowerCase();
+    const extractedFirstLast = `${formattedData.firstName || ''} ${formattedData.lastName || ''}`.trim().toLowerCase();
+    
+    const nameMatches = 
+      (userFullName && extractedFullName && extractedFullName.includes(userFullName)) ||
+      (userFullName && extractedFirstLast && extractedFirstLast.includes(userFullName)) ||
+      (userData.firstName && formattedData.firstName && 
+        formattedData.firstName.toLowerCase().includes(userData.firstName.toLowerCase())) ||
+      (userData.lastName && formattedData.lastName && 
+        formattedData.lastName.toLowerCase().includes(userData.lastName.toLowerCase()));
+    
+    const isValidDocument = formattedData.documentType && 
+      (formattedData.lenderName || formattedData.loanAmount) &&
+      formattedData.buyerName;
+    
+    const isValid = isValidDocument && nameMatches;
+    
+    return {
+      validated: isValid,
+      data: formattedData,
+      message: isValid 
+        ? "Document validated successfully" 
+        : "Document validation failed. Please ensure it's a prequalification or pre-approval letter with matching buyer name."
+    };
+  } catch (error) {
+    console.error("Error validating prequalification document:", error);
+    return {
+      validated: false,
+      data: {},
+      message: "Error processing document. Please try again with a clearer image."
+    };
+  }
+}
+
 export async function verifyKYCDocuments(
   userId: number, 
   idFrontUrl: string, 
