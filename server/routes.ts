@@ -132,9 +132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user record with prequalification info
       const fileUrl = `/uploads/prequalification/${fileName}`;
       await storage.updateUser(req.user!.id, {
-        verification_method: "prequalification",
-        prequalification_doc_url: fileUrl,
-        prequalification_validated: false, // Will be validated via AI in the next step
+        verificationMethod: "prequalification",
+        prequalificationDocUrl: fileUrl,
+        prequalificationValidated: false, // Will be validated via AI in the next step
         profileStatus: "pending" // Set to pending until validated
       });
       
@@ -146,7 +146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Update user record with validated status
         await storage.updateUser(req.user!.id, {
-          prequalification_validated: true,
+          prequalificationValidated: true,
           profileStatus: "verified" // Auto-verify for now
         });
         
@@ -177,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       // Update user's verification method
       await storage.updateUser(req.user!.id, {
-        verification_method: "kyc"
+        verificationMethod: "kyc"
       });
       
       // Create a Veriff session for the user
