@@ -237,6 +237,53 @@ export default function BuyerPropertyDetail() {
         status: error.response?.status,
       });
       
+      // Check if we need to sign a global BRBC agreement
+      if (error.response?.data?.requiresBrbc && error.response?.data?.agentId) {
+        console.log("Global BRBC agreement required with agent:", error.response.data.agentId);
+        
+        toast({
+          title: "Agreement Required",
+          description: "You need to sign a Buyer Representation Agreement with this agent before requesting a viewing.",
+          variant: "default",
+        });
+        
+        // Check if the global BRBC already exists but is not signed
+        apiRequest("GET", `/api/global-brbc/${error.response.data.agentId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) {
+              if (data.exists) {
+                // BRBC exists but needs to be completed, open it
+                // TODO: implement a component to display the existing agreement
+                console.log("Existing global BRBC found:", data.agreement);
+                
+                // For now, just alert the user
+                toast({
+                  title: "Agreement Exists",
+                  description: "You have already started a global BRBC agreement with this agent. Please check your agreements page to complete it.",
+                  variant: "default",
+                });
+              } else {
+                // Need to create a new global BRBC
+                // Store the agent ID to create an agreement with
+                setSelectedAgentId(error.response.data.agentId);
+                // Show the agency disclosure form for now
+                setIsDisclosureFormOpen(true);
+              }
+            }
+          })
+          .catch(err => {
+            console.error("Error checking for global BRBC:", err);
+            toast({
+              title: "Error",
+              description: "Could not check for existing agreements. Please try again.",
+              variant: "destructive",
+            });
+          });
+        
+        return;
+      }
+      
       // Since buyers should be able to make multiple viewing requests,
       // we'll bypass the "already exists" error by adding the property here
       if (error.message?.includes("already exists")) {

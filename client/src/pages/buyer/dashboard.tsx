@@ -385,13 +385,22 @@ export default function BuyerDashboard() {
                                 ? "Buyer Representation Agreement"
                                 : agreement.type === "standard"
                                 ? "Buyer Representation Agreement"
+                                : agreement.type === "global_brbc"
+                                ? "Global Buyer Representation Agreement"
                                 : "Agreement Document"}
                             </span>
                             <div className="text-xs text-gray-500 mt-1">
                               <div className="flex flex-col">
                                 <span>
-                                  Property: {agreement.property ? agreement.property.address : "Unknown"}
+                                  {agreement.isGlobal 
+                                    ? "Type: Global (All Properties)" 
+                                    : `Property: ${agreement.property ? agreement.property.address : "Unknown"}`}
                                 </span>
+                                {agreement.isGlobal && (
+                                  <span className="text-blue-600">
+                                    Agent: {agreement.agentName || "Your Agent"}
+                                  </span>
+                                )}
                                 <span>
                                   Signed: {new Date(agreement.date).toLocaleDateString()}
                                 </span>
