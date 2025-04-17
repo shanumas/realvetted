@@ -2894,9 +2894,116 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           });
         }
 
-        // Always check if there's a saved PDF content in the database, regardless of viewingRequestId
         // Get existing agreements for this property
         const agreements = await storage.getAgreementsByProperty(propertyId);
+        const userId = req.user!.id;
+        const userRole = req.user!.role;
+        
+        // Check if user is an agent and should use buyer-signed forms
+        if (userRole === "agent") {
+          // First check for buyer-signed agreements that the agent should use
+          const buyerSignedAgreements = agreements.filter(
+            (a) => 
+              a.type === "agency_disclosure" && 
+              a.status === "signed_by_buyer" && 
+              a.buyerSignature
+          );
+          
+          if (buyerSignedAgreements.length > 0) {
+            const latestSignedAgreement = 
+              buyerSignedAgreements[buyerSignedAgreements.length - 1];
+            
+            console.log(
+              "Agent user found buyer-signed agreement ID:",
+              latestSignedAgreement.id
+            );
+            
+            try {
+              // Get the PDF file path from document URL
+              let pdfPath = "";
+              if (latestSignedAgreement.documentUrl && latestSignedAgreement.documentUrl.startsWith("/uploads/")) {
+                pdfPath = path.join(process.cwd(), latestSignedAgreement.documentUrl.substring(1));
+                console.log("Using buyer-signed document from path:", pdfPath);
+              }
+              
+              let pdfBuffer;
+              
+              // Try to load the buyer-signed PDF if available
+              if (pdfPath && fs.existsSync(pdfPath)) {
+                try {
+                  pdfBuffer = fs.readFileSync(pdfPath);
+                  console.log("Successfully loaded buyer-signed PDF from file system");
+                } catch (readError) {
+                  console.error("Error reading buyer-signed PDF file:", readError);
+                  // Will fall back to generating from template
+                }
+              }
+              
+              // If we couldn't load from file or if file doesn't exist, generate a new one
+              if (!pdfBuffer) {
+                console.log("Generating from template with buyer's signature data");
+                
+                // Get buyer information
+                let buyer = null;
+                if (latestSignedAgreement.buyerId) {
+                  buyer = await storage.getUser(latestSignedAgreement.buyerId);
+                }
+                
+                // Get agent information (current user)
+                let agent = await storage.getUser(userId);
+                
+                // Prepare form data - pre-fill with buyer's info
+                const formDataWithBuyerInfo = {
+                  ...formData,
+                  buyerName1: buyer
+                    ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || 
+                      buyer.email
+                    : "",
+                  isEditable: true
+                };
+                
+                // Generate a fresh PDF with the form data
+                pdfBuffer = await fillAgencyDisclosureForm(formDataWithBuyerInfo);
+                
+                // Add the buyer's signature from the agreement
+                if (latestSignedAgreement.buyerSignature) {
+                  pdfBuffer = await addSignatureToPdf(
+                    pdfBuffer,
+                    latestSignedAgreement.buyerSignature,
+                    "buyer1"
+                  );
+                }
+              }
+              
+              // Set appropriate headers
+              res.setHeader("Content-Type", "application/pdf");
+              res.setHeader(
+                "Content-Disposition",
+                `inline; filename="Agency_Disclosure_Preview.pdf"`
+              );
+              
+              if (isEditable) {
+                console.log("Keeping form fields editable as requested");
+                res.setHeader(
+                  "Cache-Control",
+                  "no-store, no-cache, must-revalidate, proxy-revalidate"
+                );
+                res.setHeader("Pragma", "no-cache");
+                res.setHeader("Expires", "0");
+                res.setHeader("X-PDF-Editable", "true");
+              }
+              
+              // Send the PDF to the client
+              return res.send(pdfBuffer);
+            } catch (error) {
+              console.error("Error processing buyer-signed form for agent:", error);
+              // Continue to standard process if an error occurs
+            }
+          }
+        }
+        
+        // If we're not an agent or couldn't process the buyer-signed agreement,
+        // continue with the normal flow: check for edited PDF content
         const agencyDisclosureAgreements = agreements.filter(
           (a) =>
             a.type === "agency_disclosure" &&
