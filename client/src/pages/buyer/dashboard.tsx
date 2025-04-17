@@ -261,6 +261,16 @@ export default function BuyerDashboard() {
                               : "Your identity verification is still pending. "}
                             Complete verification to unlock all features.
                           </p>
+                          
+                          <div className="bg-blue-50 p-3 rounded-md border border-blue-100 mb-2">
+                            <h4 className="text-sm font-medium text-blue-700">Verification Options:</h4>
+                            <ul className="mt-1 text-xs text-blue-600 list-disc pl-5">
+                              <li>Verify your identity using our secure online verification process, or</li>
+                              <li>Upload a pre-qualification document from your lender, or</li>
+                              <li>After uploading, request manual approval of your pre-qualification document</li>
+                            </ul>
+                          </div>
+                          
                           <div className="flex space-x-2">
                             <Button 
                               size="sm"
@@ -305,7 +315,7 @@ export default function BuyerDashboard() {
                                   ) : (
                                     <MailCheck className="mr-2 h-3 w-3" />
                                   )}
-                                  {isRequestingApproval ? "Sending..." : "Get Pre-Qualification Approval"}
+                                  {isRequestingApproval ? "Sending..." : "Request Manual Approval"}
                                 </Button>
                               )}
                             </div>

@@ -145,7 +145,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
         <DialogHeader>
           <DialogTitle>Upload Pre-qualification Document</DialogTitle>
           <DialogDescription>
-            Upload a pre-qualification document from any lender to verify your buying status.
+            Upload a pre-qualification document from any lender to verify your buying status. After uploading, you can request manual approval if needed.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,10 +189,11 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
             <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
               <h4 className="text-sm font-medium text-blue-700 flex items-center">
                 <MailCheck className="h-4 w-4 mr-2 text-blue-500" />
-                Get Pre-Qualification Approval
+                Get Pre-Qualification Approval (Option 3)
               </h4>
               <p className="mt-1 text-xs text-blue-600 mb-2">
-                After uploading your document, you can request a manual review and approval of your pre-qualification document.
+                <strong>After uploading your document</strong>, you can request a manual review 
+                if automatic verification doesn't work. This sends your document to our team for approval.
               </p>
               <Button 
                 type="button" 
@@ -209,7 +210,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
                   </>
                 ) : (
                   <>
-                    Request Approval
+                    Request Manual Approval
                   </>
                 )}
               </Button>
