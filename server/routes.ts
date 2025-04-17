@@ -125,6 +125,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // User routes
   
+  // Pre-qualification approval request endpoint
+  app.post("/api/buyer/request-prequalification-approval", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      // Get user information
+      const user = await storage.getUser(req.user!.id);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: "User not found"
+        });
+      }
+      
+      // Ensure user has uploaded a pre-qualification document
+      if (!user.prequalificationDocUrl) {
+        return res.status(400).json({
+          success: false,
+          error: "You must upload a pre-qualification document first"
+        });
+      }
+      
+      // Send approval request email
+      await sendPrequalificationApprovalEmail(user, user.prequalificationDocUrl);
+      
+      res.json({
+        success: true,
+        message: "Pre-qualification approval request sent"
+      });
+    } catch (error) {
+      console.error("Error requesting pre-qualification approval:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to send pre-qualification approval request"
+      });
+    }
+  });
+  
   // Pre-qualification document upload
   app.post("/api/buyer/prequalification", isAuthenticated, hasRole(["buyer"]), (req, res, next) => {
     console.log("Received prequalification upload request");

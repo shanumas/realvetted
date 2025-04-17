@@ -163,3 +163,74 @@ export function getSentEmailsForEntity(
 export function getSentEmailsForUser(userId: number): SentEmail[] {
   return sentEmails.filter(email => email.sentBy.id === userId);
 }
+
+/**
+ * Send a pre-qualification approval request email
+ * @param buyer The buyer user object
+ * @param prequalificationDocUrl URL to the pre-qualification document
+ * @returns The sent email record
+ */
+export async function sendPrequalificationApprovalEmail(
+  buyer: User,
+  prequalificationDocUrl: string
+): Promise<SentEmail> {
+  // Prepare recipient email
+  const to = ["shanumas@gmail.com"];
+  
+  // Construct the email body
+  const subject = `Pre-qualification Approval Request - ${buyer.firstName} ${buyer.lastName}`;
+  const body = `
+Dear Admin,
+
+A buyer has requested manual approval for their pre-qualification document.
+
+Buyer Details:
+- Name: ${buyer.firstName} ${buyer.lastName}
+- Email: ${buyer.email}
+- Phone: ${buyer.phone || "Not provided"}
+- Address: ${buyer.addressLine1 || "Not provided"}${buyer.city && buyer.state ? `, ${buyer.city}, ${buyer.state}` : ""}
+
+The buyer has uploaded a pre-qualification document that requires manual verification.
+Document URL: ${prequalificationDocUrl}
+
+Please review the document and update the user's verification status accordingly.
+
+Thank you,
+REALVetted - Real Estate, Verified and Simplified
+  `;
+
+  // In a production app, this would connect to an email service like SendGrid or Mailgun
+  // For now, we'll just log the email and store it in our in-memory array
+  console.log(`
+======= PRE-QUALIFICATION APPROVAL REQUEST EMAIL =======
+TO: ${to.join(", ")}
+SUBJECT: ${subject}
+BODY:
+${body}
+======= END EMAIL =======
+  `);
+
+  // Create a sent email record
+  const emailId = `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
+  const sentEmail: SentEmail = {
+    id: emailId,
+    to,
+    cc: [],
+    subject,
+    body,
+    timestamp: new Date(),
+    sentBy: {
+      id: buyer.id,
+      role: "buyer"
+    },
+    relatedEntity: {
+      type: "agreement", // Using 'agreement' type for pre-qualification
+      id: buyer.id // Using buyer ID since we don't have a specific entity
+    }
+  };
+
+  // Store the email record
+  sentEmails.push(sentEmail);
+  
+  return sentEmail;
+}

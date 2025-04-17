@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText } from "lucide-react";
+import { Loader2, FileText, MailCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -23,8 +23,40 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
     }
   };
 
-  // State for tracking the upload status
+  // State for tracking the upload and approval request status
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingApproval, setIsRequestingApproval] = useState(false);
+  const [hasUploaded, setHasUploaded] = useState(false);
+
+  // Request pre-qualification approval
+  const requestApprovalMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("/api/buyer/request-prequalification-approval", "POST");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Approval request sent",
+        description: "Your pre-qualification approval request has been sent.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request failed",
+        description: error.message || "Failed to send pre-qualification approval request.",
+        variant: "destructive",
+      });
+    }
+  });
+  
+  const handleRequestApproval = async () => {
+    setIsRequestingApproval(true);
+    try {
+      await requestApprovalMutation.mutateAsync();
+    } finally {
+      setIsRequestingApproval(false);
+    }
+  };
 
   // Handle manual form submission with XMLHttpRequest for better FormData handling
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -105,7 +137,7 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
     xhr.send(formData);
   };
 
-  const isLoading = isSubmitting;
+  const isLoading = isSubmitting || isRequestingApproval;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -153,6 +185,35 @@ export function PrequalificationUpload({ isOpen, onClose, onVerified }: Prequali
                 </div>
               </div>
             )}
+            
+            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+              <h4 className="text-sm font-medium text-blue-700 flex items-center">
+                <MailCheck className="h-4 w-4 mr-2 text-blue-500" />
+                Get Pre-Qualification Approval
+              </h4>
+              <p className="mt-1 text-xs text-blue-600 mb-2">
+                After uploading your document, you can request a manual review and approval of your pre-qualification document.
+              </p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                className="bg-white/70 border-blue-200 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                onClick={handleRequestApproval}
+                disabled={isRequestingApproval}
+              >
+                {isRequestingApproval ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    Sending Request...
+                  </>
+                ) : (
+                  <>
+                    Request Approval
+                  </>
+                )}
+              </Button>
+            </div>
 
             <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
               <h4 className="text-sm font-medium text-gray-700">What types of documents work?</h4>
