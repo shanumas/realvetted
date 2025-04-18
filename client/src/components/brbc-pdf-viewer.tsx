@@ -56,6 +56,8 @@ export function BRBCPdfViewer({
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
+  // Track if the user already has a signed agreement
+  const [existingAgreement, setExistingAgreement] = useState<any | null>(null);
   const [lastPreviewTimestamp, setLastPreviewTimestamp] = useState<number | null>(null);
 
   // Signature refs for different signature types
@@ -89,6 +91,73 @@ export function BRBCPdfViewer({
   
   // PDF document for client-side manipulation
   const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
+
+  // Function to fetch existing signed BRBC agreements for this buyer
+  const fetchExistingAgreement = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch buyer agreements from the server
+      const response = await fetch(`/api/buyer/agreements`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch agreements: ${response.status} ${response.statusText}`);
+      }
+      
+      const agreements = await response.json();
+      
+      // Find the most recent global BRBC agreement
+      const brbcAgreement = agreements.find((a: any) => a.type === 'global_brbc');
+      
+      if (brbcAgreement && brbcAgreement.documentUrl) {
+        // Found an existing signed agreement
+        setExistingAgreement(brbcAgreement);
+        
+        // Ensure the documentUrl path is correct
+        let documentUrl = brbcAgreement.documentUrl;
+        if (!documentUrl.startsWith('/uploads/') && !documentUrl.startsWith('http')) {
+          documentUrl = `/uploads/${documentUrl}`;
+        }
+        
+        console.log("Found existing signed BRBC agreement:", documentUrl);
+        
+        // Set the signed state since we're viewing an existing document
+        setHasSigned(true);
+        
+        // Load the existing PDF
+        try {
+          // Fetch the PDF document directly from its URL
+          const pdfResponse = await fetch(documentUrl);
+          if (!pdfResponse.ok) {
+            console.error(`Failed to fetch existing PDF from ${documentUrl}: ${pdfResponse.status}`);
+            throw new Error("Couldn't load the signed document");
+          }
+          
+          const arrayBuffer = await pdfResponse.arrayBuffer();
+          
+          // Create a blob URL for displaying the PDF
+          const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(blob);
+          setPdfUrl(blobUrl);
+          
+          return true; // Successfully loaded existing agreement
+        } catch (error) {
+          console.error('Error loading existing PDF:', error);
+          toast({
+            title: "Error Loading Signed Document",
+            description: "Could not load your signed agreement. Loading the blank form instead.",
+            variant: "destructive"
+          });
+        }
+      }
+      
+      return false; // No existing agreement found
+    } catch (error) {
+      console.error('Error checking for existing agreements:', error);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Function to fetch and load the PDF data for client-side processing
   const fetchPdfData = async () => {
@@ -143,10 +212,9 @@ export function BRBCPdfViewer({
   };
   
   useEffect(() => {
-    // When the dialog opens, load the prefilled PDF
+    // When the dialog opens, check for existing agreements and load the appropriate PDF
     if (isOpen) {
       // Reset states
-      setHasSigned(false);
       setIsSigning(false);
       setIsPreviewing(false);
       setShowSubmitConfirm(false);
@@ -155,8 +223,13 @@ export function BRBCPdfViewer({
       setPdfArrayBuffer(null);
       setFormFields({});
       
-      // Load the PDF document
-      fetchPdfData();
+      // First try to fetch existing agreement
+      fetchExistingAgreement().then(found => {
+        if (!found) {
+          // If no existing agreement, load the blank template
+          fetchPdfData();
+        }
+      });
     }
   }, [isOpen]);
 
