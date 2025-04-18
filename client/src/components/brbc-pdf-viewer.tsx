@@ -502,11 +502,11 @@ export function BRBCPdfViewer({
       saveCurrentSignature();
       captureFormValues();
       
-      // Only update PDF in real-time if manually previewing or if enough time has passed since last update
-      // This prevents excessive reloading when signing quickly
-      const currentTime = Date.now();
-      if (!manualPreview && lastPreviewTimestamp && currentTime - lastPreviewTimestamp < 1000) {
-        return; // Skip automatic preview updates if less than 1 second since last update
+      // Only update PDF in real-time if manually previewing - this prevents form fields from being reset
+      // For automatic updates during signing, we'll just save the signature data without refreshing the PDF
+      if (!manualPreview) {
+        // Just save the signature data without updating the PDF display
+        return; 
       }
       
       // If this is a manual preview, show loading state
@@ -516,6 +516,7 @@ export function BRBCPdfViewer({
       }
       
       // Update timestamp
+      const currentTime = Date.now();
       setLastPreviewTimestamp(currentTime);
       
       // Try to use client-side PDF processing if we have the PDF document loaded
