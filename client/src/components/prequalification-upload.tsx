@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -9,28 +9,62 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, MailCheck } from "lucide-react";
+import { Loader2, FileText, MailCheck, AlertTriangle, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface PrequalificationUploadProps {
   isOpen: boolean;
   onClose: () => void;
   onVerified: () => void;
+  user?: {
+    prequalificationAttempts?: number;
+    failedPrequalificationUrls?: string[];
+    prequalificationMessage?: string;
+  };
 }
 
 export function PrequalificationUpload({
   isOpen,
   onClose,
   onVerified,
+  user
 }: PrequalificationUploadProps) {
   const { toast } = useToast();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  // Get user info from API if not provided as prop
+  const { data: userData } = useQuery({
+    queryKey: ["/api/auth/user"],
+    enabled: !user && isOpen // Only fetch if user isn't provided as prop and dialog is open
+  });
+  
+  // Use provided user data or fetched data
+  const currentUser = user || userData;
+  
+  // Calculate attempts info
+  const attempts = currentUser?.prequalificationAttempts || 0;
+  const remainingAttempts = Math.max(0, 3 - attempts);
+  const hasFailedDocuments = currentUser?.failedPrequalificationUrls && 
+    currentUser.failedPrequalificationUrls.length > 0;
 
-  // Handle file selection
+  // Handle file selection with size validation
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      // Check file size (1MB = 1048576 bytes)
+      if (file.size > 1048576) {
+        toast({
+          title: "File too large",
+          description: "Please select a file smaller than 1MB.",
+          variant: "destructive",
+        });
+        // Reset the input field
+        e.target.value = '';
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -180,7 +214,37 @@ export function PrequalificationUpload({
 
         <form onSubmit={handleSubmit} encType="multipart/form-data">
           <div className="space-y-4 py-4">
-            <div className="border bg-gray-50 p-4 rounded-lg border-dashed border-gray-300 hover:border-blue-400 hover:bg-blue-50 transition-colors cursor-pointer relative">
+            {/* Attempts warning */}
+            {attempts > 0 && (
+              <Alert variant={remainingAttempts === 0 ? "destructive" : "warning"}>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>
+                  {remainingAttempts === 0 
+                    ? "Maximum attempts reached" 
+                    : `You have ${remainingAttempts} attempt${remainingAttempts !== 1 ? 's' : ''} remaining`}
+                </AlertTitle>
+                <AlertDescription>
+                  {remainingAttempts === 0 
+                    ? "You've reached the maximum number of verification attempts (3). Please contact support for assistance."
+                    : `You have already attempted verification ${attempts} time${attempts !== 1 ? 's' : ''}. Make sure your document clearly shows your name and lender information.`
+                  }
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Previous rejection message */}
+            {currentUser?.prequalificationMessage && !currentUser?.prequalificationValidated && (
+              <Alert variant="warning" className="mt-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Previous verification issue</AlertTitle>
+                <AlertDescription>
+                  {currentUser.prequalificationMessage}
+                </AlertDescription>
+              </Alert>
+            )}
+          
+            {/* Document upload area - disabled if max attempts reached */}
+            <div className={`border bg-gray-50 p-4 rounded-lg border-dashed ${remainingAttempts === 0 ? 'border-red-200 bg-red-50 cursor-not-allowed' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'} transition-colors relative`}>
               <input
                 id="document"
                 name="file"
@@ -188,17 +252,22 @@ export function PrequalificationUpload({
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileChange}
-                disabled={isLoading}
+                disabled={isLoading || remainingAttempts === 0}
               />
               <div className="text-center">
-                <FileText className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-700">
-                  {selectedFile
-                    ? "Change document"
-                    : "Upload pre-qualification document"}
+                <FileText className={`h-8 w-8 mx-auto mb-2 ${remainingAttempts === 0 ? 'text-red-300' : 'text-blue-500'}`} />
+                <p className={`text-sm font-medium ${remainingAttempts === 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                  {remainingAttempts === 0 
+                    ? "Max attempts reached" 
+                    : (selectedFile ? "Change document" : "Upload pre-qualification document")}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  Drag and drop or click to select a file (PDF, JPG, PNG)
+                <p className={`text-xs mt-1 ${remainingAttempts === 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                  {remainingAttempts === 0 
+                    ? "Contact support for assistance"
+                    : "Drag and drop or click to select a file (PDF, JPG, PNG)"}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Maximum file size: 1MB
                 </p>
               </div>
             </div>

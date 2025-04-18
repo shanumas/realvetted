@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   prequalificationData: json("prequalification_data"), // Extracted data from pre-qualification document
   prequalificationMessage: text("prequalification_message"), // Validation message or rejection reason
   manualApprovalRequested: boolean("manual_approval_requested").default(false), // Whether the user has requested manual approval
+  prequalificationAttempts: integer("prequalification_attempts").default(0), // Number of attempted uploads
+  failedPrequalificationUrls: text("failed_prequalification_urls").array(), // Array of URLs to failed pre-qualification documents
 });
 
 // Property listings
@@ -222,7 +224,13 @@ export const tourRequestSchema = createInsertSchema(tourRequests)
 
 // Create schema for pre-qualification document upload
 export const prequalificationDocSchema = z.object({
-  file: z.any(), // This will be the file upload
+  file: z.any()
+    .refine(file => file?.size !== undefined, {
+      message: "File is required"
+    })
+    .refine(file => file?.size <= 1024 * 1024, {
+      message: "File size must be less than 1MB"
+    }), // File upload with 1MB size limit
   verificationMethod: z.literal("prequalification"), // Set this method
 });
 

@@ -362,7 +362,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!user) {
           throw new Error("User not found");
         }
-
+        
+        // Check if user has exceeded the maximum number of attempts (3)
+        const currentAttempts = user.prequalificationAttempts || 0;
+        if (currentAttempts >= 3) {
+          return res.status(400).json({
+            success: false,
+            error: "You have exceeded the maximum number of verification attempts (3). Please contact support for assistance."
+          });
+        }
+        
+        // Increment the attempts counter
+        console.log(`Pre-qualification attempt ${currentAttempts + 1}/3 for user ID ${req.user!.id}`);
+        
+        // Perform validation
         const validationResult = await validatePrequalificationDocument(
           filePath,
           {
@@ -371,18 +384,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         );
         
-        // Update user record with validation result
-        await storage.updateUser(req.user!.id, {
-          prequalificationValidated: validationResult.validated,
-          profileStatus: validationResult.validated ? "verified" : "pending",
-          prequalificationData: validationResult.data,
-          prequalificationMessage: validationResult.message // Store the validation message (success or rejection reason)
-        });
-        
-        // Log the verification result
+        // Update user record based on validation result
         if (validationResult.validated) {
+          // Success - update user record with validation information
+          await storage.updateUser(req.user!.id, {
+            prequalificationValidated: true,
+            profileStatus: "verified",
+            prequalificationData: validationResult.data,
+            prequalificationMessage: validationResult.message,
+            prequalificationAttempts: currentAttempts + 1
+          });
+          
           console.log(`User ID ${req.user!.id} verified through pre-qualification document.`);
         } else {
+          // Failed validation - store the failed document URL and update attempt count
+          const failedUrls = user.failedPrequalificationUrls || [];
+          failedUrls.push(fileUrl); // Add current failed document to history
+          
+          await storage.updateUser(req.user!.id, {
+            prequalificationValidated: false,
+            profileStatus: "pending",
+            prequalificationData: validationResult.data,
+            prequalificationMessage: validationResult.message,
+            prequalificationAttempts: currentAttempts + 1,
+            failedPrequalificationUrls: failedUrls
+          });
+          
           console.log(`User ID ${req.user!.id} pre-qualification document failed validation: ${validationResult.message}`);
         }
       } catch (validationError) {
