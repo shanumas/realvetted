@@ -14,14 +14,13 @@ import { Button } from "@/components/ui/button";
 import { AgencyDisclosureForm } from "@/components/agency-disclosure-form";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 import { 
-  Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
+  Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
   Send, Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon, AlertTriangle
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
-import { AgentEmailEditor } from "@/components/agent-email-editor";
 import {
   Dialog,
   DialogContent,
@@ -947,12 +946,7 @@ export default function BuyerPropertyDetail() {
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
                       </TabsTrigger>
-                      <TabsTrigger value="agent-email" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
-                        <span className="flex items-center">
-                          <Mail className="mr-1 h-4 w-4" /> 
-                          Agent Email
-                        </span>
-                      </TabsTrigger>
+
                       <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
                           <Activity className="mr-1 h-4 w-4" /> 
@@ -1076,23 +1070,7 @@ export default function BuyerPropertyDetail() {
                     )}
                   </TabsContent>
                   
-                  <TabsContent value="agent-email">
-                    <div className="p-4">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-medium flex items-center text-gray-900">
-                          <Mail className="mr-2 h-5 w-5 text-primary" />
-                          Agent Email Settings
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Update the listing agent's email address for this property
-                        </p>
-                      </div>
-                      <AgentEmailEditor 
-                        propertyId={propertyId} 
-                        currentEmail={property.sellerEmail || ""} 
-                      />
-                    </div>
-                  </TabsContent>
+
                 
                   <TabsContent value="activity">
                     <div className="p-4">
