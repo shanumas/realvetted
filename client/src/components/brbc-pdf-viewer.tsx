@@ -85,17 +85,36 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   // Clear the signature canvas based on active tab
   const clearSignature = () => {
     if (activeTab === "buyer1-signature" && signatureRef.current) {
+      // Clear the canvas
       signatureRef.current.clear();
+      // Update empty state
       setSignatureIsEmpty(true);
+      // Also update the saved signatures state
+      setSavedSignatures(prev => ({ ...prev, primary: null }));
+      
     } else if (activeTab === "buyer1-initials" && initialsRef.current) {
+      // Clear the canvas
       initialsRef.current.clear();
+      // Update empty state
       setInitialsIsEmpty(true);
+      // Also update the saved signatures state
+      setSavedSignatures(prev => ({ ...prev, initials: null }));
+      
     } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
+      // Clear the canvas
       buyer2SignatureRef.current.clear();
+      // Update empty state
       setBuyer2SignatureIsEmpty(true);
+      // Also update the saved signatures state
+      setSavedSignatures(prev => ({ ...prev, buyer2Primary: null }));
+      
     } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
+      // Clear the canvas
       buyer2InitialsRef.current.clear();
+      // Update empty state
       setBuyer2InitialsIsEmpty(true);
+      // Also update the saved signatures state
+      setSavedSignatures(prev => ({ ...prev, buyer2Initials: null }));
     }
   };
 
@@ -105,21 +124,40 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
       const updatedSignatures = { ...savedSignatures };
       
       if (activeTab === "buyer1-signature" && signatureRef.current) {
-        if (!signatureRef.current.isEmpty()) {
-          updatedSignatures.primary = signatureRef.current.toDataURL();
-        }
+        // Set to either data URL or null based on isEmpty
+        updatedSignatures.primary = signatureRef.current.isEmpty() 
+          ? null 
+          : signatureRef.current.toDataURL();
+        
+        // Update the empty state
+        setSignatureIsEmpty(signatureRef.current.isEmpty());
+        
       } else if (activeTab === "buyer1-initials" && initialsRef.current) {
-        if (!initialsRef.current.isEmpty()) {
-          updatedSignatures.initials = initialsRef.current.toDataURL();
-        }
+        // Set to either data URL or null based on isEmpty
+        updatedSignatures.initials = initialsRef.current.isEmpty() 
+          ? null 
+          : initialsRef.current.toDataURL();
+        
+        // Update the empty state
+        setInitialsIsEmpty(initialsRef.current.isEmpty());
+        
       } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
-        if (!buyer2SignatureRef.current.isEmpty()) {
-          updatedSignatures.buyer2Primary = buyer2SignatureRef.current.toDataURL();
-        }
+        // Set to either data URL or null based on isEmpty
+        updatedSignatures.buyer2Primary = buyer2SignatureRef.current.isEmpty() 
+          ? null 
+          : buyer2SignatureRef.current.toDataURL();
+        
+        // Update the empty state
+        setBuyer2SignatureIsEmpty(buyer2SignatureRef.current.isEmpty());
+        
       } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
-        if (!buyer2InitialsRef.current.isEmpty()) {
-          updatedSignatures.buyer2Initials = buyer2InitialsRef.current.toDataURL();
-        }
+        // Set to either data URL or null based on isEmpty
+        updatedSignatures.buyer2Initials = buyer2InitialsRef.current.isEmpty() 
+          ? null 
+          : buyer2InitialsRef.current.toDataURL();
+        
+        // Update the empty state
+        setBuyer2InitialsIsEmpty(buyer2InitialsRef.current.isEmpty());
       }
       
       setSavedSignatures(updatedSignatures);
