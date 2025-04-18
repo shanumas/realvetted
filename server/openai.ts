@@ -167,26 +167,106 @@ export async function validatePrequalificationDocument(
   }
 ): Promise<{ validated: boolean; data: PrequalificationData; message: string }> {
   try {
-    // If there's no API key, return simulated validation for development
+    // If there's no API key, check if the file is likely a prequalification letter based on basic validation
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
-      console.log("Using mock validation for prequalification document (no API key)");
-      const mockData: PrequalificationData = {
-        documentType: "Pre-Approval Letter",
-        buyerName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
-        firstName: userData.firstName || undefined,
-        lastName: userData.lastName || undefined,
-        lenderName: "Sample Bank",
-        loanAmount: "$500,000",
-        loanType: "Conventional",
-        approvalDate: new Date().toISOString().split('T')[0],
-        expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      };
+      console.log("Using enhanced mock validation for prequalification document (no API key)");
       
-      return { 
-        validated: true, 
-        data: mockData,
-        message: "Document validated successfully" 
-      };
+      // Read the file and check for keywords that would indicate it's a prequalification letter
+      try {
+        const fileBuffer = fs.readFileSync(filePath);
+        const fileContent = fileBuffer.toString('utf-8').toLowerCase();
+        
+        // Check for keywords that would indicate this is a prequalification letter
+        const prequalKeywords = [
+          'pre-qualification', 'prequalification', 
+          'pre-approval', 'preapproval',
+          'pre qualify', 'prequalify',
+          'mortgage', 'loan approval',
+          'lender', 'qualification letter'
+        ];
+        
+        // Check for lender names or terms
+        const lenderKeywords = [
+          'bank', 'mortgage', 'financial', 'credit union', 
+          'lending', 'capital', 'home loan'
+        ];
+        
+        // Check if the document contains mortgage-related terms
+        const mortgageKeywords = [
+          'loan amount', 'interest rate', 'down payment',
+          'approval', 'borrower', 'property', 'purchase'
+        ];
+        
+        // Count the number of matching keywords to determine validity
+        let keywordMatches = 0;
+        let prequalFound = false;
+        let lenderFound = false;
+        let mortgageFound = false;
+        
+        for (const keyword of prequalKeywords) {
+          if (fileContent.includes(keyword)) {
+            prequalFound = true;
+            keywordMatches++;
+          }
+        }
+        
+        for (const keyword of lenderKeywords) {
+          if (fileContent.includes(keyword)) {
+            lenderFound = true; 
+            keywordMatches++;
+          }
+        }
+        
+        for (const keyword of mortgageKeywords) {
+          if (fileContent.includes(keyword)) {
+            mortgageFound = true;
+            keywordMatches++;
+          }
+        }
+        
+        // Check for user name in the document
+        const userFullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim().toLowerCase();
+        const nameFound = userFullName && fileContent.includes(userFullName);
+        
+        // For validation to pass, the document should:
+        // 1. Contain at least one prequalification term
+        // 2. Contain at least one lender term
+        // 3. Contain user's name
+        // 4. Have a reasonable number of relevant keywords (3+)
+        
+        const isValid = prequalFound && (lenderFound || mortgageFound) && nameFound && keywordMatches >= 3;
+        
+        const mockData: PrequalificationData = {
+          documentType: prequalFound ? "Pre-Approval Letter" : "Unknown Document",
+          buyerName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+          firstName: userData.firstName || undefined,
+          lastName: userData.lastName || undefined,
+          lenderName: lenderFound ? "Detected Lender" : undefined,
+          loanAmount: mortgageFound ? "$500,000" : undefined,
+          loanType: mortgageFound ? "Conventional" : undefined,
+          approvalDate: new Date().toISOString().split('T')[0],
+          expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        };
+        
+        const validationMessage = isValid 
+          ? "Document validated successfully" 
+          : `Document doesn't appear to be a valid prequalification letter. Missing ${!prequalFound ? 'prequalification terms' : ''}${!lenderFound && !mortgageFound ? ', lender information' : ''}${!nameFound ? ', matching name' : ''}.`;
+        
+        console.log(`Mock validation result: ${isValid ? 'VALID' : 'INVALID'} - ${validationMessage}`);
+        
+        return { 
+          validated: isValid, 
+          data: mockData,
+          message: validationMessage
+        };
+      } catch (error) {
+        console.error("Error performing basic document validation:", error);
+        return {
+          validated: false,
+          data: {},
+          message: "Error analyzing document content. Please try again with a different file."
+        };
+      }
     }
     
     // In production, read file and convert to base64
