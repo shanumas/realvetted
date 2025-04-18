@@ -187,7 +187,8 @@ export function BRBCPdfViewer({
     try {
       setIsLoading(true);
       const timestamp = Date.now();
-      const url = `/api/docs/brbc.pdf?fillable=true&prefill=buyer&inline=true&t=${timestamp}`;
+      // Remove fillable=true parameter to make the PDF non-editable
+      const url = `/api/docs/brbc.pdf?prefill=buyer&inline=true&t=${timestamp}`;
 
       // Fetch the PDF as an ArrayBuffer
       const response = await fetch(url);

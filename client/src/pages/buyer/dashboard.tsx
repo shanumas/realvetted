@@ -543,10 +543,18 @@ export default function BuyerDashboard() {
                         const brbcAgreement = buyerAgreements?.find(a => a.type === "global_brbc");
                         if (brbcAgreement && brbcAgreement.documentUrl) {
                           // Format the URL properly if needed
-                          const documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
-                                             brbcAgreement.documentUrl.startsWith('http') ? 
-                                             brbcAgreement.documentUrl : 
-                                             `/uploads/${brbcAgreement.documentUrl}`;
+                          let documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
+                                            brbcAgreement.documentUrl.startsWith('http') ? 
+                                            brbcAgreement.documentUrl : 
+                                            `/uploads/${brbcAgreement.documentUrl}`;
+                          
+                          // Add a timestamp and download parameter to force non-editable mode and prevent caching
+                          if (documentUrl.includes('?')) {
+                            documentUrl += '&download=true&t=' + Date.now();
+                          } else {
+                            documentUrl += '?download=true&t=' + Date.now();
+                          }
+                          
                           console.log("Opening document URL:", documentUrl);
                           window.open(documentUrl, "_blank");
                         } else {
@@ -572,8 +580,34 @@ export default function BuyerDashboard() {
               <Button
                 className="w-full py-1.5 px-2 h-auto text-xs"
                 onClick={() => {
-                  // Always use the new PDF viewer for both viewing and signing
-                  setIsBRBCPdfViewerOpen(true);
+                  // If already signed, open a non-editable view, otherwise open signing modal
+                  if (buyerAgreements?.some((a) => a.type === "global_brbc")) {
+                    // Find the signed agreement
+                    const brbcAgreement = buyerAgreements.find(a => a.type === "global_brbc");
+                    if (brbcAgreement && brbcAgreement.documentUrl) {
+                      // Format the URL properly if needed
+                      let documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
+                                        brbcAgreement.documentUrl.startsWith('http') ? 
+                                        brbcAgreement.documentUrl : 
+                                        `/uploads/${brbcAgreement.documentUrl}`;
+                      
+                      // Add a timestamp and download parameter to force non-editable mode and prevent caching
+                      if (documentUrl.includes('?')) {
+                        documentUrl += '&download=true&t=' + Date.now();
+                      } else {
+                        documentUrl += '?download=true&t=' + Date.now();
+                      }
+                      
+                      console.log("Opening document URL:", documentUrl);
+                      window.open(documentUrl, "_blank");
+                    } else {
+                      // Fallback to viewer if no document URL is found
+                      setIsBRBCPdfViewerOpen(true);
+                    }
+                  } else {
+                    // Open signing modal for new agreements
+                    setIsBRBCPdfViewerOpen(true);
+                  }
                 }}
                 variant={
                   buyerAgreements?.some((a) => a.type === "global_brbc")
