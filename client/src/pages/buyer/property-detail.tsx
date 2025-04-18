@@ -873,7 +873,7 @@ export default function BuyerPropertyDetail() {
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
-                    <TabsList className="w-full grid grid-cols-5">
+                    <TabsList className="w-full grid grid-cols-4">
                       <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         <span className="flex items-center">
                           <Eye className="mr-1 h-4 w-4" /> 
@@ -885,13 +885,6 @@ export default function BuyerPropertyDetail() {
                       </TabsTrigger>
                       <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Agent Chat
-                      </TabsTrigger>
-
-                      <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
-                        <span className="flex items-center">
-                          <Activity className="mr-1 h-4 w-4" /> 
-                          Activity
-                        </span>
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -1051,23 +1044,6 @@ export default function BuyerPropertyDetail() {
                         </p>
                       </div>
                     )}
-                  </TabsContent>
-                  
-
-                
-                  <TabsContent value="activity">
-                    <div className="p-4">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-medium flex items-center text-gray-900">
-                          <Activity className="mr-2 h-5 w-5 text-primary" />
-                          Property Activity History
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          View all activity and changes related to this property
-                        </p>
-                      </div>
-                      <PropertyActivityLog propertyId={propertyId} />
-                    </div>
                   </TabsContent>
                 </Tabs>
               </CardContent>
