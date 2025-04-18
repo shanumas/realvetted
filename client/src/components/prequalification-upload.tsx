@@ -242,6 +242,35 @@ export function PrequalificationUpload({
                 </AlertDescription>
               </Alert>
             )}
+            
+            {/* Show previously failed documents if any */}
+            {hasFailedDocuments && (
+              <div className="bg-red-50 p-3 rounded-md border border-red-100">
+                <h4 className="text-sm font-medium text-red-700 flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  Previously rejected documents
+                </h4>
+                <p className="text-xs text-red-600 mt-1 mb-2">
+                  The following documents were rejected during previous verification attempts:
+                </p>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {currentUser?.failedPrequalificationUrls?.map((url, index) => (
+                    <div key={index} className="flex items-center text-xs text-red-600">
+                      <FileText className="h-3 w-3 mr-1 flex-shrink-0" />
+                      <a 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="truncate hover:underline flex items-center"
+                      >
+                        Failed document #{index + 1}
+                        <ExternalLink className="h-3 w-3 ml-1 inline-block" />
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           
             {/* Document upload area - disabled if max attempts reached */}
             <div className={`border bg-gray-50 p-4 rounded-lg border-dashed ${remainingAttempts === 0 ? 'border-red-200 bg-red-50 cursor-not-allowed' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'} transition-colors relative`}>
