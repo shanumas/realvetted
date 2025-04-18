@@ -20,6 +20,7 @@ import {
   File,
   Upload,
   MailCheck,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useVerificationStatus } from "@/hooks/use-verification-status";
@@ -556,19 +557,14 @@ export default function BuyerDashboard() {
                     const existingAgreement = buyerAgreements.find(
                       (a) => a.type === "global_brbc",
                     );
+                    // Show the signed agreement
                     setSelectedAgentId(existingAgreement?.agentId || 0);
                     setIsBRBCModalOpen(true);
                     return;
                   }
 
-                  // Try to find an agent ID from different sources
-                  const firstAgent =
-                    properties?.find((p) => p.agentId)?.agentId ||
-                    buyerAgreements?.find((a) => a.agentId)?.agentId ||
-                    19; // Default agent ID as fallback
-
-                  setSelectedAgentId(firstAgent);
-                  setIsBRBCModalOpen(true);
+                  // Otherwise open the fillable PDF directly in a new tab
+                  window.open('/api/docs/brbc.pdf?fillable=true&prefill=buyer', '_blank');
                 }}
                 variant={
                   buyerAgreements?.some((a) => a.type === "global_brbc")
@@ -695,29 +691,68 @@ export default function BuyerDashboard() {
                       key={property.id}
                       property={property}
                       actionButton={
-                        <div className="flex space-x-2">
-                          <Link href={`/buyer/property/${property.id}`}>
-                            <Button variant="outline" size="sm">
-                              View Details
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex space-x-2">
+                            <Link href={`/buyer/property/${property.id}`}>
+                              <Button variant="outline" size="sm">
+                                View Details
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? "opacity-50 cursor-not-allowed" : ""}`}
+                              onClick={() =>
+                                property.agentId
+                                  ? null
+                                  : setPropertyToDelete(property.id)
+                              }
+                              title={
+                                property.agentId
+                                  ? "Cannot delete after agent has accepted"
+                                  : "Delete property"
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          </Link>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={`bg-red-50 text-red-600 hover:bg-red-100 ${property.agentId ? "opacity-50 cursor-not-allowed" : ""}`}
-                            onClick={() =>
-                              property.agentId
-                                ? null
-                                : setPropertyToDelete(property.id)
-                            }
-                            title={
-                              property.agentId
-                                ? "Cannot delete after agent has accepted"
-                                : "Delete property"
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          </div>
+                          
+                          <div className="flex space-x-2 items-center">
+                            {buyerAgreements?.some(a => a.type === "global_brbc") ? (
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="bg-green-50 text-green-600 hover:bg-green-100 w-full"
+                                onClick={() => {
+                                  window.location.href = `/buyer/property/${property.id}#viewing-requests-section`;
+                                }}
+                              >
+                                <Eye className="mr-2 h-4 w-4" />
+                                Request Tour
+                              </Button>
+                            ) : (
+                              <div className="flex flex-col space-y-1 w-full">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="bg-gray-100 text-gray-400 w-full cursor-not-allowed"
+                                  disabled={true}
+                                  title="You need to sign the Buyer Representation Agreement first"
+                                >
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Request Tour
+                                </Button>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-amber-700 p-0 h-6 font-medium text-xs underline"
+                                  onClick={() => window.open('/api/docs/brbc.pdf?fillable=true&prefill=buyer', '_blank')}
+                                >
+                                  Sign Representation Agreement
+                                </Button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       }
                     />
