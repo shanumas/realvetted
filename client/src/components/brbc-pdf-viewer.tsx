@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PDFDocument, PDFTextField } from 'pdf-lib';
 
 // Utility to save and restore signature canvas data
 interface SignatureData {
@@ -76,7 +77,71 @@ export function BRBCPdfViewer({
     buyer2Primary: null,
     buyer2Initials: null,
   });
+  
+  // Reference to the iframe to access the PDF form fields
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  
+  // State to store the raw PDF data for client-side processing
+  const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
+  
+  // State to store form field values
+  const [formFields, setFormFields] = useState<Record<string, string>>({});
+  
+  // PDF document for client-side manipulation
+  const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
 
+  // Function to fetch and load the PDF data for client-side processing
+  const fetchPdfData = async () => {
+    try {
+      setIsLoading(true);
+      const timestamp = Date.now();
+      const url = `/api/docs/brbc.pdf?fillable=true&prefill=buyer&inline=true&t=${timestamp}`;
+      
+      // Fetch the PDF as an ArrayBuffer
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+      
+      const arrayBuffer = await response.arrayBuffer();
+      setPdfArrayBuffer(arrayBuffer);
+      
+      // Load the PDF document using pdf-lib
+      const pdfDocument = await PDFDocument.load(arrayBuffer);
+      setPdfDoc(pdfDocument);
+      
+      // Create a blob URL for displaying the PDF
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      setPdfUrl(blobUrl);
+      setCachedPdfUrl(blobUrl);
+      
+      // Extract form field names and default values
+      const form = pdfDocument.getForm();
+      const fields = form.getFields();
+      
+      const fieldValues: Record<string, string> = {};
+      for (const field of fields) {
+        if (field instanceof PDFTextField) {
+          const name = field.getName();
+          const value = field.getText() || '';
+          fieldValues[name] = value;
+        }
+      }
+      
+      setFormFields(fieldValues);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast({
+        title: "Error Loading PDF",
+        description: "Failed to load the agreement. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   useEffect(() => {
     // When the dialog opens, load the prefilled PDF
     if (isOpen) {
@@ -86,21 +151,17 @@ export function BRBCPdfViewer({
       setIsPreviewing(false);
       setShowSubmitConfirm(false);
       setCachedPdfUrl(null);
+      setPdfDoc(null);
+      setPdfArrayBuffer(null);
+      setFormFields({});
       
-      // Load fresh PDF
-      const url = `/api/docs/brbc.pdf?fillable=true&prefill=buyer&inline=true&t=${Date.now()}`;
-      setPdfUrl(url);
-      setIsLoading(true);
+      // Load the PDF document
+      fetchPdfData();
     }
   }, [isOpen]);
 
   const handlePdfLoad = () => {
     setIsLoading(false);
-    
-    // After successful load, cache the current PDF URL if it's not a preview
-    if (!isPreviewing && pdfUrl && !pdfUrl.includes('preview')) {
-      setCachedPdfUrl(pdfUrl);
-    }
     
     // If we were previewing, turn off preview mode after load
     if (isPreviewing) {
@@ -653,299 +714,300 @@ export function BRBCPdfViewer({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b">
-          <DialogTitle className="text-xl font-semibold">
-            <div className="flex items-center">
-              <FileText className="mr-2 h-5 w-5 text-primary" />
-              Buyer Representation Agreement
-            </div>
-          </DialogTitle>
-          <DialogDescription>
-            Please review and sign the agreement below to proceed with your
-            property search.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="text-xl font-semibold">
+              <div className="flex items-center">
+                <FileText className="mr-2 h-5 w-5 text-primary" />
+                Buyer Representation Agreement
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Please review and sign the agreement below to proceed with your
+              property search.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
-          {/* PDF Viewer */}
-          <div
-            className={`flex-grow ${isSigning ? "w-2/3" : "w-full"} overflow-hidden relative`}
-          >
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-70 z-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
+            {/* PDF Viewer */}
+            <div
+              className={`flex-grow ${isSigning ? "w-2/3" : "w-full"} overflow-hidden relative`}
+            >
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-70 z-10">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              )}
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full border-0"
+                onLoad={handlePdfLoad}
+                onError={handlePdfError}
+              ></iframe>
+            </div>
+
+            {/* Signature Panel (only visible when signing) */}
+            {isSigning && (
+              <div className="w-full md:w-1/3 border-l border-gray-200 p-4 flex flex-col">
+                <h3 className="font-semibold mb-2">Sign Agreement</h3>
+
+                <Tabs
+                  value={activeTab}
+                  onValueChange={(newTab) => {
+                    // Save current signature before switching tabs
+                    saveCurrentSignature();
+                    // Update active tab
+                    setActiveTab(newTab);
+                    // Restore signature for the new tab
+                    restoreSignaturesOnTabLoad(newTab);
+                  }}
+                  className="flex-grow flex flex-col"
+                >
+                  {/* Main tabs for Buyer 1 and Buyer 2 */}
+                  <TabsList className="w-full grid grid-cols-2 mb-4">
+                    <TabsTrigger
+                      value="buyer1-signature"
+                      className="flex items-center"
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      Buyer 1
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="buyer2-signature"
+                      className="flex items-center"
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Buyer 2
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Buyer 1 Tab Content */}
+                  <TabsContent
+                    value="buyer1-signature"
+                    className="flex-grow flex flex-col space-y-6"
+                  >
+                    {/* Buyer 1 Signature Section */}
+                    <div>
+                      <h4 className="font-medium mb-2">
+                        Signature - full signature
+                      </h4>
+                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                        <SignatureCanvas
+                          ref={signatureRef}
+                          canvasProps={{
+                            className: "w-full h-full signature-canvas",
+                            onMouseUp: checkSignature,
+                            onTouchEnd: checkSignature,
+                          }}
+                          onEnd={checkSignature}
+                        />
+                      </div>
+
+                      {/* Buyer 1 Initials Section */}
+
+                      <h4 className="font-medium mb-2">
+                        Initials - short signature
+                      </h4>
+                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
+                        <SignatureCanvas
+                          ref={initialsRef}
+                          canvasProps={{
+                            className: "w-full h-full signature-canvas",
+                            onMouseUp: checkSignature,
+                            onTouchEnd: checkSignature,
+                          }}
+                          onEnd={checkSignature}
+                        />
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Buyer 2 Tab Content */}
+                  <TabsContent
+                    value="buyer2-signature"
+                    className="flex-grow flex flex-col space-y-6"
+                  >
+                    {/* Buyer 2 Signature Section */}
+                    <div>
+                      <h4 className="font-medium mb-2">
+                        Signature - Full Signature
+                      </h4>
+                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                        <SignatureCanvas
+                          ref={buyer2SignatureRef}
+                          canvasProps={{
+                            className: "w-full h-full signature-canvas",
+                            onMouseUp: checkSignature,
+                            onTouchEnd: checkSignature,
+                          }}
+                          onEnd={checkSignature}
+                        />
+                      </div>
+
+                      {/* Buyer 2 Initials Section */}
+
+                      <h4 className="font-medium mb-2">
+                        Initials - Short Signature
+                      </h4>
+                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
+                        <SignatureCanvas
+                          ref={buyer2InitialsRef}
+                          canvasProps={{
+                            className: "w-full h-full signature-canvas",
+                            onMouseUp: checkSignature,
+                            onTouchEnd: checkSignature,
+                          }}
+                          onEnd={checkSignature}
+                        />
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <div className="mt-2 flex justify-between items-center">
+                    <Button
+                      variant="outline"
+                      onClick={clearSignature}
+                      size="sm"
+                      className="w-24"
+                    >
+                      Clear
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        // Save current signature before switching tabs
+                        saveCurrentSignature();
+
+                        // Toggle between Buyer 1 and Buyer 2 tabs
+                        const nextTab =
+                          activeTab === "buyer1-signature"
+                            ? "buyer2-signature"
+                            : "buyer1-signature";
+
+                        // Set new tab and restore any saved signature
+                        setActiveTab(nextTab);
+                        restoreSignaturesOnTabLoad(nextTab);
+                      }}
+                      className="w-24"
+                    >
+                      {activeTab === "buyer1-signature" ? "Buyer 2" : "Buyer 1"}
+                    </Button>
+                  </div>
+                </Tabs>
               </div>
             )}
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full border-0"
-              onLoad={handlePdfLoad}
-              onError={handlePdfError}
-            ></iframe>
           </div>
 
-          {/* Signature Panel (only visible when signing) */}
-          {isSigning && (
-            <div className="w-full md:w-1/3 border-l border-gray-200 p-4 flex flex-col">
-              <h3 className="font-semibold mb-2">Sign Agreement</h3>
-
-              <Tabs
-                value={activeTab}
-                onValueChange={(newTab) => {
-                  // Save current signature before switching tabs
-                  saveCurrentSignature();
-                  // Update active tab
-                  setActiveTab(newTab);
-                  // Restore signature for the new tab
-                  restoreSignaturesOnTabLoad(newTab);
-                }}
-                className="flex-grow flex flex-col"
-              >
-                {/* Main tabs for Buyer 1 and Buyer 2 */}
-                <TabsList className="w-full grid grid-cols-2 mb-4">
-                  <TabsTrigger
-                    value="buyer1-signature"
-                    className="flex items-center"
-                  >
-                    <User className="mr-2 h-4 w-4" />
-                    Buyer 1
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="buyer2-signature"
-                    className="flex items-center"
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Buyer 2
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* Buyer 1 Tab Content */}
-                <TabsContent
-                  value="buyer1-signature"
-                  className="flex-grow flex flex-col space-y-6"
-                >
-                  {/* Buyer 1 Signature Section */}
-                  <div>
-                    <h4 className="font-medium mb-2">
-                      Signature - full signature
-                    </h4>
-                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
-                      <SignatureCanvas
-                        ref={signatureRef}
-                        canvasProps={{
-                          className: "w-full h-full signature-canvas",
-                          onMouseUp: checkSignature,
-                          onTouchEnd: checkSignature,
-                        }}
-                        onEnd={checkSignature}
-                      />
-                    </div>
-
-                    {/* Buyer 1 Initials Section */}
-
-                    <h4 className="font-medium mb-2">
-                      Initials - short signature
-                    </h4>
-                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
-                      <SignatureCanvas
-                        ref={initialsRef}
-                        canvasProps={{
-                          className: "w-full h-full signature-canvas",
-                          onMouseUp: checkSignature,
-                          onTouchEnd: checkSignature,
-                        }}
-                        onEnd={checkSignature}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Buyer 2 Tab Content */}
-                <TabsContent
-                  value="buyer2-signature"
-                  className="flex-grow flex flex-col space-y-6"
-                >
-                  {/* Buyer 2 Signature Section */}
-                  <div>
-                    <h4 className="font-medium mb-2">
-                      Signature - Full Signature
-                    </h4>
-                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
-                      <SignatureCanvas
-                        ref={buyer2SignatureRef}
-                        canvasProps={{
-                          className: "w-full h-full signature-canvas",
-                          onMouseUp: checkSignature,
-                          onTouchEnd: checkSignature,
-                        }}
-                        onEnd={checkSignature}
-                      />
-                    </div>
-
-                    {/* Buyer 2 Initials Section */}
-
-                    <h4 className="font-medium mb-2">
-                      Initials - Short Signature
-                    </h4>
-                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
-                      <SignatureCanvas
-                        ref={buyer2InitialsRef}
-                        canvasProps={{
-                          className: "w-full h-full signature-canvas",
-                          onMouseUp: checkSignature,
-                          onTouchEnd: checkSignature,
-                        }}
-                        onEnd={checkSignature}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <div className="mt-2 flex justify-between items-center">
-                  <Button
-                    variant="outline"
-                    onClick={clearSignature}
-                    size="sm"
-                    className="w-24"
-                  >
-                    Clear
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      // Save current signature before switching tabs
-                      saveCurrentSignature();
-
-                      // Toggle between Buyer 1 and Buyer 2 tabs
-                      const nextTab =
-                        activeTab === "buyer1-signature"
-                          ? "buyer2-signature"
-                          : "buyer1-signature";
-
-                      // Set new tab and restore any saved signature
-                      setActiveTab(nextTab);
-                      restoreSignaturesOnTabLoad(nextTab);
-                    }}
-                    className="w-24"
-                  >
-                    {activeTab === "buyer1-signature" ? "Buyer 2" : "Buyer 1"}
-                  </Button>
-                </div>
-              </Tabs>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-2">
-          {hasSigned ? (
-            <div className="flex items-center text-green-600 font-medium">
-              <Check className="mr-1.5 h-5 w-5" />
-              Successfully signed
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center">
-              {!isSigning ? (
-                <Button
-                  className="mr-2 mt-0"
-                  onClick={() => setIsSigning(true)}
-                >
-                  Sign Agreement
-                </Button>
-              ) : (
-                <>
-                  {/* Preview button - shows PDF with signatures without submitting */}
-                  <Button
-                    variant="outline"
-                    onClick={previewSignedPdf}
-                    disabled={isPreviewing || isSubmitting}
-                    className="mr-2"
-                  >
-                    {isPreviewing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Previewing...
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview
-                      </>
-                    )}
-                  </Button>
-                  
-                  {/* Submit button - now shows confirmation dialog */}
-                  <Button
-                    onClick={() => {
-                      // Force a final check of all signatures before submission
-                      if (signatureRef.current) {
-                        setSignatureIsEmpty(signatureRef.current.isEmpty());
-                      }
-                      if (initialsRef.current) {
-                        setInitialsIsEmpty(initialsRef.current.isEmpty());
-                      }
-
-                      // Use a short timeout to let state update before submitting
-                      setTimeout(() => {
-                        handleSubmitSignature();
-                      }, 50);
-                    }}
-                    disabled={
-                      isSubmitting ||
-                      isPreviewing ||
-                      (!savedSignatures.primary && signatureIsEmpty) ||
-                      (!savedSignatures.initials && initialsIsEmpty)
-                    }
-                    className="mr-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      "Submit Signatures"
-                    )}
-                  </Button>
-                </>
-              )}
-
-              <Button variant="outline" onClick={handleClose}>
-                {hasSigned ? "Close" : "Cancel"}
-              </Button>
-            </div>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    
-    {/* Confirmation Alert Dialog - shown before final submission */}
-    <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
-          <AlertDialogDescription>
-            Please review the document with your signatures above.
-            Are you sure you want to submit this agreement?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={confirmAndSubmitSignature}>
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
-              </>
+          <DialogFooter className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-2">
+            {hasSigned ? (
+              <div className="flex items-center text-green-600 font-medium">
+                <Check className="mr-1.5 h-5 w-5" />
+                Successfully signed
+              </div>
             ) : (
-              "Submit Agreement"
+              <div className="flex-1 flex items-center">
+                {!isSigning ? (
+                  <Button
+                    className="mr-2 mt-0"
+                    onClick={() => setIsSigning(true)}
+                  >
+                    Sign Agreement
+                  </Button>
+                ) : (
+                  <>
+                    {/* Preview button - shows PDF with signatures without submitting */}
+                    <Button
+                      variant="outline"
+                      onClick={previewSignedPdf}
+                      disabled={isPreviewing || isSubmitting}
+                      className="mr-2"
+                    >
+                      {isPreviewing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Previewing...
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Submit button - now shows confirmation dialog */}
+                    <Button
+                      onClick={() => {
+                        // Force a final check of all signatures before submission
+                        if (signatureRef.current) {
+                          setSignatureIsEmpty(signatureRef.current.isEmpty());
+                        }
+                        if (initialsRef.current) {
+                          setInitialsIsEmpty(initialsRef.current.isEmpty());
+                        }
+
+                        // Use a short timeout to let state update before submitting
+                        setTimeout(() => {
+                          handleSubmitSignature();
+                        }, 50);
+                      }}
+                      disabled={
+                        isSubmitting ||
+                        isPreviewing ||
+                        (!savedSignatures.primary && signatureIsEmpty) ||
+                        (!savedSignatures.initials && initialsIsEmpty)
+                      }
+                      className="mr-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Signatures"
+                      )}
+                    </Button>
+                  </>
+                )}
+
+                <Button variant="outline" onClick={handleClose}>
+                  {hasSigned ? "Close" : "Cancel"}
+                </Button>
+              </div>
             )}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
+            <AlertDialogDescription>
+              Please review the document with your signatures above.
+              Are you sure you want to submit this agreement?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmAndSubmitSignature}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                "Submit Agreement"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
