@@ -351,6 +351,14 @@ export default function BuyerDashboard() {
           {/* First column - Verification methods */}
           <div className="relative rounded-lg">
             <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                {user?.verificationMethod && (
+                  <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
+                    ✓ Verified
+                  </div>
+                )}
+              </div>
+
               {/* Identity verification section - smaller */}
               <div className="bg-white rounded-md border border-gray-200 p-2 mb-2">
                 <div className="flex items-center justify-between mb-1">

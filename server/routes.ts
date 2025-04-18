@@ -329,31 +329,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check attempt limit (max 2 attempts per user)
-      const user = await storage.getUser(req.user!.id);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: "User not found"
-        });
-      }
-      
-      // Get current attempts count (default to 0 if not set)
-      const currentAttempts = user.prequalificationAttempts || 0;
-      
-      // Check if the user has already reached the maximum number of attempts
-      if (currentAttempts >= 2) {
-        return res.status(400).json({
-          success: false,
-          error: "You have reached the maximum number of document validation attempts (2). Please request manual approval instead.",
-          attemptsRemaining: 0
-        });
-      }
-      
-      // Increment attempt counter
-      const newAttemptCount = currentAttempts + 1;
-      console.log(`Pre-qualification attempt ${newAttemptCount}/2 for user ID ${req.user!.id}`);
-      
       // Get the uploaded file
       const file = req.file;
       
@@ -364,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = path.join(prequalificationDir, fileName);
       fs.writeFileSync(filePath, file.buffer);
       
-      // Update user record with prequalification info and increment attempt counter
+      // Update user record with prequalification info
       const fileUrl = `/uploads/prequalification/${fileName}`;
       
       try {
@@ -372,8 +347,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verificationMethod: "prequalification",
           prequalificationDocUrl: fileUrl,
           prequalificationValidated: false, // Will be validated via AI in the next step
-          profileStatus: "pending", // Set to pending until validated
-          prequalificationAttempts: newAttemptCount // Update attempt counter
+          profileStatus: "pending" // Set to pending until validated
         });
         console.log("User record updated with prequalification info");
       } catch (updateError) {
@@ -383,17 +357,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Use OpenAI to extract information from the document for validation
       try {
-        // Get updated user with new attempt count
-        const updatedUser = await storage.getUser(req.user!.id);
-        if (!updatedUser) {
+        // Validate the document using AI
+        const user = await storage.getUser(req.user!.id);
+        if (!user) {
           throw new Error("User not found");
         }
 
         const validationResult = await validatePrequalificationDocument(
           filePath,
           {
-            firstName: updatedUser.firstName,
-            lastName: updatedUser.lastName
+            firstName: user.firstName,
+            lastName: user.lastName
           }
         );
         
@@ -411,28 +385,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           console.log(`User ID ${req.user!.id} pre-qualification document failed validation: ${validationResult.message}`);
         }
-        
-        // Include attempts remaining information for the frontend
-        const attemptsRemaining = Math.max(0, 2 - newAttemptCount);
-        validationResult.message = validationResult.validated 
-          ? validationResult.message 
-          : `${validationResult.message} (${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining)`;
       } catch (validationError) {
         console.error("Error validating pre-qualification document:", validationError);
         // Don't fail the request, just leave as pending for manual review
       }
       
-      // Return success with updated user data and attempts information
-      const finalUser = await storage.getUser(req.user!.id);
-      const attemptsRemaining = Math.max(0, 2 - newAttemptCount);
-      
+      // Return success
+      const updatedUser = await storage.getUser(req.user!.id);
       res.json({
         success: true,
-        data: finalUser,
-        meta: {
-          attemptsRemaining,
-          maxAttempts: 2
-        }
+        data: updatedUser
       });
     } catch (error) {
       console.error("Pre-qualification upload error:", error);
