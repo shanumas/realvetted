@@ -557,7 +557,7 @@ export default function BuyerDashboard() {
                   : "Sign Agreement"}
               </Button>
             </div>
-            
+
             {/* Pre-Qualification Card - Added to second column */}
             <div className="bg-green-50 rounded-lg border border-green-200 p-4 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-1.5">
@@ -629,7 +629,8 @@ export default function BuyerDashboard() {
 
               <div className="bg-indigo-50 text-indigo-700 text-xs p-3 rounded-md border border-indigo-200 mb-2">
                 <span>
-                  Track and manage your property viewing requests here. Schedule new viewings from property details pages.
+                  Track and manage your property viewing requests here. Schedule
+                  new viewings from property details pages.
                 </span>
               </div>
 
@@ -640,7 +641,9 @@ export default function BuyerDashboard() {
                   // Set active tab to viewing requests
                   setActiveTab("viewingRequests");
                   // Scroll to the viewing requests tab content
-                  const element = document.getElementById("viewingRequestsSection");
+                  const element = document.getElementById(
+                    "viewingRequestsSection",
+                  );
                   if (element) {
                     element.scrollIntoView({ behavior: "smooth" });
                   }
@@ -779,7 +782,11 @@ export default function BuyerDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent value="viewingRequests" className="p-0" id="viewingRequestsSection">
+            <TabsContent
+              value="viewingRequests"
+              className="p-0"
+              id="viewingRequestsSection"
+            >
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">
                   My Viewing Requests
