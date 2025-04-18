@@ -30,6 +30,7 @@ import { createVeriffSession, launchVeriff } from "@/lib/veriff";
 import { PrequalificationUpload } from "@/components/prequalification-upload";
 import { ManualApprovalForm } from "@/components/manual-approval-form";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
+import { BRBCPdfViewer } from "@/components/brbc-pdf-viewer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,6 +55,7 @@ export default function BuyerDashboard() {
   const [isManualApprovalFormOpen, setIsManualApprovalFormOpen] =
     useState(false);
   const [isBRBCModalOpen, setIsBRBCModalOpen] = useState(false);
+  const [isBRBCPdfViewerOpen, setIsBRBCPdfViewerOpen] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
 
   // Get stored verification session ID if it exists
@@ -563,8 +565,8 @@ export default function BuyerDashboard() {
                     return;
                   }
 
-                  // Otherwise open the fillable PDF directly in a new tab
-                  window.open('/api/docs/brbc.pdf?fillable=true&prefill=buyer', '_blank');
+                  // Otherwise open the BRBC PDF viewer for signing
+                  setIsBRBCPdfViewerOpen(true);
                 }}
                 variant={
                   buyerAgreements?.some((a) => a.type === "global_brbc")
@@ -746,7 +748,7 @@ export default function BuyerDashboard() {
                                   variant="link"
                                   size="sm"
                                   className="text-amber-700 p-0 h-6 font-medium text-xs underline"
-                                  onClick={() => window.open('/api/docs/brbc.pdf?fillable=true&prefill=buyer', '_blank')}
+                                  onClick={() => setIsBRBCPdfViewerOpen(true)}
                                 >
                                   Sign Representation Agreement
                                 </Button>
@@ -976,6 +978,20 @@ export default function BuyerDashboard() {
         onClose={() => setIsBRBCModalOpen(false)}
         agentId={selectedAgentId || 0}
         isGlobal={true}
+      />
+      
+      {/* BRBC PDF Viewer */}
+      <BRBCPdfViewer 
+        isOpen={isBRBCPdfViewerOpen}
+        onClose={() => setIsBRBCPdfViewerOpen(false)}
+        onSigned={() => {
+          // Refresh agreements after signing
+          queryClient.invalidateQueries({ queryKey: ["/api/buyer/agreements"] });
+          toast({
+            title: "Agreement Signed",
+            description: "Your buyer representation agreement has been signed.",
+          });
+        }}
       />
     </div>
   );
