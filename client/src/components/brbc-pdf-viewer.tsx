@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FileText, Check } from "lucide-react";
+import { Loader2, FileText, Check, User, UserPlus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SignatureCanvas from "react-signature-canvas";
 
 interface BRBCPdfViewerProps {
@@ -28,8 +28,19 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   const [isSigning, setIsSigning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
+  const [activeTab, setActiveTab] = useState("buyer1-signature");
+  
+  // Signature refs for different signature types
   const signatureRef = useRef<SignatureCanvas>(null);
+  const initialsRef = useRef<SignatureCanvas>(null);
+  const buyer2SignatureRef = useRef<SignatureCanvas>(null);
+  const buyer2InitialsRef = useRef<SignatureCanvas>(null);
+  
+  // Signature empty states
   const [signatureIsEmpty, setSignatureIsEmpty] = useState(true);
+  const [initialsIsEmpty, setInitialsIsEmpty] = useState(true);
+  const [buyer2SignatureIsEmpty, setBuyer2SignatureIsEmpty] = useState(true);
+  const [buyer2InitialsIsEmpty, setBuyer2InitialsIsEmpty] = useState(true);
 
   useEffect(() => {
     // When the dialog opens, load the prefilled PDF
@@ -55,24 +66,52 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
     });
   };
 
+  // Clear the signature canvas based on active tab
   const clearSignature = () => {
-    if (signatureRef.current) {
+    if (activeTab === "buyer1-signature" && signatureRef.current) {
       signatureRef.current.clear();
       setSignatureIsEmpty(true);
+    } else if (activeTab === "buyer1-initials" && initialsRef.current) {
+      initialsRef.current.clear();
+      setInitialsIsEmpty(true);
+    } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
+      buyer2SignatureRef.current.clear();
+      setBuyer2SignatureIsEmpty(true);
+    } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
+      buyer2InitialsRef.current.clear();
+      setBuyer2InitialsIsEmpty(true);
     }
   };
 
+  // Check if the signature canvas is empty based on active tab
   const checkSignature = () => {
-    if (signatureRef.current) {
+    if (activeTab === "buyer1-signature" && signatureRef.current) {
       setSignatureIsEmpty(signatureRef.current.isEmpty());
+    } else if (activeTab === "buyer1-initials" && initialsRef.current) {
+      setInitialsIsEmpty(initialsRef.current.isEmpty());
+    } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
+      setBuyer2SignatureIsEmpty(buyer2SignatureRef.current.isEmpty());
+    } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
+      setBuyer2InitialsIsEmpty(buyer2InitialsRef.current.isEmpty());
     }
   };
 
   const handleSubmitSignature = async () => {
+    // Require at least the primary buyer's signature
     if (!signatureRef.current || signatureRef.current.isEmpty()) {
       toast({
-        title: "Signature Required",
-        description: "Please sign the agreement before submitting.",
+        title: "Primary Signature Required",
+        description: "Please provide the primary buyer's signature before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Also require initials from the primary buyer
+    if (!initialsRef.current || initialsRef.current.isEmpty()) {
+      toast({
+        title: "Initials Required",
+        description: "Please provide the primary buyer's initials before submitting.",
         variant: "destructive",
       });
       return;
@@ -81,14 +120,36 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
     try {
       setIsSubmitting(true);
       
-      // Get the signature as base64 data
+      // Get all signature data
       const signatureData = signatureRef.current.toDataURL();
+      const initialsData = initialsRef.current.toDataURL();
       
-      // Submit signature to server - using the correct endpoint
-      const response = await apiRequest("/api/global-brbc/pdf-signature", "POST", {
-        signatureData,
-        details: {}
-      });
+      // Get optional buyer2 signatures if provided
+      const buyer2SignatureData = buyer2SignatureRef.current && !buyer2SignatureRef.current.isEmpty() 
+        ? buyer2SignatureRef.current.toDataURL() 
+        : null;
+        
+      const buyer2InitialsData = buyer2InitialsRef.current && !buyer2InitialsRef.current.isEmpty()
+        ? buyer2InitialsRef.current.toDataURL()
+        : null;
+      
+      // Submit signature to server with all signature types
+      const response = await fetch("/api/global-brbc/pdf-signature", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          // Main signature for sign1 field
+          signatureData,
+          // Initials for initial1 field
+          initialsData,
+          // Optional second buyer signature and initials
+          buyer2SignatureData,
+          buyer2InitialsData,
+          details: {}
+        }),
+      }).then(res => res.json());
       
       // Handle successful submission
       if (response && response.success) {
@@ -171,25 +232,116 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
           {isSigning && (
             <div className="w-full md:w-1/3 border-l border-gray-200 p-4 flex flex-col">
               <h3 className="font-semibold mb-2">Sign Agreement</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Please sign in the box below using your mouse or touch screen.
+              <p className="text-sm text-gray-600 mb-2">
+                Please provide your signature and initials in the tabs below.
               </p>
-
-              <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
-                <SignatureCanvas
-                  ref={signatureRef}
-                  canvasProps={{
-                    className: "w-full h-full signature-canvas",
-                  }}
-                  onEnd={checkSignature}
-                />
-              </div>
-
-              <div className="flex space-x-2 mb-4">
-                <Button variant="outline" onClick={clearSignature} size="sm">
-                  Clear
-                </Button>
-              </div>
+              
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col">
+                <TabsList className="w-full grid grid-cols-2 mb-4">
+                  <TabsTrigger value="buyer1-signature" className="flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    Signature
+                  </TabsTrigger>
+                  <TabsTrigger value="buyer1-initials" className="flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    Initials
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="buyer1-signature" className="flex-grow flex flex-col">
+                  <p className="text-xs text-gray-500 mb-2">Your full signature for main signature fields</p>
+                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
+                    <SignatureCanvas
+                      ref={signatureRef}
+                      canvasProps={{
+                        className: "w-full h-full signature-canvas",
+                      }}
+                      onEnd={checkSignature}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="buyer1-initials" className="flex-grow flex flex-col">
+                  <p className="text-xs text-gray-500 mb-2">Your initials for document pages</p>
+                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
+                    <SignatureCanvas
+                      ref={initialsRef}
+                      canvasProps={{
+                        className: "w-full h-full signature-canvas",
+                      }}
+                      onEnd={checkSignature}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="buyer2-signature" className="flex-grow flex flex-col">
+                  <p className="text-xs text-gray-500 mb-2">Second buyer's full signature (optional)</p>
+                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
+                    <SignatureCanvas
+                      ref={buyer2SignatureRef}
+                      canvasProps={{
+                        className: "w-full h-full signature-canvas",
+                      }}
+                      onEnd={checkSignature}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="buyer2-initials" className="flex-grow flex flex-col">
+                  <p className="text-xs text-gray-500 mb-2">Second buyer's initials (optional)</p>
+                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
+                    <SignatureCanvas
+                      ref={buyer2InitialsRef}
+                      canvasProps={{
+                        className: "w-full h-full signature-canvas",
+                      }}
+                      onEnd={checkSignature}
+                    />
+                  </div>
+                </TabsContent>
+                
+                <div className="mt-2 flex justify-between items-center">
+                  <Button variant="outline" onClick={clearSignature} size="sm" className="w-24">
+                    Clear
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setActiveTab(activeTab === "buyer1-signature" ? "buyer1-initials" : (
+                      activeTab === "buyer1-initials" ? "buyer2-signature" : (
+                        activeTab === "buyer2-signature" ? "buyer2-initials" : "buyer1-signature"
+                      )
+                    ))}
+                    className="w-24"
+                  >
+                    Next
+                  </Button>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full flex items-center justify-center"
+                    onClick={() => setActiveTab(
+                      activeTab.startsWith("buyer1") ? "buyer2-signature" : "buyer1-signature"
+                    )}
+                  >
+                    {activeTab.startsWith("buyer1") ? (
+                      <>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add Second Buyer (Optional)
+                      </>
+                    ) : (
+                      <>
+                        <User className="mr-2 h-4 w-4" />
+                        Back to Primary Buyer
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </Tabs>
             </div>
           )}
         </div>
