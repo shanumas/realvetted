@@ -8,6 +8,7 @@ import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
 import BuyerDashboard from "@/pages/buyer/dashboard";
 import BuyerPropertyDetail from "@/pages/buyer/property-detail";
+import BuyerProfile from "@/pages/buyer/profile";
 import AgentKYC from "@/pages/agent/kyc-verification";
 import AgentDashboard from "@/pages/agent/dashboard";
 import AgentPropertyDetail from "@/pages/agent/property-detail";
@@ -26,6 +27,7 @@ function Router() {
       {/* Buyer Routes */}
       <ProtectedRoute path="/buyer/dashboard" component={BuyerDashboard} allowedRoles={["buyer"]} />
       <ProtectedRoute path="/buyer/property/:id" component={BuyerPropertyDetail} allowedRoles={["buyer"]} />
+      <ProtectedRoute path="/buyer/profile" component={BuyerProfile} allowedRoles={["buyer"]} />
       
       {/* Agent Routes */}
       <ProtectedRoute path="/agent/kyc" component={AgentKYC} allowedRoles={["agent"]} />
