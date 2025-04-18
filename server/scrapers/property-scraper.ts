@@ -278,7 +278,7 @@ async function extractAgentInfoWithAI(html: string, url: string): Promise<Partia
 }
 
 // Try to find the agent's email by searching for their website and extracting contact information
-async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): Promise<string | undefined> {
+async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): Promise<string> {
   try {
     // If no API key available, return placeholder data
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
@@ -288,6 +288,7 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
     
     // First, use AI to help construct a good search query
     const searchQuery = await constructAgentSearchQuery(agentName, agentCompany);
+    console.log(`Searching for agent email with query: ${searchQuery}`);
     
     // Use a simple browser to search
     const browser = await puppeteer.launch({
@@ -302,7 +303,7 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
       await page.goto(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`, 
         { waitUntil: 'networkidle2', timeout: 30000 });
       
-      // Extract the first few search result URLs
+      // Extract the first 5 search result URLs
       const searchResults = await page.evaluate(() => {
         const links: string[] = [];
         const elements = document.querySelectorAll('a');
@@ -311,7 +312,7 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
           const href = el.getAttribute('href');
           if (href && href.startsWith('/url?q=') && 
               !href.includes('google.com') && 
-              links.length < 3) {
+              links.length < 5) { // Increased from 3 to 5
             links.push(href.substring(7, href.indexOf('&')));
           }
         }
@@ -319,9 +320,12 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
         return links;
       });
       
+      console.log(`Found ${searchResults.length} potential websites to check for agent email`);
+      
       // Visit each link and look for an email
       for (const url of searchResults) {
         try {
+          console.log(`Checking URL for agent email: ${url}`);
           await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
           
           // Get the page content
@@ -331,6 +335,7 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
           const email = await extractEmailWithAI(content, agentName);
           
           if (email) {
+            console.log(`Found email for agent ${agentName}: ${email}`);
             return email;
           }
         } catch (err) {
@@ -339,13 +344,16 @@ async function findAgentEmailFromWeb(agentName: string, agentCompany?: string): 
         }
       }
       
-      return undefined;
+      // If no email found, use the fallback email
+      console.log(`No email found for agent ${agentName}, using fallback email: shanumas@gmail.com`);
+      return "shanumas@gmail.com";
     } finally {
       await browser.close();
     }
   } catch (error) {
     console.error("Error finding agent email:", error);
-    return undefined;
+    // Return fallback email in case of any errors
+    return "shanumas@gmail.com";
   }
 }
 
@@ -394,11 +402,42 @@ async function extractEmailWithAI(html: string, agentName: string): Promise<stri
       return `${agentName.toLowerCase().replace(/\s+/g, '.')}@example.com`;
     }
     
+    // First, try to find email directly using regex
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
+    const emailMatches = html.match(emailRegex);
+    
+    if (emailMatches && emailMatches.length > 0) {
+      // If we have multiple email matches, try to find one that seems related to the agent
+      const agentNameWords = agentName.toLowerCase().split(/\s+/);
+      
+      for (const email of emailMatches) {
+        const emailLower = email.toLowerCase();
+        // Check if any part of the agent's name appears in the email
+        if (agentNameWords.some(word => word.length > 2 && emailLower.includes(word))) {
+          console.log(`Found email matching agent name pattern: ${email}`);
+          return email;
+        }
+      }
+      
+      // If no specific match found, return the first email
+      console.log(`Found generic email: ${emailMatches[0]}`);
+      return emailMatches[0];
+    }
+    
+    // If regex doesn't find anything, try with AI
+    console.log(`No emails found using regex, trying AI extraction for ${agentName}`);
+    
     // Extract only the relevant parts of the HTML to avoid token limit issues
     const simplifiedHtml = simplifyHtml(html, 'email');
     
     const prompt = `
-      Find the email address for real estate agent "${agentName}" from this webpage HTML:
+      Find the email address for real estate agent "${agentName}" from this webpage HTML.
+      Look for:
+      1. mailto: links
+      2. Contact information sections
+      3. Email address patterns (something@domain.com)
+      4. "Email" or "Contact" sections
+      5. Footer contact information
       
       ${simplifiedHtml}
       
@@ -410,7 +449,7 @@ async function extractEmailWithAI(html: string, agentName: string): Promise<stri
       messages: [
         {
           role: "system",
-          content: "You are an expert at finding email addresses in webpages. Return only the email address, no additional text."
+          content: "You are an expert at finding email addresses in webpages. You search thoroughly through HTML for email addresses. Return only the email address, no additional text."
         },
         { role: "user", content: prompt }
       ]
@@ -419,9 +458,11 @@ async function extractEmailWithAI(html: string, agentName: string): Promise<stri
     const result = response.choices[0].message.content?.trim();
     
     if (result && result !== "No email found" && result.includes('@')) {
+      console.log(`AI found email: ${result}`);
       return result;
     }
     
+    console.log(`No email found for ${agentName} using AI either`);
     return undefined;
   } catch (error) {
     console.error("Error extracting email with AI:", error);
