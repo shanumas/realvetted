@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { PDFDocument, PDFTextField } from 'pdf-lib';
+import { PDFDocument, PDFTextField } from "pdf-lib";
 
 // Utility to save and restore signature canvas data
 interface SignatureData {
@@ -56,18 +56,20 @@ export function BRBCPdfViewer({
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
-  
+
   // Calculate today's date and end date (90 days from today)
   const today = new Date();
   const endDate = new Date(today);
   endDate.setDate(today.getDate() + 90);
-  
+
   // Constants for date formatting
-  const START_DATE = today.toLocaleDateString('en-US');
-  const END_DATE = endDate.toLocaleDateString('en-US');
+  const START_DATE = today.toLocaleDateString("en-US");
+  const END_DATE = endDate.toLocaleDateString("en-US");
   // Track if the user already has a signed agreement
   const [existingAgreement, setExistingAgreement] = useState<any | null>(null);
-  const [lastPreviewTimestamp, setLastPreviewTimestamp] = useState<number | null>(null);
+  const [lastPreviewTimestamp, setLastPreviewTimestamp] = useState<
+    number | null
+  >(null);
 
   // Signature refs for different signature types
   const signatureRef = useRef<SignatureCanvas>(null);
@@ -88,16 +90,18 @@ export function BRBCPdfViewer({
     buyer2Primary: null,
     buyer2Initials: null,
   });
-  
+
   // Reference to the iframe to access the PDF form fields
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  
+
   // State to store the raw PDF data for client-side processing
-  const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
-  
+  const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(
+    null,
+  );
+
   // State to store form field values
   const [formFields, setFormFields] = useState<Record<string, string>>({});
-  
+
   // PDF document for client-side manipulation
   const [pdfDoc, setPdfDoc] = useState<PDFDocument | null>(null);
 
@@ -105,63 +109,73 @@ export function BRBCPdfViewer({
   const fetchExistingAgreement = async () => {
     try {
       setIsLoading(true);
-      
+
       // Fetch buyer agreements from the server
       const response = await fetch(`/api/buyer/agreements`);
       if (!response.ok) {
-        throw new Error(`Failed to fetch agreements: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch agreements: ${response.status} ${response.statusText}`,
+        );
       }
-      
+
       const agreements = await response.json();
-      
+
       // Find the most recent global BRBC agreement
-      const brbcAgreement = agreements.find((a: any) => a.type === 'global_brbc');
-      
+      const brbcAgreement = agreements.find(
+        (a: any) => a.type === "global_brbc",
+      );
+
       if (brbcAgreement && brbcAgreement.documentUrl) {
         // Found an existing signed agreement
         setExistingAgreement(brbcAgreement);
-        
+
         // Ensure the documentUrl path is correct
         let documentUrl = brbcAgreement.documentUrl;
-        if (!documentUrl.startsWith('/uploads/') && !documentUrl.startsWith('http')) {
+        if (
+          !documentUrl.startsWith("/uploads/") &&
+          !documentUrl.startsWith("http")
+        ) {
           documentUrl = `/uploads/${documentUrl}`;
         }
-        
+
         console.log("Found existing signed BRBC agreement:", documentUrl);
-        
+
         // Set the signed state since we're viewing an existing document
         setHasSigned(true);
-        
+
         // Load the existing PDF
         try {
           // Fetch the PDF document directly from its URL
           const pdfResponse = await fetch(documentUrl);
           if (!pdfResponse.ok) {
-            console.error(`Failed to fetch existing PDF from ${documentUrl}: ${pdfResponse.status}`);
+            console.error(
+              `Failed to fetch existing PDF from ${documentUrl}: ${pdfResponse.status}`,
+            );
             throw new Error("Couldn't load the signed document");
           }
-          
+
           const arrayBuffer = await pdfResponse.arrayBuffer();
-          
+
           // Create a blob URL for displaying the PDF
-          const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+          const blob = new Blob([arrayBuffer], { type: "application/pdf" });
           const blobUrl = URL.createObjectURL(blob);
           setPdfUrl(blobUrl);
-          
+
           return true; // Successfully loaded existing agreement
         } catch (error) {
-          console.error('Error loading existing PDF:', error);
+          console.error("Error loading existing PDF:", error);
           toast({
             title: "Error Loading Signed Document",
-            description: "Could not load your signed agreement. Loading the blank form instead.",
-            variant: "destructive"
+            description:
+              "Could not load your signed agreement. Loading the blank form instead.",
+            variant: "destructive",
           });
         }
       }
-      
+
       return false; // No existing agreement found
     } catch (error) {
-      console.error('Error checking for existing agreements:', error);
+      console.error("Error checking for existing agreements:", error);
       return false;
     } finally {
       setIsLoading(false);
@@ -174,52 +188,54 @@ export function BRBCPdfViewer({
       setIsLoading(true);
       const timestamp = Date.now();
       const url = `/api/docs/brbc.pdf?fillable=true&prefill=buyer&inline=true&t=${timestamp}`;
-      
+
       // Fetch the PDF as an ArrayBuffer
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+        throw new Error(
+          `Failed to fetch PDF: ${response.status} ${response.statusText}`,
+        );
       }
-      
+
       const arrayBuffer = await response.arrayBuffer();
       setPdfArrayBuffer(arrayBuffer);
-      
+
       // Load the PDF document using pdf-lib
       const pdfDocument = await PDFDocument.load(arrayBuffer);
       setPdfDoc(pdfDocument);
-      
+
       // Create a blob URL for displaying the PDF
-      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      const blob = new Blob([arrayBuffer], { type: "application/pdf" });
       const blobUrl = URL.createObjectURL(blob);
       setPdfUrl(blobUrl);
       setCachedPdfUrl(blobUrl);
-      
+
       // Extract form field names and default values
       const form = pdfDocument.getForm();
       const fields = form.getFields();
-      
+
       const fieldValues: Record<string, string> = {};
       for (const field of fields) {
         if (field instanceof PDFTextField) {
           const name = field.getName();
-          const value = field.getText() || '';
+          const value = field.getText() || "";
           fieldValues[name] = value;
         }
       }
-      
+
       setFormFields(fieldValues);
     } catch (error) {
-      console.error('Error loading PDF:', error);
+      console.error("Error loading PDF:", error);
       toast({
         title: "Error Loading PDF",
         description: "Failed to load the agreement. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   useEffect(() => {
     // When the dialog opens, check for existing agreements and load the appropriate PDF
     if (isOpen) {
@@ -231,9 +247,9 @@ export function BRBCPdfViewer({
       setPdfDoc(null);
       setPdfArrayBuffer(null);
       setFormFields({});
-      
+
       // First try to fetch existing agreement
-      fetchExistingAgreement().then(found => {
+      fetchExistingAgreement().then((found) => {
         if (!found) {
           // If no existing agreement, load the blank template
           fetchPdfData();
@@ -244,7 +260,7 @@ export function BRBCPdfViewer({
 
   const handlePdfLoad = () => {
     setIsLoading(false);
-    
+
     // If we were previewing, turn off preview mode after load
     if (isPreviewing) {
       setIsPreviewing(false);
@@ -253,7 +269,7 @@ export function BRBCPdfViewer({
 
   const handlePdfError = () => {
     setIsLoading(false);
-    
+
     // If load fails and we have a cached PDF, use it
     if (cachedPdfUrl) {
       setPdfUrl(cachedPdfUrl);
@@ -268,7 +284,9 @@ export function BRBCPdfViewer({
   };
 
   // Clear the signature canvas based on type
-  const clearSignature = (type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials") => {
+  const clearSignature = (
+    type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials",
+  ) => {
     if (type === "primary" && signatureRef.current) {
       // Clear the canvas
       signatureRef.current.clear();
@@ -305,7 +323,7 @@ export function BRBCPdfViewer({
     try {
       // Save form values first
       captureFormValues();
-      
+
       const updatedSignatures = { ...savedSignatures };
 
       if (activeTab === "buyer1-signature") {
@@ -447,7 +465,7 @@ export function BRBCPdfViewer({
   const checkSignature = () => {
     // Capture form values before checking signature
     captureFormValues();
-    
+
     if (activeTab === "buyer1-signature") {
       // Check primary buyer's signature if available
       if (signatureRef.current) {
@@ -504,60 +522,61 @@ export function BRBCPdfViewer({
   const updatePdfPreviewWithSignature = async (
     signatureData: string,
     type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials",
-    manualPreview = false
+    manualPreview = false,
   ) => {
     try {
       // Save current signature and form values to state
       saveCurrentSignature();
       captureFormValues();
-      
+
       // Only update PDF in real-time if manually previewing - this prevents form fields from being reset
       // For automatic updates during signing, we'll just save the signature data without refreshing the PDF
       if (!manualPreview) {
         // Just save the signature data without updating the PDF display
-        return; 
+        return;
       }
-      
+
       // If this is a manual preview, show loading state
       if (manualPreview) {
         setIsLoading(true);
         setIsPreviewing(true);
       }
-      
+
       // Update timestamp
       const currentTime = Date.now();
       setLastPreviewTimestamp(currentTime);
-      
+
       // Try to use client-side PDF processing if we have the PDF document loaded
       if (pdfDoc && pdfArrayBuffer) {
         try {
           // Create a duplicate of the PDF for editing
           const pdfBytes = await pdfDoc.save();
           const newPdfDoc = await PDFDocument.load(pdfBytes);
-          
+
           // Get form to edit
           const form = newPdfDoc.getForm();
-          
+
           // Save all form field values to preserve manual edits
           const fields = form.getFields();
           const updatedFormFields: Record<string, string> = {};
-          
+
           for (const field of fields) {
             if (field instanceof PDFTextField) {
               const name = field.getName();
               // Try to get value from iframe if it exists
-              const value = field.getText() || '';
+              const value = field.getText() || "";
               updatedFormFields[name] = value;
             }
           }
-          
+
           // Apply the current form field values
           if (iframeRef.current) {
             try {
               const iframe = iframeRef.current;
               if (iframe.contentWindow && iframe.contentWindow.document) {
-                const formElements = iframe.contentWindow.document.querySelectorAll('input');
-                formElements.forEach(input => {
+                const formElements =
+                  iframe.contentWindow.document.querySelectorAll("input");
+                formElements.forEach((input) => {
                   if (input.name && input.value) {
                     updatedFormFields[input.name] = input.value;
                   }
@@ -567,7 +586,7 @@ export function BRBCPdfViewer({
               console.error("Error accessing iframe form fields:", err);
             }
           }
-          
+
           // Apply saved form field values
           Object.entries(updatedFormFields).forEach(([name, value]) => {
             try {
@@ -580,27 +599,29 @@ export function BRBCPdfViewer({
               console.warn(`Could not set field ${name}:`, err);
             }
           });
-          
+
           // Update formFields state for future use
           setFormFields(updatedFormFields);
-          
+
           // Save the modified PDF and update the viewer
           const modifiedPdfBytes = await newPdfDoc.save();
-          const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+          const blob = new Blob([modifiedPdfBytes], {
+            type: "application/pdf",
+          });
           const blobUrl = URL.createObjectURL(blob);
-          
+
           if (manualPreview) {
             setPdfUrl(blobUrl);
           } else if (!cachedPdfUrl) {
             setPdfUrl(blobUrl);
             setCachedPdfUrl(blobUrl);
           }
-          
+
           if (manualPreview) {
             setIsPreviewing(false);
             setIsLoading(false);
           }
-          
+
           return;
         } catch (err) {
           console.error("Error in client-side PDF processing:", err);
@@ -660,8 +681,8 @@ export function BRBCPdfViewer({
         // If we're coming from a manual preview, we want to reload
         if (manualPreview) {
           setPdfUrl(response.data.pdfUrl);
-        } 
-        // For auto-updates, only update if we don't have a cached PDF yet 
+        }
+        // For auto-updates, only update if we don't have a cached PDF yet
         // or if this is a manual preview request
         else if (!cachedPdfUrl) {
           setPdfUrl(response.data.pdfUrl);
@@ -670,7 +691,7 @@ export function BRBCPdfViewer({
       }
     } catch (error) {
       console.error("Error updating PDF preview:", error);
-      
+
       // For manual previews, show error
       if (manualPreview) {
         setIsPreviewing(false);
@@ -683,40 +704,45 @@ export function BRBCPdfViewer({
       }
     }
   };
-  
+
   // Function to generate a preview of the PDF with current signatures
   const previewSignedPdf = async () => {
     try {
       // Show loading state
       setIsLoading(true);
       setIsPreviewing(true);
-      
+
       // Save current signature data
       saveCurrentSignature();
-      
+
       // Capture form field values
       captureFormValues();
-      
+
       // Check if we have at least one signature
-      if (!savedSignatures.primary && !savedSignatures.initials && 
-          !savedSignatures.buyer2Primary && !savedSignatures.buyer2Initials) {
+      if (
+        !savedSignatures.primary &&
+        !savedSignatures.initials &&
+        !savedSignatures.buyer2Primary &&
+        !savedSignatures.buyer2Initials
+      ) {
         toast({
           title: "No Signatures",
-          description: "Please add at least one signature or initial before previewing.",
-          variant: "default"
+          description:
+            "Please add at least one signature or initial before previewing.",
+          variant: "default",
         });
         setIsLoading(false);
         setIsPreviewing(false);
         return;
       }
-      
+
       // Prepare request data with all signatures and form fields
       const requestData: Record<string, any> = {
         previewOnly: true,
         details: {},
-        formFieldValues: formFields
+        formFieldValues: formFields,
       };
-      
+
       // Add all available signatures
       if (savedSignatures.primary) {
         requestData.signatureData = savedSignatures.primary;
@@ -730,7 +756,7 @@ export function BRBCPdfViewer({
       if (savedSignatures.buyer2Initials) {
         requestData.buyer2InitialsData = savedSignatures.buyer2Initials;
       }
-      
+
       // Send the request to get a preview PDF with signatures
       const response = await fetch("/api/global-brbc/pdf-signature", {
         method: "POST",
@@ -739,9 +765,14 @@ export function BRBCPdfViewer({
         },
         body: JSON.stringify(requestData),
       }).then((res) => res.json());
-      
+
       // If successful, update the PDF preview
-      if (response && response.success && response.data && response.data.pdfUrl) {
+      if (
+        response &&
+        response.success &&
+        response.data &&
+        response.data.pdfUrl
+      ) {
         // Set the PDF URL to the preview PDF
         setPdfUrl(response.data.pdfUrl);
       } else {
@@ -752,7 +783,7 @@ export function BRBCPdfViewer({
       toast({
         title: "Preview Failed",
         description: "Could not generate preview. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -766,15 +797,16 @@ export function BRBCPdfViewer({
     try {
       // Get the current form field values from the iframe
       if (iframeRef.current && iframeRef.current.contentWindow) {
-        const formElements = iframeRef.current.contentWindow.document.querySelectorAll('input');
-        const updatedFormFields: Record<string, string> = {...formFields};
-        
-        formElements.forEach(input => {
+        const formElements =
+          iframeRef.current.contentWindow.document.querySelectorAll("input");
+        const updatedFormFields: Record<string, string> = { ...formFields };
+
+        formElements.forEach((input) => {
           if (input.name && input.value) {
             updatedFormFields[input.name] = input.value;
           }
         });
-        
+
         // Update form fields state
         setFormFields(updatedFormFields);
       }
@@ -786,7 +818,7 @@ export function BRBCPdfViewer({
   const handleSubmitSignature = async () => {
     // Capture any form field values before switching to sign mode
     captureFormValues();
-    
+
     // Force an update of the current tab's signatures
     saveCurrentSignature();
 
@@ -824,11 +856,11 @@ export function BRBCPdfViewer({
 
     // Show a preview before submitting
     await previewSignedPdf();
-    
+
     // Open confirmation dialog once preview is loaded
     setShowSubmitConfirm(true);
   };
-  
+
   // Actually submit the signature after confirmation
   const confirmAndSubmitSignature = async () => {
     // Save any signature currently in the active canvas
@@ -873,7 +905,7 @@ export function BRBCPdfViewer({
 
       // Capture latest form values before submitting
       captureFormValues();
-      
+
       // Submit signature to server with all signature types and form field data
       const response = await fetch("/api/global-brbc/pdf-signature", {
         method: "POST",
@@ -891,7 +923,11 @@ export function BRBCPdfViewer({
           // Include form field values to preserve user edits
           formFieldValues: formFields,
           details: {
-            buyer1: formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : ""),
+            buyer1:
+              formFields.buyer1 ||
+              (user?.firstName && user?.lastName
+                ? `${user.firstName} ${user.lastName}`.trim()
+                : ""),
             buyer2: formFields.buyer2 || "",
             startDate: START_DATE,
             endDate: END_DATE,
@@ -967,17 +1003,17 @@ export function BRBCPdfViewer({
             <DialogTitle className="text-xl font-semibold">
               <div className="flex items-center">
                 <FileText className="mr-2 h-5 w-5 text-primary" />
-                {existingAgreement ? "Signed Buyer Representation Agreement" : "Buyer Representation Agreement"}
+                {existingAgreement
+                  ? "Signed Buyer Representation Agreement"
+                  : "Buyer Representation Agreement"}
               </div>
             </DialogTitle>
             <DialogDescription>
-              {hasSigned ? (
-                "Your completed and signed buyer representation agreement."
-              ) : isSigning ? (
-                "Please review the agreement and add your signature below."
-              ) : (
-                "Please review and sign the agreement below to proceed with your property search."
-              )}
+              {hasSigned
+                ? "Your completed and signed buyer representation agreement."
+                : isSigning
+                  ? "Please review the agreement and add your signature below."
+                  : "Please review and sign the agreement below to proceed with your property search."}
             </DialogDescription>
           </DialogHeader>
 
@@ -1007,8 +1043,6 @@ export function BRBCPdfViewer({
             {/* Signature Panel (only visible when signing) */}
             {isSigning && (
               <div className="w-full md:w-1/3 border-l border-gray-200 p-4 flex flex-col">
-                <h3 className="font-semibold mb-2">Sign Agreement</h3>
-
                 <Tabs
                   value={activeTab}
                   onValueChange={(newTab) => {
@@ -1050,43 +1084,35 @@ export function BRBCPdfViewer({
                       {/* Buyer 1 Information Fields */}
                       <div className="mb-4 space-y-3">
                         <div className="flex flex-col">
-                          <label className="text-sm font-medium mb-1 text-gray-700">Full Name:</label>
-                          <input 
-                            type="text" 
+                          <label className="text-sm font-medium mb-1 text-gray-700">
+                            Full Name:
+                          </label>
+                          <input
+                            type="text"
                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                             placeholder="Full Name"
-                            value={formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : "")}
+                            value={
+                              formFields.buyer1 ||
+                              (user?.firstName && user?.lastName
+                                ? `${user.firstName} ${user.lastName}`.trim()
+                                : "")
+                            }
                             onChange={(e) => {
-                              const updatedFields = {...formFields, buyer1: e.target.value};
+                              const updatedFields = {
+                                ...formFields,
+                                buyer1: e.target.value,
+                              };
                               setFormFields(updatedFields);
                             }}
                           />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="flex flex-col">
-                            <label className="text-sm font-medium mb-1 text-gray-700">Start Date:</label>
-                            <input 
-                              type="text" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50"
-                              value={new Date().toLocaleDateString('en-US')}
-                              readOnly
-                            />
-                          </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm font-medium mb-1 text-gray-700">End Date:</label>
-                            <input 
-                              type="text" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50"
-                              value={new Date(new Date().setDate(new Date().getDate() + 90)).toLocaleDateString('en-US')}
-                              readOnly
-                            />
-                          </div>
-                        </div>
                       </div>
-                      
+
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">Signature - full signature</h4>
-                        <Button 
+                        <h4 className="font-medium">
+                          Signature - full signature
+                        </h4>
+                        <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => clearSignature("primary")}
@@ -1110,8 +1136,10 @@ export function BRBCPdfViewer({
 
                       {/* Buyer 1 Initials Section */}
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">Initials - short signature</h4>
-                        <Button 
+                        <h4 className="font-medium">
+                          Initials - short signature
+                        </h4>
+                        <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => clearSignature("initials")}
@@ -1145,23 +1173,30 @@ export function BRBCPdfViewer({
                       {/* Buyer 2 Information Fields - Only Name */}
                       <div className="mb-4">
                         <div className="flex flex-col">
-                          <label className="text-sm font-medium mb-1 text-gray-700">Full Name:</label>
-                          <input 
-                            type="text" 
+                          <label className="text-sm font-medium mb-1 text-gray-700">
+                            Full Name:
+                          </label>
+                          <input
+                            type="text"
                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                             placeholder="Full Name (Co-Buyer)"
                             value={formFields.buyer2 || ""}
                             onChange={(e) => {
-                              const updatedFields = {...formFields, buyer2: e.target.value};
+                              const updatedFields = {
+                                ...formFields,
+                                buyer2: e.target.value,
+                              };
                               setFormFields(updatedFields);
                             }}
                           />
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">Signature - Full Signature</h4>
-                        <Button 
+                        <h4 className="font-medium">
+                          Signature - Full Signature
+                        </h4>
+                        <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => clearSignature("buyer2Primary")}
@@ -1185,8 +1220,10 @@ export function BRBCPdfViewer({
 
                       {/* Buyer 2 Initials Section */}
                       <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">Initials - Short Signature</h4>
-                        <Button 
+                        <h4 className="font-medium">
+                          Initials - Short Signature
+                        </h4>
+                        <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => clearSignature("buyer2Initials")}
@@ -1275,7 +1312,7 @@ export function BRBCPdfViewer({
                         </>
                       )}
                     </Button>
-                    
+
                     {/* Submit button - now shows confirmation dialog */}
                     <Button
                       onClick={() => {
@@ -1306,7 +1343,7 @@ export function BRBCPdfViewer({
                           Submitting...
                         </>
                       ) : (
-                        "Submit Signatures"
+                        "Submit Agreement"
                       )}
                     </Button>
                   </>
@@ -1320,14 +1357,14 @@ export function BRBCPdfViewer({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
             <AlertDialogDescription>
-              Please review the document with your signatures above.
-              Are you sure you want to submit this agreement?
+              Please review the document with your signatures above. Are you
+              sure you want to submit this agreement?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
