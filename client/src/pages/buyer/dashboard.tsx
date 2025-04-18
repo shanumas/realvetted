@@ -385,45 +385,40 @@ export default function BuyerDashboard() {
                     )}
                   </div>
                   
-                  {/* Identity verification section */}
-                  <div className="bg-white rounded-md border border-gray-200 p-3 mb-3">
-                    <div className="flex items-center justify-between mb-2">
+                  {/* Identity verification section - smaller */}
+                  <div className="bg-white rounded-md border border-gray-200 p-2 mb-2">
+                    <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center">
-                        <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                          <Shield className="h-3 w-3 text-blue-700" />
+                        <div className="bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
+                          <Shield className="h-2.5 w-2.5 text-blue-700" />
                         </div>
-                        <h5 className="font-medium text-gray-800 text-sm">
+                        <h5 className="font-medium text-gray-800 text-xs">
                           Verify Identity
                         </h5>
                       </div>
                       
                       {/* Veriff logo */}
-                      <div className="h-6 ml-2 flex items-center">
-                        <div className="text-xs text-blue-700 font-semibold italic flex items-center">
-                          by <span className="font-bold ml-1 text-blue-800">VERIFF</span>
+                      <div className="h-5 ml-1 flex items-center">
+                        <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
+                          by <span className="font-bold ml-0.5 text-blue-800">VERIFF</span>
                         </div>
                       </div>
                     </div>
                     
-                    <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                      Complete online ID verification through our secure identity
-                      verification partner.
-                    </p>
-                    
                     {user?.verificationMethod === "kyc" ? (
-                      <div className="bg-green-50 text-green-700 text-xs p-2 rounded-md border border-green-100 mb-2">
+                      <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
                         ✓ Identity verified successfully
                       </div>
                     ) : (
                       <Button
-                        className="w-full py-1.5 px-2 h-auto text-xs"
+                        className="w-full py-1 px-2 h-auto text-[10px]"
                         onClick={startVerification}
                         disabled={isVerifyingIdentity || isVerificationStarted}
                       >
                         {isVerifyingIdentity ? (
-                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                          <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />
                         ) : (
-                          <Shield className="mr-1.5 h-3 w-3" />
+                          <Shield className="mr-1 h-2.5 w-2.5" />
                         )}
                         {isVerificationStarted
                           ? "In Progress..."
@@ -434,22 +429,29 @@ export default function BuyerDashboard() {
                     )}
                   </div>
                   
-                  {/* Pre-qualification upload section */}
-                  <div className="bg-white rounded-md border border-gray-200 p-3">
-                    <div className="flex items-center mb-1.5">
-                      <div className="bg-purple-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                        <Upload className="h-3 w-3 text-purple-700" />
+                  {/* "OR" divider */}
+                  <div className="flex items-center justify-center mb-2">
+                    <div className="border-t border-gray-200 flex-grow"></div>
+                    <div className="mx-2 text-xs text-gray-500 font-medium">OR</div>
+                    <div className="border-t border-gray-200 flex-grow"></div>
+                  </div>
+                  
+                  {/* Pre-qualification upload section - smaller */}
+                  <div className="bg-white rounded-md border border-gray-200 p-2">
+                    <div className="flex items-center mb-1">
+                      <div className="bg-purple-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
+                        <Upload className="h-2.5 w-2.5 text-purple-700" />
                       </div>
-                      <h5 className="font-medium text-gray-800 text-sm">
+                      <h5 className="font-medium text-gray-800 text-xs">
                         Upload Pre-qualification
                       </h5>
                     </div>
                     
                     {user?.prequalificationDocUrl ? (
                       <>
-                        <div className="mb-2 flex-grow">
+                        <div className="mb-1 flex-grow">
                           <div
-                            className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
+                            className={`text-[10px] font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
                           >
                             {user?.prequalificationValidated
                               ? "✓ Document validated successfully"
@@ -457,34 +459,33 @@ export default function BuyerDashboard() {
                           </div>
                           {user?.prequalificationMessage &&
                             !user?.prequalificationValidated && (
-                              <p className="text-xs text-red-500 mt-1">
+                              <p className="text-[10px] text-red-500 mt-0.5">
                                 {user.prequalificationMessage}
                               </p>
                             )}
                         </div>
                         <Button
-                          className="w-full py-1.5 px-2 h-auto text-xs"
+                          className="w-full py-1 px-2 h-auto text-[10px]"
                           onClick={() => setIsPrequalificationModalOpen(true)}
                           disabled={isVerificationStarted}
                           variant="outline"
                         >
-                          <Upload className="mr-1.5 h-3 w-3" />
+                          <Upload className="mr-1 h-2.5 w-2.5" />
                           Upload New Document
                         </Button>
                       </>
                     ) : (
                       <>
-                        <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                          Upload your lender pre-qualification document as an
-                          alternative verification method.
+                        <p className="text-[10px] text-gray-600 mb-1 flex-grow line-clamp-2">
+                          Upload lender pre-qualification document as verification alternative.
                         </p>
                         <Button
-                          className="w-full py-1.5 px-2 h-auto text-xs"
+                          className="w-full py-1 px-2 h-auto text-[10px]"
                           onClick={() => setIsPrequalificationModalOpen(true)}
                           disabled={isVerificationStarted}
                           variant="outline"
                         >
-                          <Upload className="mr-1.5 h-3 w-3" />
+                          <Upload className="mr-1 h-2.5 w-2.5" />
                           Upload Document
                         </Button>
                       </>
