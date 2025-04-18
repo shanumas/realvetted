@@ -45,7 +45,6 @@ import {
   fillAgentReferralForm,
   fillBrbcForm,
 } from "./pdf-service";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 // Create uploads directories if they don't exist
 const uploadsDir = path.join(process.cwd(), "uploads");

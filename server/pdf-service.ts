@@ -51,7 +51,7 @@ export interface AgentReferralFormData {
   agentSignature?: string;
   date?: string;
   isEditable?: boolean;
-  
+
   // New fields for the enhanced referral form
   brokerageName?: string;
   phoneNumber?: string;
@@ -69,7 +69,7 @@ export interface AgentReferralFormData {
 export async function addSignatureToPdf(
   pdfBuffer: Buffer,
   signatureData: string,
-  signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent" | "sign1" | "sign2" | "initial1" | "initial2",
+  signatureField: "sign1" | "sign2" | "initial1" | "initial2",
 ): Promise<Buffer> {
   try {
     // Load the PDF document
@@ -87,169 +87,32 @@ export async function addSignatureToPdf(
     // Embed the signature image
     const signatureImage = await pdfDoc.embedPng(signatureBuffer);
 
-    // Get the signature field name based on the signatureField parameter
-    let fieldName = "";
-    switch (signatureField) {
-      case "buyer1":
-        fieldName = "buyer_signature_1";
-        break;
-      case "buyer2":
-        fieldName = "buyer_signature_2";
-        break;
-      case "seller1":
-        fieldName = "seller_signature_1";
-        break;
-      case "seller2":
-        fieldName = "seller_signature_2";
-        break;
-      case "agent":
-        fieldName = "agent_signature";
-        break;
-      case "sign1":
-        fieldName = "sign1";
-        break;
-      case "sign2":
-        fieldName = "sign2";
-        break;
-      case "initial1":
-        fieldName = "initial1";
-        break;
-      case "initial2":
-        fieldName = "initial2";
-        break;
-    }
-
-    // Get the first page of the document
-    const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
-
     // Get the form to find the signature field
     const form = pdfDoc.getForm();
 
-    try {
-      // Try to find the signature field
-      const signatureTextField = form.getTextField(fieldName);
+    const formFields = form.getFields();
+    console.log(
+      "-----------------Form fields:",
+      formFields.map((f) => f.getName()),
+    );
 
-      // Try to get position and size from the text field
-      // Note: Different versions of pdf-lib might have different APIs
-      let x = 100,
-        y = 100,
-        width = 150,
-        height = 50;
-
-      try {
-        // For PDF-lib v1.x
-        const fieldRect = (signatureTextField as any).acroField.getRectangle();
-        x = fieldRect.x;
-        y = fieldRect.y;
-        width = fieldRect.width;
-        height = fieldRect.height;
-      } catch (e) {
-        try {
-          // For other versions, try to access the field bounds
-          const bounds = (signatureTextField as any).getBounds();
-          if (bounds) {
-            x = bounds.x;
-            y = bounds.y;
-            width = bounds.width;
-            height = bounds.height;
+    for (const field of formFields) {
+      if (field.getName().toLowerCase() === signatureField) {
+        const widgets = field.acroField?.getWidgets?.() || [];
+        for (const widget of widgets) {
+          const ref = widget.dict.get(PDFName.of("P"));
+          const page = pdfDoc.getPages().find((p) => p.ref === ref);
+          const rect = widget.getRectangle();
+          if (page && rect) {
+            page.drawImage(signatureImage, {
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+            });
           }
-        } catch (e2) {
-          console.warn(
-            "Could not get signature field bounds, using default position",
-          );
         }
       }
-
-      // Draw the signature image at the field position
-      firstPage.drawImage(signatureImage, {
-        x,
-        y,
-        width,
-        height,
-      });
-
-      // Clear the text field
-      signatureTextField.setText("");
-
-      // Try to flatten the field if the method exists
-      try {
-        (signatureTextField as any).flatten();
-      } catch (e) {
-        console.warn("Could not flatten text field, but image was drawn");
-      }
-    } catch (fieldError) {
-      console.warn(
-        `Signature field ${fieldName} not found. Using default placement.`,
-      );
-      // If field not found, add signature in a default position
-      const { width, height } = firstPage.getSize();
-      let sigWidth = 150;
-      let sigHeight = 50;
-      let sigX = 100;
-      let sigY = 100;
-
-      // Adjust position based on signature type
-      switch (signatureField) {
-        case "buyer1":
-          sigX = width * 0.2;
-          sigY = height * 0.3;
-          break;
-        case "buyer2":
-          sigX = width * 0.2;
-          sigY = height * 0.25;
-          break;
-        case "seller1":
-          sigX = width * 0.6;
-          sigY = height * 0.3;
-          break;
-        case "seller2":
-          sigX = width * 0.6;
-          sigY = height * 0.25;
-          break;
-        case "agent":
-          sigX = width * 0.6;
-          sigY = height * 0.15;
-          break;
-        case "sign1":
-          // Fixed position for sign1 - primary buyer signature
-          sigX = width * 0.3;  // Place it at 30% from the left
-          sigY = height * 0.3;  // Place it at 30% from the bottom
-          sigWidth = 150;
-          sigHeight = 50;
-          break;
-        case "sign2":
-          // Fixed position for sign2 - secondary buyer signature
-          sigX = width * 0.7;  // Place it at 70% from the left
-          sigY = height * 0.3;  // Place it at 30% from the bottom
-          sigWidth = 150;
-          sigHeight = 50;
-          break;
-        case "initial1":
-          // Fixed position for initial1 - primary buyer initials
-          sigX = width * 0.3;
-          sigY = height * 0.7;
-          // For initials, make the signature smaller
-          sigWidth = 80;
-          sigHeight = 30;
-          break;
-        case "initial2":
-          // Fixed position for initial2 - secondary buyer initials 
-          sigX = width * 0.7;
-          sigY = height * 0.7;
-          // For initials, make the signature smaller
-          sigWidth = 80;
-          sigHeight = 30;
-          break;
-      }
-
-      // Draw the signature image
-      firstPage.drawImage(signatureImage, {
-        x: sigX,
-        y: sigY,
-        width: sigWidth,
-        height: sigHeight,
-      });
     }
 
     // Save the document
@@ -346,7 +209,7 @@ export async function fillAgencyDisclosureForm(
     // Load the template PDF
     console.log("Loading template PDF from file system");
     const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
-    
+
     try {
       pdfBuffer = fs.readFileSync(templatePath);
     } catch (error) {
@@ -358,136 +221,78 @@ export async function fillAgencyDisclosureForm(
   // Load the PDF document
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const form = pdfDoc.getForm();
-  
+
   // Fill form fields based on the formData
   try {
     // Get current date for 'today' field
     const today = new Date();
     const formattedToday = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-    
+
     // Calculate date 89 days from today for '3Months' field
     const threeMonthsLater = new Date(today);
     threeMonthsLater.setDate(today.getDate() + 89);
     const formattedThreeMonths = `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
-    
+
     // Extract initials from buyerName1 if available
     let buyerInitials = "";
     if (formData.buyerName1) {
       // Split the name into parts and get the first letter of each part
       buyerInitials = formData.buyerName1
         .split(" ")
-        .map(part => part.charAt(0).toUpperCase())
+        .map((part) => part.charAt(0).toUpperCase())
         .join("");
     }
-    
+
     // Set the buyer1 field (buyerName1)
     if (formData.buyerName1) {
       try {
-        form.getTextField('buyer1').setText(formData.buyerName1);
-        console.log(`Successfully filled 'buyer1' field with: ${formData.buyerName1}`);
+        form.getTextField("buyer1").setText(formData.buyerName1);
+        console.log(
+          `Successfully filled 'buyer1' field with: ${formData.buyerName1}`,
+        );
       } catch (error) {
         console.warn("Could not set buyer1 field:", error);
       }
     }
-    
+
     // Set the today field
     try {
-      form.getTextField('today').setText(formattedToday);
+      form.getTextField("today").setText(formattedToday);
       console.log(`Successfully filled 'today' field with: ${formattedToday}`);
     } catch (error) {
       console.warn("Could not set today field:", error);
     }
-    
+
     // Set the 3Months field
     try {
-      form.getTextField('3Months').setText(formattedThreeMonths);
-      console.log(`Successfully filled '3Months' field with: ${formattedThreeMonths}`);
+      form.getTextField("3Months").setText(formattedThreeMonths);
+      console.log(
+        `Successfully filled '3Months' field with: ${formattedThreeMonths}`,
+      );
     } catch (error) {
       console.warn("Could not set 3Months field:", error);
-    }
-    
-    // Set the initial1 field with buyer initials
-    if (buyerInitials) {
-      try {
-        form.getTextField('initial1').setText(buyerInitials);
-        console.log(`Successfully filled 'initial1' field with: ${buyerInitials}`);
-      } catch (error) {
-        console.warn("Could not set initial1 field:", error);
-      }
-    }
-    
-    // Set buyer signatures if provided
-    if (formData.buyerSignature1) {
-      try {
-        form.getTextField('sign1').setText(formData.buyerSignature1);
-        console.log(`Successfully filled 'sign1' field with buyer's primary signature`);
-      } catch (error) {
-        console.warn("Could not set sign1 field:", error);
-      }
-    }
-    
-    if (formData.buyerSignature2) {
-      try {
-        form.getTextField('sign2').setText(formData.buyerSignature2);
-        console.log(`Successfully filled 'sign2' field with buyer's secondary signature`);
-      } catch (error) {
-        console.warn("Could not set sign2 field:", error);
-      }
-    }
-    
-    // Fill in other fields from formData if provided
-    if (formData.buyerName2) {
-      try {
-        form.getTextField('buyer2').setText(formData.buyerName2);
-      } catch (error) {
-        console.warn("Could not set buyer2 field:", error);
-      }
-    }
-    
-    if (formData.agentName) {
-      try {
-        form.getTextField('agent').setText(formData.agentName);
-      } catch (error) {
-        console.warn("Could not set agent field:", error);
-      }
-    }
-    
-    if (formData.agentBrokerageName) {
-      try {
-        form.getTextField('brokerage').setText(formData.agentBrokerageName);
-      } catch (error) {
-        console.warn("Could not set brokerage field:", error);
-      }
-    }
-    
-    if (formData.propertyAddress) {
-      try {
-        form.getTextField('property').setText(formData.propertyAddress);
-      } catch (error) {
-        console.warn("Could not set property address field:", error);
-      }
     }
   } catch (error) {
     console.error("Error filling agency disclosure form fields:", error);
   }
-  
+
   // Handle the editable flag
   if (formData.isEditable === true) {
-    console.log('Keeping form fields editable as requested');
+    console.log("Keeping form fields editable as requested");
     // For editable PDFs, we keep the form fields as is (not flattened)
   } else {
     // For non-editable PDFs, flatten the form fields
     try {
       form.flatten();
-      console.log('Flattened form fields (non-editable PDF)');
+      console.log("Flattened form fields (non-editable PDF)");
     } catch (error) {
-      console.warn('Could not flatten form fields:', error);
+      console.warn("Could not flatten form fields:", error);
     }
   }
 
   // Save the document with appropriate options
   const modifiedPdfBytes = await pdfDoc.save({
-    updateFieldAppearances: true // This updates the visual appearance of form fields
+    updateFieldAppearances: true, // This updates the visual appearance of form fields
   });
 
   return Buffer.from(modifiedPdfBytes);
@@ -495,13 +300,13 @@ export async function fillAgencyDisclosureForm(
 
 /**
  * Fills out the BRBC form with the provided data
- * 
+ *
  * @param buyerName The name of the buyer to fill in
  * @returns Buffer containing the filled PDF document
  */
 export async function fillBrbcForm(
   buyerName: string,
-  existingPdfBuffer?: Buffer
+  existingPdfBuffer?: Buffer,
 ): Promise<Buffer> {
   let pdfBuffer;
 
@@ -513,7 +318,7 @@ export async function fillBrbcForm(
     // Load the template PDF
     console.log("Loading BRBC template from file system");
     const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
-    
+
     try {
       pdfBuffer = fs.readFileSync(templatePath);
     } catch (error) {
@@ -525,52 +330,50 @@ export async function fillBrbcForm(
   // Load the PDF document
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const form = pdfDoc.getForm();
-  
+
   // Get current date for 'today' field
   const today = new Date();
   const formattedToday = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
-  
+
   // Calculate date 89 days from today for '3Months' field
   const threeMonthsLater = new Date(today);
   threeMonthsLater.setDate(today.getDate() + 89);
   const formattedThreeMonths = `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
-  
+
   // Extract initials from buyerName
   let buyerInitials = "";
   if (buyerName) {
     // Split the name into parts and get the first letter of each part
     buyerInitials = buyerName
       .split(" ")
-      .map(part => part.charAt(0).toUpperCase())
+      .map((part) => part.charAt(0).toUpperCase())
       .join("");
   }
-  
+
   // Fill in all instances of each field
   const fields = form.getFields();
-  
+
   for (const field of fields) {
     const fieldName = field.getName();
-    
+
     try {
-      if (fieldName === 'buyer1' && field instanceof PDFTextField) {
+      if (fieldName === "buyer1" && field instanceof PDFTextField) {
         field.setText(buyerName);
-      } else if (fieldName === 'today' && field instanceof PDFTextField) {
+      } else if (fieldName === "today" && field instanceof PDFTextField) {
         field.setText(formattedToday);
-      } else if (fieldName === '3Months' && field instanceof PDFTextField) {
+      } else if (fieldName === "3Months" && field instanceof PDFTextField) {
         field.setText(formattedThreeMonths);
-      } else if (fieldName === 'initial1' && field instanceof PDFTextField) {
-        field.setText(buyerInitials);
       }
     } catch (error) {
       console.warn(`Could not set field ${fieldName}:`, error);
     }
   }
-  
+
   // Save the modified PDF
   const modifiedPdfBytes = await pdfDoc.save({
-    updateFieldAppearances: true
+    updateFieldAppearances: true,
   });
-  
+
   return Buffer.from(modifiedPdfBytes);
 }
 
@@ -593,12 +396,20 @@ export async function fillAgentReferralForm(
   } else {
     // Load the template PDF
     console.log("Loading agent referral agreement template from file system");
-    const templatePath = path.join(process.cwd(), "uploads", "pdf", "agent_referral_agreement.pdf");
-    
+    const templatePath = path.join(
+      process.cwd(),
+      "uploads",
+      "pdf",
+      "agent_referral_agreement.pdf",
+    );
+
     try {
       pdfBuffer = fs.readFileSync(templatePath);
     } catch (error) {
-      console.error("Error reading agent referral agreement template PDF:", error);
+      console.error(
+        "Error reading agent referral agreement template PDF:",
+        error,
+      );
       throw new Error("Could not read agent referral agreement template PDF");
     }
   }
@@ -606,115 +417,115 @@ export async function fillAgentReferralForm(
   // Load the PDF document
   const pdfDoc = await PDFDocument.load(pdfBuffer);
   const form = pdfDoc.getForm();
-  
+
   // Fill in form fields
   try {
     // Agent Name - fill in both 'agent_name' (for backward compatibility) and 'agent' (new field)
     if (formData.agentName) {
       try {
-        form.getTextField('agent_name').setText(formData.agentName);
+        form.getTextField("agent_name").setText(formData.agentName);
       } catch (error) {
         console.warn("Could not set agent_name field:", error);
       }
-      
+
       try {
-        form.getTextField('agent').setText(formData.agentName);
+        form.getTextField("agent").setText(formData.agentName);
       } catch (error) {
         console.warn("Could not set agent field:", error);
       }
     }
-    
+
     // License Number
     if (formData.licenseNumber) {
       try {
-        form.getTextField('license_number').setText(formData.licenseNumber);
+        form.getTextField("license_number").setText(formData.licenseNumber);
       } catch (error) {
         console.warn("Could not set license_number field:", error);
       }
     }
-    
+
     // Brokerage Name
     if (formData.brokerageName) {
       try {
-        form.getTextField('firm').setText(formData.brokerageName);
+        form.getTextField("firm").setText(formData.brokerageName);
       } catch (error) {
         console.warn("Could not set firm field:", error);
       }
     }
-    
+
     // Phone Number
     if (formData.phoneNumber) {
       try {
-        form.getTextField('agentPhone').setText(formData.phoneNumber);
+        form.getTextField("agentPhone").setText(formData.phoneNumber);
       } catch (error) {
         console.warn("Could not set agentPhone field:", error);
       }
     }
-    
+
     // Email
     if (formData.email) {
       try {
-        form.getTextField('agentEmail').setText(formData.email);
+        form.getTextField("agentEmail").setText(formData.email);
       } catch (error) {
         console.warn("Could not set agentEmail field:", error);
       }
     }
-    
+
     // Address
     if (formData.address) {
       try {
-        form.getTextField('address').setText(formData.address);
+        form.getTextField("address").setText(formData.address);
       } catch (error) {
         console.warn("Could not set address field:", error);
       }
     }
-    
+
     // City
     if (formData.city) {
       try {
-        form.getTextField('city').setText(formData.city);
+        form.getTextField("city").setText(formData.city);
       } catch (error) {
         console.warn("Could not set city field:", error);
       }
     }
-    
+
     // State
     if (formData.state) {
       try {
-        form.getTextField('state').setText(formData.state);
+        form.getTextField("state").setText(formData.state);
       } catch (error) {
         console.warn("Could not set state field:", error);
       }
     }
-    
+
     // Zip
     if (formData.zip) {
       try {
-        form.getTextField('zip').setText(formData.zip);
+        form.getTextField("zip").setText(formData.zip);
       } catch (error) {
         console.warn("Could not set zip field:", error);
       }
     }
-    
+
     // Date - fill in both 'date' (for backward compatibility) and 'today' (new field)
     if (formData.date) {
       try {
-        form.getTextField('date').setText(formData.date);
+        form.getTextField("date").setText(formData.date);
       } catch (error) {
         console.warn("Could not set date field:", error);
       }
-      
+
       try {
-        form.getTextField('today').setText(formData.date);
+        form.getTextField("today").setText(formData.date);
       } catch (error) {
         console.warn("Could not set today field:", error);
       }
     }
-    
+
     // Agent Signature - if there's a signature provided, set it in the 'agentSign' field
     if (formData.agentSignature) {
       try {
-        form.getTextField('agentSign').setText(formData.agentSignature);
+        form.getTextField("agentSign").setText(formData.agentSignature);
       } catch (error) {
         console.warn("Could not set agentSign field:", error);
       }
@@ -725,21 +536,21 @@ export async function fillAgentReferralForm(
 
   // Handle the editable flag
   if (formData.isEditable === true) {
-    console.log('Keeping form fields editable as requested');
+    console.log("Keeping form fields editable as requested");
     // For editable PDFs, we keep the form fields as is (not flattened)
   } else {
     // For non-editable PDFs, flatten the form fields
     try {
       form.flatten();
-      console.log('Flattened form fields (non-editable PDF)');
+      console.log("Flattened form fields (non-editable PDF)");
     } catch (error) {
-      console.warn('Could not flatten form fields:', error);
+      console.warn("Could not flatten form fields:", error);
     }
   }
 
   // Save the document with appropriate options
   const modifiedPdfBytes = await pdfDoc.save({
-    updateFieldAppearances: true // This updates the visual appearance of form fields
+    updateFieldAppearances: true, // This updates the visual appearance of form fields
   });
 
   return Buffer.from(modifiedPdfBytes);
