@@ -813,63 +813,7 @@ export default function BuyerPropertyDetail() {
                             </dd>
                           </div>
                         )}
-                        <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                          <dt className="text-sm font-medium text-gray-500 flex items-center">
-                            <Mail className="mr-2 h-4 w-4" /> Email
-                          </dt>
-                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                            <div className="flex flex-col space-y-2">
-                              {/* Editable Email Address */}
-                              <div className="flex items-center flex-wrap gap-2">
-                                <AgentEmailEditor
-                                  propertyId={Number(propertyId)}
-                                  currentEmail={property.sellerEmail}
-                                  inline={true}
-                                />
-                              </div>
-                              
-                              {/* Email Actions */}
-                              {property.sellerEmail && (
-                                <div className="flex items-center mt-2">
-                                  <a 
-                                    href={`mailto:${property.sellerEmail}`}
-                                    className="text-blue-600 hover:underline inline-flex items-center text-sm"
-                                  >
-                                    <Mail className="mr-1 h-3 w-3" />
-                                    Email agent
-                                  </a>
-                                  
-                                  {property.emailSent ? (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                      <Mail className="mr-1 h-3 w-3" />
-                                      Email sent
-                                    </span>
-                                  ) : (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      className="ml-2"
-                                      onClick={handleSendEmail}
-                                      disabled={sendEmailMutation.isPending}
-                                    >
-                                      {sendEmailMutation.isPending ? (
-                                        <>
-                                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                          Sending...
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Send className="mr-1 h-3 w-3" />
-                                          Send Email
-                                        </>
-                                      )}
-                                    </Button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </dd>
-                        </div>
+
                         {property.sellerPhone && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
