@@ -48,6 +48,7 @@ const registerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
+  phone: z.string().min(1, "Phone number is required"),
   profilePhotoUrl: z.string().optional(),
   licenseNumber: z.string().optional(),
 });
@@ -101,6 +102,7 @@ export default function AuthPage() {
       password: "",
       firstName: "",
       lastName: "",
+      phone: "",
       profilePhotoUrl: "",
       licenseNumber: "",
     },
@@ -265,6 +267,7 @@ export default function AuthPage() {
       password: values.password,
       firstName: values.firstName,
       lastName: values.lastName,
+      phone: values.phone,
       profilePhotoUrl: values.profilePhotoUrl,
       licenseNumber: values.licenseNumber,
       role: roleTab as any,
@@ -461,6 +464,28 @@ export default function AuthPage() {
                           onChange={(e) => registerForm.setValue('lastName', e.target.value)}
                         />
                       </div>
+                    </div>
+                    <div>
+                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
+                        Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          id="phone"
+                          name="phone"
+                          type="tel"
+                          placeholder="(123) 456-7890"
+                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                          value={registerForm.watch('phone')}
+                          onChange={(e) => registerForm.setValue('phone', e.target.value)}
+                          required
+                        />
+                      </div>
+                      {registerForm.formState.errors.phone && (
+                        <p className="text-sm text-red-500 mt-1">
+                          {registerForm.formState.errors.phone.message}
+                        </p>
+                      )}
                     </div>
 
                     <FormField

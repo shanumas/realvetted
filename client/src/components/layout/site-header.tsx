@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Home, User, LogOut, Menu, X } from "lucide-react";
+import { Bell, Home, User, LogOut, Menu, X, Activity } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function SiteHeader() {
@@ -143,14 +143,24 @@ export function SiteHeader() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <div className="flex items-center cursor-pointer text-gray-700">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>My Profile</span>
-                    </div>
+                    <Link href={`/${user?.role}/profile`}>
+                      <div className="flex items-center cursor-pointer w-full text-gray-700">
+                        <User className="mr-2 h-4 w-4" />
+                        <span>My Profile</span>
+                      </div>
+                    </Link>
                   </DropdownMenuItem>
                 </div>
                 
                 <div className="py-1 border-t border-gray-100">
+                  <DropdownMenuItem asChild>
+                    <Link href="#">
+                      <div className="flex items-center cursor-pointer w-full text-gray-700">
+                        <Activity className="mr-2 h-4 w-4" />
+                        <span>Activity</span>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Sign out</span>
@@ -218,6 +228,22 @@ export function SiteHeader() {
                           </a>
                         </Link>
                       ))}
+                      
+                      <Link href={`/${user?.role}/profile`}>
+                        <a className="text-gray-700 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-4 py-2 text-sm rounded-md transition-colors duration-150"
+                          onClick={() => setMobileNavOpen(false)}>
+                          <User className="mr-2 h-4 w-4" />
+                          My Profile
+                        </a>
+                      </Link>
+                      
+                      <Link href="#">
+                        <a className="text-gray-700 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-4 py-2 text-sm rounded-md transition-colors duration-150"
+                          onClick={() => setMobileNavOpen(false)}>
+                          <Activity className="mr-2 h-4 w-4" />
+                          Activity
+                        </a>
+                      </Link>
                     </div>
                   </nav>
                   
