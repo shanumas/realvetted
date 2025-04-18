@@ -471,12 +471,6 @@ export async function fillAgencyDisclosureForm(
  * @param buyerName The name of the buyer to fill in
  * @returns Buffer containing the filled PDF document
  */
-/**
- * Fills out the BRBC form with the provided data
- * 
- * @param buyerName The name of the buyer to fill in
- * @returns Buffer containing the filled PDF document
- */
 export async function fillBrbcForm(
   buyerName: string,
   existingPdfBuffer?: Buffer

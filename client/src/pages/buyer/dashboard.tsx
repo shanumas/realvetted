@@ -551,21 +551,7 @@ export default function BuyerDashboard() {
               <Button
                 className="w-full py-1.5 px-2 h-auto text-xs"
                 onClick={() => {
-                  // If the agreement is already signed, just open it for viewing
-                  if (
-                    buyerAgreements?.some((a) => a.type === "global_brbc")
-                  ) {
-                    // Get the agent ID from the existing agreement
-                    const existingAgreement = buyerAgreements.find(
-                      (a) => a.type === "global_brbc",
-                    );
-                    // Show the signed agreement
-                    setSelectedAgentId(existingAgreement?.agentId || 0);
-                    setIsBRBCModalOpen(true);
-                    return;
-                  }
-
-                  // Otherwise open the BRBC PDF viewer for signing
+                  // Always use the new PDF viewer for both viewing and signing
                   setIsBRBCPdfViewerOpen(true);
                 }}
                 variant={
