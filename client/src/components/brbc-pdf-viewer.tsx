@@ -56,6 +56,15 @@ export function BRBCPdfViewer({
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
+  
+  // Calculate today's date and end date (90 days from today)
+  const today = new Date();
+  const endDate = new Date(today);
+  endDate.setDate(today.getDate() + 90);
+  
+  // Constants for date formatting
+  const START_DATE = today.toLocaleDateString('en-US');
+  const END_DATE = endDate.toLocaleDateString('en-US');
   // Track if the user already has a signed agreement
   const [existingAgreement, setExistingAgreement] = useState<any | null>(null);
   const [lastPreviewTimestamp, setLastPreviewTimestamp] = useState<number | null>(null);
@@ -884,10 +893,10 @@ export function BRBCPdfViewer({
           details: {
             buyer1: formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : ""),
             buyer2: formFields.buyer2 || "",
-            startDate: formFields.today || new Date().toISOString().slice(0, 10),
-            endDate: formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10),
-            startDate2: formFields.today2 || formFields.today || new Date().toISOString().slice(0, 10),
-            endDate2: formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10),
+            startDate: START_DATE,
+            endDate: END_DATE,
+            startDate2: START_DATE,
+            endDate2: END_DATE,
           },
         }),
       }).then((res) => res.json());
@@ -1057,25 +1066,19 @@ export function BRBCPdfViewer({
                           <div className="flex flex-col">
                             <label className="text-sm font-medium mb-1 text-gray-700">Start Date:</label>
                             <input 
-                              type="date" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              value={formFields.today || new Date().toISOString().slice(0, 10)}
-                              onChange={(e) => {
-                                const updatedFields = {...formFields, today: e.target.value};
-                                setFormFields(updatedFields);
-                              }}
+                              type="text" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50"
+                              value={new Date().toLocaleDateString('en-US')}
+                              readOnly
                             />
                           </div>
                           <div className="flex flex-col">
                             <label className="text-sm font-medium mb-1 text-gray-700">End Date:</label>
                             <input 
-                              type="date" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              value={formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10)}
-                              onChange={(e) => {
-                                const updatedFields = {...formFields, '3Months': e.target.value};
-                                setFormFields(updatedFields);
-                              }}
+                              type="text" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50"
+                              value={new Date(new Date().setDate(new Date().getDate() + 90)).toLocaleDateString('en-US')}
+                              readOnly
                             />
                           </div>
                         </div>
