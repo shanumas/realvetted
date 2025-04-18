@@ -123,41 +123,46 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
     try {
       const updatedSignatures = { ...savedSignatures };
       
-      if (activeTab === "buyer1-signature" && signatureRef.current) {
-        // Set to either data URL or null based on isEmpty
-        updatedSignatures.primary = signatureRef.current.isEmpty() 
-          ? null 
-          : signatureRef.current.toDataURL();
+      if (activeTab === "buyer1-signature") {
+        // Save Buyer 1 signature if available
+        if (signatureRef.current) {
+          updatedSignatures.primary = signatureRef.current.isEmpty() 
+            ? null 
+            : signatureRef.current.toDataURL();
+          
+          // Update the empty state
+          setSignatureIsEmpty(signatureRef.current.isEmpty());
+        }
         
-        // Update the empty state
-        setSignatureIsEmpty(signatureRef.current.isEmpty());
+        // Save Buyer 1 initials if available
+        if (initialsRef.current) {
+          updatedSignatures.initials = initialsRef.current.isEmpty() 
+            ? null 
+            : initialsRef.current.toDataURL();
+          
+          // Update the empty state
+          setInitialsIsEmpty(initialsRef.current.isEmpty());
+        }
+      } else if (activeTab === "buyer2-signature") {
+        // Save Buyer 2 signature if available
+        if (buyer2SignatureRef.current) {
+          updatedSignatures.buyer2Primary = buyer2SignatureRef.current.isEmpty() 
+            ? null 
+            : buyer2SignatureRef.current.toDataURL();
+          
+          // Update the empty state
+          setBuyer2SignatureIsEmpty(buyer2SignatureRef.current.isEmpty());
+        }
         
-      } else if (activeTab === "buyer1-initials" && initialsRef.current) {
-        // Set to either data URL or null based on isEmpty
-        updatedSignatures.initials = initialsRef.current.isEmpty() 
-          ? null 
-          : initialsRef.current.toDataURL();
-        
-        // Update the empty state
-        setInitialsIsEmpty(initialsRef.current.isEmpty());
-        
-      } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
-        // Set to either data URL or null based on isEmpty
-        updatedSignatures.buyer2Primary = buyer2SignatureRef.current.isEmpty() 
-          ? null 
-          : buyer2SignatureRef.current.toDataURL();
-        
-        // Update the empty state
-        setBuyer2SignatureIsEmpty(buyer2SignatureRef.current.isEmpty());
-        
-      } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
-        // Set to either data URL or null based on isEmpty
-        updatedSignatures.buyer2Initials = buyer2InitialsRef.current.isEmpty() 
-          ? null 
-          : buyer2InitialsRef.current.toDataURL();
-        
-        // Update the empty state
-        setBuyer2InitialsIsEmpty(buyer2InitialsRef.current.isEmpty());
+        // Save Buyer 2 initials if available
+        if (buyer2InitialsRef.current) {
+          updatedSignatures.buyer2Initials = buyer2InitialsRef.current.isEmpty() 
+            ? null 
+            : buyer2InitialsRef.current.toDataURL();
+          
+          // Update the empty state
+          setBuyer2InitialsIsEmpty(buyer2InitialsRef.current.isEmpty());
+        }
       }
       
       setSavedSignatures(updatedSignatures);
@@ -170,72 +175,82 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   const restoreSignaturesOnTabLoad = (newTab: string) => {
     setTimeout(() => {
       try {
-        if (newTab === "buyer1-signature" && signatureRef.current && savedSignatures.primary) {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = signatureRef.current;
-            if (canvas) {
-              canvas.clear();
-              canvas.fromDataURL(savedSignatures.primary as string);
-              
-              // Manually update empty state after a slight delay to ensure canvas has time to update
-              setTimeout(() => {
-                setSignatureIsEmpty(canvas.isEmpty());
-                // Force check for validation by simulating an end event
-                checkSignature();
-              }, 100);
-            }
-          };
-          img.src = savedSignatures.primary;
-        } else if (newTab === "buyer1-initials" && initialsRef.current && savedSignatures.initials) {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = initialsRef.current;
-            if (canvas) {
-              canvas.clear();
-              canvas.fromDataURL(savedSignatures.initials as string);
-              
-              // Manually update empty state after a slight delay
-              setTimeout(() => {
-                setInitialsIsEmpty(canvas.isEmpty());
-                // Force check for validation
-                checkSignature();
-              }, 100);
-            }
-          };
-          img.src = savedSignatures.initials;
-        } else if (newTab === "buyer2-signature" && buyer2SignatureRef.current && savedSignatures.buyer2Primary) {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = buyer2SignatureRef.current;
-            if (canvas) {
-              canvas.clear();
-              canvas.fromDataURL(savedSignatures.buyer2Primary as string);
-              
-              // Manually update empty state
-              setTimeout(() => {
-                setBuyer2SignatureIsEmpty(canvas.isEmpty());
-                checkSignature();
-              }, 100);
-            }
-          };
-          img.src = savedSignatures.buyer2Primary;
-        } else if (newTab === "buyer2-initials" && buyer2InitialsRef.current && savedSignatures.buyer2Initials) {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = buyer2InitialsRef.current;
-            if (canvas) {
-              canvas.clear();
-              canvas.fromDataURL(savedSignatures.buyer2Initials as string);
-              
-              // Manually update empty state
-              setTimeout(() => {
-                setBuyer2InitialsIsEmpty(canvas.isEmpty());
-                checkSignature();
-              }, 100);
-            }
-          };
-          img.src = savedSignatures.buyer2Initials;
+        if (newTab === "buyer1-signature") {
+          // Restore primary buyer's signature if available
+          if (signatureRef.current && savedSignatures.primary) {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = signatureRef.current;
+              if (canvas) {
+                canvas.clear();
+                canvas.fromDataURL(savedSignatures.primary as string);
+                
+                // Manually update empty state after a slight delay
+                setTimeout(() => {
+                  setSignatureIsEmpty(canvas.isEmpty());
+                  checkSignature();
+                }, 100);
+              }
+            };
+            img.src = savedSignatures.primary;
+          }
+          
+          // Restore primary buyer's initials if available
+          if (initialsRef.current && savedSignatures.initials) {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = initialsRef.current;
+              if (canvas) {
+                canvas.clear();
+                canvas.fromDataURL(savedSignatures.initials as string);
+                
+                // Manually update empty state after a slight delay
+                setTimeout(() => {
+                  setInitialsIsEmpty(canvas.isEmpty());
+                  checkSignature();
+                }, 100);
+              }
+            };
+            img.src = savedSignatures.initials;
+          }
+        } else if (newTab === "buyer2-signature") {
+          // Restore second buyer's signature if available
+          if (buyer2SignatureRef.current && savedSignatures.buyer2Primary) {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = buyer2SignatureRef.current;
+              if (canvas) {
+                canvas.clear();
+                canvas.fromDataURL(savedSignatures.buyer2Primary as string);
+                
+                // Manually update empty state
+                setTimeout(() => {
+                  setBuyer2SignatureIsEmpty(canvas.isEmpty());
+                  checkSignature();
+                }, 100);
+              }
+            };
+            img.src = savedSignatures.buyer2Primary;
+          }
+          
+          // Restore second buyer's initials if available
+          if (buyer2InitialsRef.current && savedSignatures.buyer2Initials) {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = buyer2InitialsRef.current;
+              if (canvas) {
+                canvas.clear();
+                canvas.fromDataURL(savedSignatures.buyer2Initials as string);
+                
+                // Manually update empty state
+                setTimeout(() => {
+                  setBuyer2InitialsIsEmpty(canvas.isEmpty());
+                  checkSignature();
+                }, 100);
+              }
+            };
+            img.src = savedSignatures.buyer2Initials;
+          }
         }
       } catch (err) {
         console.error('Error restoring signature:', err);
@@ -245,45 +260,53 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   
   // Check if the signature canvas is empty based on active tab and update the PDF preview
   const checkSignature = () => {
-    // Save state for UI validation
-    if (activeTab === "buyer1-signature" && signatureRef.current) {
-      const isEmpty = signatureRef.current.isEmpty();
-      setSignatureIsEmpty(isEmpty);
-      
-      // If not empty, update PDF preview with signature
-      if (!isEmpty) {
-        const signatureData = signatureRef.current.toDataURL();
-        updatePdfPreviewWithSignature(signatureData, "primary");
+    if (activeTab === "buyer1-signature") {
+      // Check primary buyer's signature if available
+      if (signatureRef.current) {
+        const isEmpty = signatureRef.current.isEmpty();
+        setSignatureIsEmpty(isEmpty);
+        
+        // If not empty, update PDF preview with signature
+        if (!isEmpty) {
+          const signatureData = signatureRef.current.toDataURL();
+          updatePdfPreviewWithSignature(signatureData, "primary");
+        }
       }
       
-    } else if (activeTab === "buyer1-initials" && initialsRef.current) {
-      const isEmpty = initialsRef.current.isEmpty();
-      setInitialsIsEmpty(isEmpty);
-      
-      // If not empty, update PDF preview with initials
-      if (!isEmpty) {
-        const initialsData = initialsRef.current.toDataURL();
-        updatePdfPreviewWithSignature(initialsData, "initials");
+      // Check primary buyer's initials if available
+      if (initialsRef.current) {
+        const isEmpty = initialsRef.current.isEmpty();
+        setInitialsIsEmpty(isEmpty);
+        
+        // If not empty, update PDF preview with initials
+        if (!isEmpty) {
+          const initialsData = initialsRef.current.toDataURL();
+          updatePdfPreviewWithSignature(initialsData, "initials");
+        }
+      }
+    } else if (activeTab === "buyer2-signature") {
+      // Check second buyer's signature if available
+      if (buyer2SignatureRef.current) {
+        const isEmpty = buyer2SignatureRef.current.isEmpty();
+        setBuyer2SignatureIsEmpty(isEmpty);
+        
+        // If not empty, update PDF preview with signature
+        if (!isEmpty) {
+          const signatureData = buyer2SignatureRef.current.toDataURL();
+          updatePdfPreviewWithSignature(signatureData, "buyer2Primary");
+        }
       }
       
-    } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
-      const isEmpty = buyer2SignatureRef.current.isEmpty();
-      setBuyer2SignatureIsEmpty(isEmpty);
-      
-      // If not empty, update PDF preview with signature
-      if (!isEmpty) {
-        const signatureData = buyer2SignatureRef.current.toDataURL();
-        updatePdfPreviewWithSignature(signatureData, "buyer2Primary");
-      }
-      
-    } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
-      const isEmpty = buyer2InitialsRef.current.isEmpty();
-      setBuyer2InitialsIsEmpty(isEmpty);
-      
-      // If not empty, update PDF preview with initials
-      if (!isEmpty) {
-        const initialsData = buyer2InitialsRef.current.toDataURL();
-        updatePdfPreviewWithSignature(initialsData, "buyer2Initials");
+      // Check second buyer's initials if available
+      if (buyer2InitialsRef.current) {
+        const isEmpty = buyer2InitialsRef.current.isEmpty();
+        setBuyer2InitialsIsEmpty(isEmpty);
+        
+        // If not empty, update PDF preview with initials
+        if (!isEmpty) {
+          const initialsData = buyer2InitialsRef.current.toDataURL();
+          updatePdfPreviewWithSignature(initialsData, "buyer2Initials");
+        }
       }
     }
   };
