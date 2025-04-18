@@ -6,6 +6,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
 import { PropertyWithParticipants, ViewingRequestWithParticipants } from "@shared/types";
+
+// Define the Agreement interface for checking BRBC agreements
+interface Agreement {
+  id: number;
+  propertyId: number | null;
+  buyerId: number;
+  agentId: number | null;
+  type: string;
+  status: string;
+  date: string;
+  documentUrl: string | null;
+  isGlobal: boolean;
+}
 import { SiteHeader } from "@/components/layout/site-header";
 import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -541,17 +554,18 @@ export default function BuyerPropertyDetail() {
     queryFn: getQueryFn({ on401: "throw" }),
   });
   
+  // Fetch buyer agreements (including BRBC)
+  const { data: buyerAgreements = [] } = useQuery<Agreement[]>({
+    queryKey: ["/api/buyer/agreements"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    enabled: !!user?.id,
+  });
+  
   // Fetch viewing requests for this property
   const { data: viewingRequests = [], isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
     queryKey: [`/api/properties/${propertyId}/viewing-requests`],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!propertyId, // Only run query if propertyId is valid
-  });
-  
-  // Fetch buyer's agreements to check for signed BRBC
-  const { data: buyerAgreements = [] } = useQuery<Agreement[]>({
-    queryKey: ['/api/buyer/agreements'],
-    queryFn: getQueryFn({ on401: "throw" }),
   });
 
   if (isLoading) {
@@ -902,21 +916,37 @@ export default function BuyerPropertyDetail() {
                             <Button 
                               className="w-full flex items-center justify-center"
                               onClick={() => setIsViewingModalOpen(true)}
+                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
                             >
                               <Eye className="mr-2 h-5 w-5" /> Request Another Viewing
                             </Button>
+                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                              <p className="text-sm text-center text-amber-600 mt-2">
+                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                                Please sign the Buyer Representation Agreement to request viewings.
+                              </p>
+                            )}
                             <p className="text-sm text-center text-amber-600">
                               <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
                               Note: You already have a pending viewing request for this property.
                             </p>
                           </div>
                         ) : (
-                          <Button 
-                            className="w-full flex items-center justify-center" 
-                            onClick={() => setIsViewingModalOpen(true)}
-                          >
-                            <Eye className="mr-2 h-5 w-5" /> Request Viewing
-                          </Button>
+                          <div className="flex flex-col gap-3">
+                            <Button 
+                              className="w-full flex items-center justify-center" 
+                              onClick={() => setIsViewingModalOpen(true)}
+                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
+                            >
+                              <Eye className="mr-2 h-5 w-5" /> Request Viewing
+                            </Button>
+                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                              <p className="text-sm text-center text-amber-600 mt-2">
+                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                                Please sign the Buyer Representation Agreement to request viewings.
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                       
