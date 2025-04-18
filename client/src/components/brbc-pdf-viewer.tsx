@@ -571,6 +571,9 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       ref={buyer2SignatureRef}
                       canvasProps={{
                         className: "w-full h-full signature-canvas",
+                        // Add event listeners directly to the canvas props
+                        onMouseUp: checkSignature,
+                        onTouchEnd: checkSignature
                       }}
                       onEnd={checkSignature}
                     />
@@ -584,6 +587,9 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       ref={buyer2InitialsRef}
                       canvasProps={{
                         className: "w-full h-full signature-canvas",
+                        // Add event listeners directly to the canvas props
+                        onMouseUp: checkSignature,
+                        onTouchEnd: checkSignature
                       }}
                       onEnd={checkSignature}
                     />
