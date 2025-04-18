@@ -995,8 +995,9 @@ export function BRBCPdfViewer({
                 <Tabs
                   value={activeTab}
                   onValueChange={(newTab) => {
-                    // Save current signature before switching tabs
+                    // Save current signature and form values before switching tabs
                     saveCurrentSignature();
+                    captureFormValues();
                     // Update active tab
                     setActiveTab(newTab);
                     // Restore signature for the new tab
@@ -1037,7 +1038,7 @@ export function BRBCPdfViewer({
                             type="text" 
                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                             placeholder="Full Name"
-                            defaultValue={formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : "")}
+                            value={formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : "")}
                             onChange={(e) => {
                               const updatedFields = {...formFields, buyer1: e.target.value};
                               setFormFields(updatedFields);
@@ -1050,7 +1051,7 @@ export function BRBCPdfViewer({
                             <input 
                               type="date" 
                               className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              defaultValue={formFields.today || new Date().toISOString().slice(0, 10)}
+                              value={formFields.today || new Date().toISOString().slice(0, 10)}
                               onChange={(e) => {
                                 const updatedFields = {...formFields, today: e.target.value};
                                 setFormFields(updatedFields);
@@ -1062,7 +1063,7 @@ export function BRBCPdfViewer({
                             <input 
                               type="date" 
                               className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              defaultValue={formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10)}
+                              value={formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10)}
                               onChange={(e) => {
                                 const updatedFields = {...formFields, '3Months': e.target.value};
                                 setFormFields(updatedFields);
@@ -1203,8 +1204,9 @@ export function BRBCPdfViewer({
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Save current signature before switching tabs
+                        // Save current signature and form values before switching tabs
                         saveCurrentSignature();
+                        captureFormValues();
 
                         // Toggle between Buyer 1 and Buyer 2 tabs
                         const nextTab =
