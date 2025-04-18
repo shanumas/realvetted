@@ -1139,7 +1139,7 @@ export function BRBCPdfViewer({
                             type="text" 
                             className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
                             placeholder="Full Name (Co-Buyer)"
-                            defaultValue={formFields.buyer2 || ""}
+                            value={formFields.buyer2 || ""}
                             onChange={(e) => {
                               const updatedFields = {...formFields, buyer2: e.target.value};
                               setFormFields(updatedFields);
