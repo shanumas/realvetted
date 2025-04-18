@@ -269,16 +269,11 @@ export async function validatePrequalificationDocument(
             .toLowerCase();
         const nameFound = userFullName && fileContent.includes(userFullName);
 
-        // For validation to pass, the document should meet less strict criteria:
-        // 1. Contain at least one prequalification term OR
-        // 2. Contain at least one lender term OR
-        // 3. Contain at least one mortgage term OR
-        // 4. Have a reasonable number of relevant keywords (2+)
-        // Note: We're making this more lenient for now
-
+        // For validation to pass, the document should have user's name and some relevant keywords
         const isValid =
           (prequalFound || lenderFound || mortgageFound) &&
-          keywordMatches >= 2;
+          keywordMatches >= 2 &&
+          nameFound;
 
         const mockData: PrequalificationData = {
           documentType: prequalFound
@@ -299,10 +294,10 @@ export async function validatePrequalificationDocument(
 
         const validationMessage = isValid
           ? "Document validated successfully"
-          : `Document doesn't appear to be valid. Please upload a document that includes some mortgage or prequalification terms.`;
+          : `Document doesn't appear to be valid. Please ensure your name (${mockData.buyerName}) is included in the document along with mortgage or prequalification terms.`;
 
         console.log(
-          `Mock validation result: ${isValid ? "VALID" : "INVALID"} - ${validationMessage}`,
+          `Mock validation result: ${isValid ? "VALID" : "INVALID"} - Keywords found: ${keywordMatches}, Name found: ${nameFound}`,
         );
 
         return {
@@ -321,155 +316,113 @@ export async function validatePrequalificationDocument(
       }
     }
 
-    // In production, read file and convert to base64
+    // With a valid OpenAI API key, use AI to analyze the document
+    console.log("Using OpenAI to analyze and validate the prequalification document");
+    
+    // Read the file
     const fileBuffer = fs.readFileSync(filePath);
-    const base64Image = fileBuffer.toString("base64");
-
-    // For PDF files, perform basic text extraction and analysis for validation
-    // In a production environment, we would use a PDF to image conversion service
-    console.log(
-      "Performing enhanced validation for prequalification document (PDF format)",
-    );
-
-    try {
-      // Read the file and check for keywords that would indicate it's a prequalification letter
-      const fileBuffer = fs.readFileSync(filePath);
-      const fileContent = fileBuffer.toString("utf-8").toLowerCase();
-
-      // Check for keywords that would indicate this is a prequalification letter
-      const prequalKeywords = [
-        "pre-qualification",
-        "prequalification",
-        "pre-approval",
-        "preapproval",
-        "pre qualify",
-        "prequalify",
-        "mortgage",
-        "loan approval",
-        "lender",
-        "qualification letter",
-      ];
-
-      // Check for lender names or terms
-      const lenderKeywords = [
-        "bank",
-        "mortgage",
-        "financial",
-        "credit union",
-        "lending",
-        "capital",
-        "home loan",
-      ];
-
-      // Check if the document contains mortgage-related terms
-      const mortgageKeywords = [
-        "loan amount",
-        "interest rate",
-        "down payment",
-        "approval",
-        "borrower",
-        "property",
-        "purchase",
-      ];
-
-      // Count the number of matching keywords to determine validity
-      let keywordMatches = 0;
-      let prequalFound = false;
-      let lenderFound = false;
-      let mortgageFound = false;
-
-      for (const keyword of prequalKeywords) {
-        if (fileContent.includes(keyword)) {
-          prequalFound = true;
-          keywordMatches++;
-        }
-      }
-
-      for (const keyword of lenderKeywords) {
-        if (fileContent.includes(keyword)) {
-          lenderFound = true;
-          keywordMatches++;
-        }
-      }
-
-      for (const keyword of mortgageKeywords) {
-        if (fileContent.includes(keyword)) {
-          mortgageFound = true;
-          keywordMatches++;
-        }
-      }
-
-      // Check for user name in the document
-      const userFullName =
-        `${userData.firstName || ""} ${userData.lastName || ""}`
-          .trim()
-          .toLowerCase();
-      const firstNameCheck = userData.firstName
-        ? fileContent.includes(userData.firstName.toLowerCase())
-        : false;
-      const lastNameCheck = userData.lastName
-        ? fileContent.includes(userData.lastName.toLowerCase())
-        : false;
-      const nameFound =
-        userFullName &&
-        (fileContent.includes(userFullName) ||
-          (firstNameCheck && lastNameCheck));
-
-      // For validation to pass, the document should meet less strict criteria:
-      // 1. Contain at least one prequalification term OR
-      // 2. Contain at least one lender term OR
-      // 3. Contain at least one mortgage term OR
-      // 4. Have a reasonable number of relevant keywords (2+)
-      // Note: We're making this more lenient for now
-
-      const isValid =
-        (prequalFound || lenderFound || mortgageFound) &&
-        keywordMatches >= 2;
-
-      const mockData: PrequalificationData = {
-        documentType: prequalFound ? "Pre-Approval Letter" : "Unknown Document",
-        buyerName:
-          `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
-        firstName: userData.firstName || undefined,
-        lastName: userData.lastName || undefined,
-        lenderName: lenderFound ? "Detected Lender" : undefined,
-        loanAmount: mortgageFound ? "$500,000" : undefined,
-        loanType: mortgageFound ? "Conventional" : undefined,
-        approvalDate: new Date().toISOString().split("T")[0],
-        expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-      };
-
-      const validationMessage = isValid
-        ? "Document validated successfully"
-        : `Document doesn't appear to be valid. Please upload a document that includes some mortgage or prequalification terms.`;
-
-      console.log(
-        `PDF validation result: ${isValid ? "VALID" : "INVALID"} - Keywords found: ${keywordMatches}, Name found: ${nameFound}`,
-      );
-
-      return {
-        validated: isValid,
-        data: mockData,
-        message: validationMessage,
-      };
-    } catch (error) {
-      console.error("Error performing PDF document validation:", error);
+    const fileContent = fileBuffer.toString("utf-8");
+    
+    // First check if the user's name appears in the document
+    const userFullName = `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
+    const firstNamePresent = userData.firstName ? 
+      fileContent.toLowerCase().includes(userData.firstName.toLowerCase()) : false;
+    const lastNamePresent = userData.lastName ? 
+      fileContent.toLowerCase().includes(userData.lastName.toLowerCase()) : false;
+    
+    // Name check - either full name or both first and last names separately
+    const nameFound = 
+      fileContent.toLowerCase().includes(userFullName.toLowerCase()) || 
+      (firstNamePresent && lastNamePresent);
+    
+    if (!nameFound) {
+      console.log(`Name not found in document. User: ${userFullName}`);
       return {
         validated: false,
-        data: {},
-        message:
-          "Error analyzing PDF content. Please try again with a different file.",
+        data: {
+          buyerName: userFullName,
+          firstName: userData.firstName || undefined,
+          lastName: userData.lastName || undefined,
+        },
+        message: `The document does not contain your name (${userFullName}). Please ensure your name appears in the pre-qualification document.`
       };
     }
+    
+    // Now use OpenAI to analyze the document content
+    const prompt = `
+      You are an expert in real estate pre-qualification documents. Analyze this document and determine if it's a valid pre-qualification or pre-approval letter for a mortgage loan.
+
+      Document content:
+      ${fileContent}
+
+      Buyer name to verify: ${userFullName}
+
+      Extract the following information if present:
+      1. Document type (pre-qualification, pre-approval, etc.)
+      2. Lender name
+      3. Loan amount
+      4. Loan type
+      5. Approval date
+      6. Expiration date
+      
+      Validation criteria:
+      - The document must appear to be from a lending institution
+      - It must indicate pre-qualification or pre-approval for a mortgage loan
+      - The buyer's name (${userFullName}) must be present
+      
+      Respond with a JSON object containing:
+      {
+        "isValid": boolean,
+        "documentType": string,
+        "lenderName": string,
+        "loanAmount": string,
+        "loanType": string,
+        "approvalDate": string,
+        "expirationDate": string,
+        "validationMessage": string,
+        "nameFoundInDocument": boolean
+      }
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        { role: "system", content: "You are a document validation expert that specializes in pre-qualification letters for mortgages." },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" }
+    });
+
+    const analysisResult = JSON.parse(response.choices[0].message.content || "{}");
+    
+    console.log(`OpenAI validation result: ${analysisResult.isValid ? "VALID" : "INVALID"} - ${analysisResult.validationMessage}`);
+    
+    const extractedData: PrequalificationData = {
+      documentType: analysisResult.documentType || "Pre-Qualification Letter",
+      buyerName: userFullName,
+      firstName: userData.firstName || undefined,
+      lastName: userData.lastName || undefined,
+      lenderName: analysisResult.lenderName,
+      loanAmount: analysisResult.loanAmount,
+      loanType: analysisResult.loanType,
+      approvalDate: analysisResult.approvalDate,
+      expirationDate: analysisResult.expirationDate
+    };
+
+    return {
+      validated: analysisResult.isValid === true,
+      data: extractedData,
+      message: analysisResult.validationMessage || (analysisResult.isValid 
+        ? "Document validated successfully" 
+        : "Document doesn't appear to be a valid pre-qualification letter.")
+    };
   } catch (error) {
-    console.error("Error validating prequalification document:", error);
+    console.error("Error performing PDF document validation:", error);
     return {
       validated: false,
       data: {},
       message:
-        "Error processing document. Please try again with a clearer image.",
+        "Error analyzing PDF content. Please try again with a different file.",
     };
   }
 }
