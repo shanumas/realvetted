@@ -941,10 +941,20 @@ export default function BuyerPropertyDetail() {
                               <Eye className="mr-2 h-5 w-5" /> Request Viewing
                             </Button>
                             {!buyerAgreements?.some(a => a.type === "global_brbc") && (
-                              <p className="text-sm text-center text-amber-600 mt-2">
-                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                                Please sign the Buyer Representation Agreement to request viewings.
-                              </p>
+                              <div className="text-sm text-center text-amber-600 mt-2">
+                                <p className="mb-1">
+                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                                  Please sign the Buyer Representation Agreement to request viewings.
+                                </p>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-amber-700 p-0 h-auto font-medium underline"
+                                  onClick={() => window.open('/api/docs/brsr.pdf?fillable=true&prefill=buyer', '_blank')}
+                                >
+                                  Sign Representation Agreement
+                                </Button>
+                              </div>
                             )}
                           </div>
                         )}
@@ -980,10 +990,20 @@ export default function BuyerPropertyDetail() {
                               Request Viewing
                             </Button>
                             {!buyerAgreements?.some(a => a.type === "global_brbc") && (
-                              <p className="text-sm text-center text-amber-600 mt-2">
-                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                                Please sign the Buyer Representation Agreement to request viewings.
-                              </p>
+                              <div className="text-sm text-center text-amber-600 mt-2">
+                                <p className="mb-1">
+                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                                  Please sign the Buyer Representation Agreement to request viewings.
+                                </p>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-amber-700 p-0 h-auto font-medium underline"
+                                  onClick={() => window.open('/api/docs/brsr.pdf?fillable=true&prefill=buyer', '_blank')}
+                                >
+                                  Sign Representation Agreement
+                                </Button>
+                              </div>
                             )}
                           </div>
                         )}
