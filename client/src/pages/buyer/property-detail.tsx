@@ -16,7 +16,7 @@ import { BuyerRepresentationAgreement } from "@/components/buyer-representation-
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Send, Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon, AlertTriangle
+  Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon, AlertTriangle
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
@@ -135,31 +135,7 @@ export default function BuyerPropertyDetail() {
     }
   };
 
-  const sendEmailMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/properties/${propertyId}/send-email`, {});
-      return await res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Email sent",
-        description: "Your email has been sent to the listing agent.",
-        variant: "default",
-      });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Could not send email",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  });
 
-  const handleSendEmail = () => {
-    sendEmailMutation.mutate();
-  };
   
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
