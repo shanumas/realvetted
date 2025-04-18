@@ -105,6 +105,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("Upload directories:");
   console.log(" - Uploads dir path:", uploadsDir);
   console.log(" - Prequalification dir path:", prequalificationDir);
+  
+  // Serve PDF files with optional fillable mode
+  app.get("/api/docs/:filename", (req, res) => {
+    try {
+      const { filename } = req.params;
+      const fillable = req.query.fillable === 'true';
+      const prefill = req.query.prefill as string || '';
+      
+      // Only allow specific PDF files to be served
+      if (!['brbc.pdf', 'brsr.pdf'].includes(filename)) {
+        return res.status(404).json({
+          success: false,
+          error: "File not found",
+        });
+      }
+      
+      // Create file path
+      const filePath = path.join(process.cwd(), "uploads", "pdf", filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          error: "File not found",
+        });
+      }
+      
+      // Read the PDF file
+      const pdfBuffer = fs.readFileSync(filePath);
+      
+      // Set headers for PDF viewing
+      res.setHeader("Content-Type", "application/pdf");
+      
+      // If fillable mode is requested, set inline disposition to open in browser
+      if (fillable) {
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+        // Add headers to prevent caching for editable PDFs
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
+        // Set custom header to indicate this is editable
+        res.setHeader("X-PDF-Editable", "true");
+      } else {
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      }
+      
+      // Send the PDF directly to the client
+      res.send(pdfBuffer);
+    } catch (error) {
+      console.error("Error serving PDF file:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to serve PDF file",
+      });
+    }
+  });
 
   // Configure multer for file uploads
   const multerStorage = multer.memoryStorage();
