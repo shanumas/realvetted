@@ -268,6 +268,75 @@ export default function BuyerDashboard() {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Welcome, {user?.firstName || "Buyer"}!
                 </h3>
+
+                <div className="flex items-center mt-1">
+                  <div
+                    className={`flex items-center ${user?.profileStatus === "verified" ? "text-green-600" : "text-yellow-600"} text-xs font-medium`}
+                  >
+                    {checking ? (
+                      <RefreshCw className="h-3.5 w-3.5 text-blue-400 animate-spin mr-1" />
+                    ) : user?.profileStatus === "verified" ? (
+                      <svg
+                        className="h-3.5 w-3.5 mr-1"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-3.5 w-3.5 mr-1"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                    <span>
+                      Status:{" "}
+                      <span className="font-semibold">
+                        {user?.profileStatus === "verified"
+                          ? "Verified"
+                          : "Pending"}
+                      </span>
+                      {user?.profileStatus === "verified" && (
+                        <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
+                          {user?.verificationMethod === "kyc" &&
+                          user?.prequalificationValidated
+                            ? "Verified through both KYC and pre-qualification letter"
+                            : user?.verificationMethod === "kyc"
+                              ? "Verified through KYC"
+                              : "Verified through pre-qualification letter"}
+                        </span>
+                      )}
+                    </span>
+
+                    {/* Show pre-qualification validation message/rejection reason if applicable */}
+
+                    {storedSessionId && user?.profileStatus !== "verified" && (
+                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full text-[10px]">
+                        {checking ? "Checking..." : "Auto-checking"}
+                      </span>
+                    )}
+                  </div>
+
+                  {isVerificationStarted && (
+                    <div className="ml-3 text-blue-600 text-xs flex items-center">
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      <span>Verification in progress...</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -278,7 +347,7 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-4" id="dashboardCards">
+        <div className="grid md:grid-cols-3 gap-3">
           {/* First column - Verification methods */}
           <div className="relative rounded-lg">
             <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
@@ -399,11 +468,10 @@ export default function BuyerDashboard() {
             </div>
           </div>
 
-          {/* Second column - Stacked Cards */}
-          <div className="relative rounded-lg flex flex-col gap-3">
-            {/* BRBC Agreement Card */}
+          {/* Second column - BRBC Agreement Card */}
+          <div className="relative rounded-lg">
             <div
-              className={`${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"} rounded-lg border shadow-sm p-4 flex flex-col`}
+              className={`h-full ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
@@ -557,9 +625,11 @@ export default function BuyerDashboard() {
                   : "Sign Agreement"}
               </Button>
             </div>
+          </div>
 
-            {/* Pre-Qualification Card - Added to second column */}
-            <div className="bg-green-50 rounded-lg border border-green-200 p-4 shadow-sm flex flex-col">
+          {/* Third column - Manual Approval Card */}
+          <div className="relative rounded-lg">
+            <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
                   <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
@@ -610,48 +680,6 @@ export default function BuyerDashboard() {
                   </Button>
                 </>
               )}
-            </div>
-          </div>
-
-          {/* Third column - Viewing Requests Card */}
-          <div className="relative rounded-lg shadow-sm">
-            <div className="h-full bg-indigo-50 rounded-lg border border-indigo-200 p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center">
-                  <div className="bg-indigo-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                    <CalendarRange className="h-3 w-3 text-indigo-700" />
-                  </div>
-                  <h5 className="font-medium text-indigo-800 text-sm">
-                    Viewing Requests
-                  </h5>
-                </div>
-              </div>
-
-              <div className="bg-indigo-50 text-indigo-700 text-xs p-3 rounded-md border border-indigo-200 mb-2">
-                <span>
-                  Track and manage your property viewing requests here. Schedule
-                  new viewings from property details pages.
-                </span>
-              </div>
-
-              <Button
-                className="w-full py-1.5 px-2 h-auto text-xs"
-                variant="default"
-                onClick={() => {
-                  // Set active tab to viewing requests
-                  setActiveTab("viewingRequests");
-                  // Scroll to the viewing requests tab content
-                  const element = document.getElementById(
-                    "viewingRequestsSection",
-                  );
-                  if (element) {
-                    element.scrollIntoView({ behavior: "smooth" });
-                  }
-                }}
-              >
-                <Eye className="mr-1.5 h-3.5 w-3.5" />
-                View Requests
-              </Button>
             </div>
           </div>
         </div>
@@ -782,11 +810,7 @@ export default function BuyerDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent
-              value="viewingRequests"
-              className="p-0"
-              id="viewingRequestsSection"
-            >
+            <TabsContent value="viewingRequests" className="p-0">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">
                   My Viewing Requests
