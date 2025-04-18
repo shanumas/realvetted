@@ -880,6 +880,12 @@ export default function BuyerPropertyDetail() {
                           Viewings
                         </span>
                       </TabsTrigger>
+                      <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                        <span className="flex items-center">
+                          <Activity className="mr-1 h-4 w-4" /> 
+                          Activity
+                        </span>
+                      </TabsTrigger>
                       <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
                         Seller Chat
                       </TabsTrigger>
@@ -1000,6 +1006,23 @@ export default function BuyerPropertyDetail() {
                             )}
                           </div>
                         )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="activity">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Activity className="mr-2 h-5 w-5 text-primary" />
+                          Property Activity
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Track all interactions and updates related to this property.
+                        </p>
+                      </div>
+                      <div className="mt-4">
+                        <PropertyActivityLog propertyId={propertyId} />
                       </div>
                     </div>
                   </TabsContent>
