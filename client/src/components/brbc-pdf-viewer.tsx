@@ -185,30 +185,30 @@ export function BRBCPdfViewer({
     }
   };
 
-  // Clear the signature canvas based on active tab
-  const clearSignature = () => {
-    if (activeTab === "buyer1-signature" && signatureRef.current) {
+  // Clear the signature canvas based on type
+  const clearSignature = (type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials") => {
+    if (type === "primary" && signatureRef.current) {
       // Clear the canvas
       signatureRef.current.clear();
       // Update empty state
       setSignatureIsEmpty(true);
       // Also update the saved signatures state
       setSavedSignatures((prev) => ({ ...prev, primary: null }));
-    } else if (activeTab === "buyer1-initials" && initialsRef.current) {
+    } else if (type === "initials" && initialsRef.current) {
       // Clear the canvas
       initialsRef.current.clear();
       // Update empty state
       setInitialsIsEmpty(true);
       // Also update the saved signatures state
       setSavedSignatures((prev) => ({ ...prev, initials: null }));
-    } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
+    } else if (type === "buyer2Primary" && buyer2SignatureRef.current) {
       // Clear the canvas
       buyer2SignatureRef.current.clear();
       // Update empty state
       setBuyer2SignatureIsEmpty(true);
       // Also update the saved signatures state
       setSavedSignatures((prev) => ({ ...prev, buyer2Primary: null }));
-    } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
+    } else if (type === "buyer2Initials" && buyer2InitialsRef.current) {
       // Clear the canvas
       buyer2InitialsRef.current.clear();
       // Update empty state
@@ -790,9 +790,18 @@ export function BRBCPdfViewer({
                   >
                     {/* Buyer 1 Signature Section */}
                     <div>
-                      <h4 className="font-medium mb-2">
-                        Signature - full signature
-                      </h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">Signature - full signature</h4>
+                        <Button 
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => clearSignature("primary")}
+                          disabled={signatureIsEmpty}
+                          className="h-8 px-2 py-0"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                       <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
                         <SignatureCanvas
                           ref={signatureRef}
@@ -806,10 +815,18 @@ export function BRBCPdfViewer({
                       </div>
 
                       {/* Buyer 1 Initials Section */}
-
-                      <h4 className="font-medium mb-2">
-                        Initials - short signature
-                      </h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">Initials - short signature</h4>
+                        <Button 
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => clearSignature("initials")}
+                          disabled={initialsIsEmpty}
+                          className="h-8 px-2 py-0"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                       <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
                         <SignatureCanvas
                           ref={initialsRef}
