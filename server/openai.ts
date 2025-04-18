@@ -3,6 +3,7 @@ import { PropertyAIData } from "@shared/types";
 import { Property, User } from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
+import { extractTextFromPdf } from "./pdf-util";
 
 // Initialize the OpenAI client
 const openai = new OpenAI({
@@ -276,7 +277,7 @@ ${fileContent.substring(0, 100)}...`);
         console.log(`Mock validation result: ${isValid ? 'VALID' : 'INVALID'} - ${validationMessage}`);
         
         return { 
-          validated: isValid, 
+          validated: Boolean(isValid), 
           data: mockData,
           message: validationMessage
         };
@@ -290,24 +291,42 @@ ${fileContent.substring(0, 100)}...`);
       }
     }
     
-    // Read the file
-    const fileBuffer = fs.readFileSync(filePath);
-    let fileContent = fileBuffer.toString('utf-8');
+    console.log(`Processing file: ${filePath}`);
     
-    // Check if content looks like binary data (common in some PDFs)
-    const printableChars = fileContent.replace(/[^\x20-\x7E]/g, '').length;
-    const totalChars = fileContent.length;
-    const percentPrintable = totalChars > 0 ? (printableChars / totalChars) * 100 : 0;
-    
-    console.log(`Document analysis: ${Math.round(percentPrintable)}% of characters are printable text`);
-    
-    // If less than 30% of characters are printable, it's likely a binary file
-    if (percentPrintable < 30) {
-      console.log("Document appears to be a binary/encoded PDF file that cannot be read as text");
+    // Extract text using our utility function
+    let fileContent = '';
+    try {
+      // Use our PDF utility that works with both PDF and non-PDF files
+      fileContent = await extractTextFromPdf(filePath);
+      console.log(`Text extraction successful, extracted ${fileContent.length} characters`);
+    } catch (extractError) {
+      console.error("Error extracting text from document:", extractError);
       return {
         validated: false,
         data: {},
-        message: "The document appears to be in a format that cannot be read. Please upload a text-based PDF or document file that contains your pre-qualification letter."
+        message: "Unable to read the document file. Please make sure it contains readable text and try again."
+      };
+    }
+    
+    // If no text was extracted or file is empty
+    if (!fileContent || fileContent.trim().length === 0) {
+      console.log("No text content could be extracted from the document");
+      return {
+        validated: false,
+        data: {},
+        message: "The document appears to be empty or contains no readable text. Please upload a valid pre-qualification letter."
+      };
+    }
+    
+    // Check if the extracted content is actually an error message from our extractor
+    if (fileContent.startsWith('Unable to extract') || 
+        fileContent.startsWith('This document appears to be') || 
+        fileContent.includes('cannot be read as text')) {
+      console.log("Text extraction returned an error message");
+      return {
+        validated: false,
+        data: {},
+        message: fileContent
       };
     }
     
