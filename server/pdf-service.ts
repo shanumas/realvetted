@@ -345,9 +345,9 @@ export async function fillBrbcForm(
   const formattedToday = formatDate(formData?.startDate) || 
     `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
-  // Calculate date 89 days from today for '3Months' field
+  // Calculate date 90 days from today for '3Months' field
   const threeMonthsLater = new Date(today);
-  threeMonthsLater.setDate(today.getDate() + 89);
+  threeMonthsLater.setDate(today.getDate() + 90);
   const formattedThreeMonths = formatDate(formData?.endDate) || 
     `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
 

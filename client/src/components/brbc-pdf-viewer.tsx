@@ -1062,7 +1062,7 @@ export function BRBCPdfViewer({
                             <input 
                               type="date" 
                               className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              defaultValue={formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10)}
+                              defaultValue={formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10)}
                               onChange={(e) => {
                                 const updatedFields = {...formFields, '3Months': e.target.value};
                                 setFormFields(updatedFields);
@@ -1130,8 +1130,8 @@ export function BRBCPdfViewer({
                   >
                     {/* Buyer 2 Signature Section */}
                     <div>
-                      {/* Buyer 2 Information Fields */}
-                      <div className="mb-4 space-y-3">
+                      {/* Buyer 2 Information Fields - Only Name */}
+                      <div className="mb-4">
                         <div className="flex flex-col">
                           <label className="text-sm font-medium mb-1 text-gray-700">Full Name:</label>
                           <input 
@@ -1144,32 +1144,6 @@ export function BRBCPdfViewer({
                               setFormFields(updatedFields);
                             }}
                           />
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="flex flex-col">
-                            <label className="text-sm font-medium mb-1 text-gray-700">Start Date:</label>
-                            <input 
-                              type="date" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              defaultValue={formFields.today2 || formFields.today || new Date().toISOString().slice(0, 10)}
-                              onChange={(e) => {
-                                const updatedFields = {...formFields, today2: e.target.value};
-                                setFormFields(updatedFields);
-                              }}
-                            />
-                          </div>
-                          <div className="flex flex-col">
-                            <label className="text-sm font-medium mb-1 text-gray-700">End Date:</label>
-                            <input 
-                              type="date" 
-                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
-                              defaultValue={formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10)}
-                              onChange={(e) => {
-                                const updatedFields = {...formFields, '3Months2': e.target.value};
-                                setFormFields(updatedFields);
-                              }}
-                            />
-                          </div>
                         </div>
                       </div>
                       
