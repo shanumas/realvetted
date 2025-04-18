@@ -536,7 +536,28 @@ export default function BuyerDashboard() {
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                       />
                     </svg>
-                    <span className="text-[10px] underline cursor-pointer">
+                    <span 
+                      className="text-[10px] underline cursor-pointer"
+                      onClick={() => {
+                        // Find the global BRBC agreement
+                        const brbcAgreement = buyerAgreements?.find(a => a.type === "global_brbc");
+                        if (brbcAgreement && brbcAgreement.documentUrl) {
+                          // Format the URL properly if needed
+                          const documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
+                                             brbcAgreement.documentUrl.startsWith('http') ? 
+                                             brbcAgreement.documentUrl : 
+                                             `/uploads/${brbcAgreement.documentUrl}`;
+                          console.log("Opening document URL:", documentUrl);
+                          window.open(documentUrl, "_blank");
+                        } else {
+                          toast({
+                            title: "Document Not Available",
+                            description: "The signed document is not available for download at this time.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
                       Download signed document
                     </span>
                   </div>
