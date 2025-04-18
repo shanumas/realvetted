@@ -139,7 +139,13 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
             if (canvas) {
               canvas.clear();
               canvas.fromDataURL(savedSignatures.primary as string);
-              setSignatureIsEmpty(false);
+              
+              // Manually update empty state after a slight delay to ensure canvas has time to update
+              setTimeout(() => {
+                setSignatureIsEmpty(canvas.isEmpty());
+                // Force check for validation by simulating an end event
+                checkSignature();
+              }, 100);
             }
           };
           img.src = savedSignatures.primary;
@@ -150,7 +156,13 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
             if (canvas) {
               canvas.clear();
               canvas.fromDataURL(savedSignatures.initials as string);
-              setInitialsIsEmpty(false);
+              
+              // Manually update empty state after a slight delay
+              setTimeout(() => {
+                setInitialsIsEmpty(canvas.isEmpty());
+                // Force check for validation
+                checkSignature();
+              }, 100);
             }
           };
           img.src = savedSignatures.initials;
@@ -161,7 +173,12 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
             if (canvas) {
               canvas.clear();
               canvas.fromDataURL(savedSignatures.buyer2Primary as string);
-              setBuyer2SignatureIsEmpty(false);
+              
+              // Manually update empty state
+              setTimeout(() => {
+                setBuyer2SignatureIsEmpty(canvas.isEmpty());
+                checkSignature();
+              }, 100);
             }
           };
           img.src = savedSignatures.buyer2Primary;
@@ -172,7 +189,12 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
             if (canvas) {
               canvas.clear();
               canvas.fromDataURL(savedSignatures.buyer2Initials as string);
-              setBuyer2InitialsIsEmpty(false);
+              
+              // Manually update empty state
+              setTimeout(() => {
+                setBuyer2InitialsIsEmpty(canvas.isEmpty());
+                checkSignature();
+              }, 100);
             }
           };
           img.src = savedSignatures.buyer2Initials;
@@ -491,7 +513,20 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                 </Button>
               ) : (
                 <Button 
-                  onClick={handleSubmitSignature} 
+                  onClick={() => {
+                    // Force a final check of all signatures before submission
+                    if (signatureRef.current) {
+                      setSignatureIsEmpty(signatureRef.current.isEmpty());
+                    }
+                    if (initialsRef.current) {
+                      setInitialsIsEmpty(initialsRef.current.isEmpty());
+                    }
+                    
+                    // Use a short timeout to let state update before submitting
+                    setTimeout(() => {
+                      handleSubmitSignature();
+                    }, 50);
+                  }} 
                   disabled={isSubmitting || signatureIsEmpty || initialsIsEmpty}
                   className="mr-2"
                 >
