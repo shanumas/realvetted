@@ -69,7 +69,7 @@ export interface AgentReferralFormData {
 export async function addSignatureToPdf(
   pdfBuffer: Buffer,
   signatureData: string,
-  signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent",
+  signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent" | "sign1" | "sign2",
 ): Promise<Buffer> {
   try {
     // Load the PDF document
@@ -104,6 +104,12 @@ export async function addSignatureToPdf(
         break;
       case "agent":
         fieldName = "agent_signature";
+        break;
+      case "sign1":
+        fieldName = "sign1";
+        break;
+      case "sign2":
+        fieldName = "sign2";
         break;
     }
 
@@ -198,6 +204,14 @@ export async function addSignatureToPdf(
         case "agent":
           sigX = width * 0.6;
           sigY = height * 0.15;
+          break;
+        case "sign1":
+          sigX = width * 0.2;
+          sigY = height * 0.2;
+          break;
+        case "sign2":
+          sigX = width * 0.6;
+          sigY = height * 0.2;
           break;
       }
 

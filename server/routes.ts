@@ -43,6 +43,7 @@ import {
   AgentReferralFormData,
   fillAgencyDisclosureForm,
   fillAgentReferralForm,
+  fillBrbcForm,
 } from "./pdf-service";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -5494,6 +5495,83 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       res.status(500).json({
         success: false,
         error: "Failed to create global BRBC agreement",
+      });
+    }
+  });
+  
+  // API Endpoint to save a BRBC PDF with signature
+  app.post("/api/global-brbc/pdf-signature", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
+    try {
+      const { signatureData, details } = req.body;
+      
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: "Unauthorized",
+        });
+      }
+      
+      const buyerId = req.user.id;
+      
+      // Find the first available agent
+      const agents = await storage.getUsersByRole("agent");
+      
+      if (!agents || agents.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "No agents available in the system",
+        });
+      }
+      
+      // Use the first agent as a default (this can be improved in the future)
+      const defaultAgent = agents[0];
+      
+      // Generate a prefilled BRBC PDF
+      const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+      let pdfBuffer = await fillBrbcForm(buyerName);
+      
+      // Add the signature to the PDF
+      try {
+        pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
+      } catch (error) {
+        console.error("Error adding signature to PDF:", error);
+        // Continue with the process even if signature addition fails
+      }
+      
+      // Create upload directory if it doesn't exist
+      const documentDir = path.join(process.cwd(), "uploads", "agreements");
+      await fs.promises.mkdir(documentDir, { recursive: true });
+      
+      // Save the PDF to the filesystem
+      const fileName = `brbc_${buyerId}_${Date.now()}.pdf`;
+      const filePath = path.join(documentDir, fileName);
+      await fs.promises.writeFile(filePath, pdfBuffer);
+      
+      // Document URL relative to uploads directory
+      const documentUrl = `/uploads/agreements/${fileName}`;
+      
+      // Create a global BRBC agreement
+      const agreement = await storage.createAgreement({
+        agentId: defaultAgent.id,
+        buyerId: buyerId,
+        type: "global_brbc",
+        agreementText: JSON.stringify(details || {}),
+        buyerSignature: signatureData,
+        date: new Date(),
+        status: "signed_by_buyer", // Buyer has signed, waiting for agent
+        isGlobal: true, // This is a global agreement
+        documentUrl: documentUrl,
+      });
+      
+      res.json({
+        success: true,
+        data: agreement,
+      });
+    } catch (error) {
+      console.error("Error creating BRBC agreement with PDF:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to create BRBC agreement",
       });
     }
   });
