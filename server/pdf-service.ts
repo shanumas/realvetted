@@ -212,23 +212,31 @@ export async function addSignatureToPdf(
           sigY = height * 0.15;
           break;
         case "sign1":
-          sigX = width * 0.2;
-          sigY = height * 0.2;
+          // Fixed position for sign1 - primary buyer signature
+          sigX = width * 0.3;  // Place it at 30% from the left
+          sigY = height * 0.3;  // Place it at 30% from the bottom
+          sigWidth = 150;
+          sigHeight = 50;
           break;
         case "sign2":
-          sigX = width * 0.6;
-          sigY = height * 0.2;
+          // Fixed position for sign2 - secondary buyer signature
+          sigX = width * 0.7;  // Place it at 70% from the left
+          sigY = height * 0.3;  // Place it at 30% from the bottom
+          sigWidth = 150;
+          sigHeight = 50;
           break;
         case "initial1":
-          sigX = width * 0.2;
+          // Fixed position for initial1 - primary buyer initials
+          sigX = width * 0.3;
           sigY = height * 0.7;
           // For initials, make the signature smaller
           sigWidth = 80;
           sigHeight = 30;
           break;
         case "initial2":
-          sigX = width * 0.6; 
-          sigY = height * 0.4; // Changed position to be vertically separated from initial1
+          // Fixed position for initial2 - secondary buyer initials 
+          sigX = width * 0.7;
+          sigY = height * 0.7;
           // For initials, make the signature smaller
           sigWidth = 80;
           sigHeight = 30;
