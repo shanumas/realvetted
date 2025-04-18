@@ -219,8 +219,8 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   };
 
   const handleSubmitSignature = async () => {
-    // Require at least the primary buyer's signature
-    if (!signatureRef.current || signatureRef.current.isEmpty()) {
+    // Manual check for primary buyer's signature using saved signature data
+    if (!savedSignatures.primary && (signatureRef.current?.isEmpty() || !signatureRef.current)) {
       toast({
         title: "Primary Signature Required",
         description: "Please provide the primary buyer's signature before submitting.",
@@ -229,8 +229,8 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
       return;
     }
     
-    // Also require initials from the primary buyer
-    if (!initialsRef.current || initialsRef.current.isEmpty()) {
+    // Manual check for initials using saved data
+    if (!savedSignatures.initials && (initialsRef.current?.isEmpty() || !initialsRef.current)) {
       toast({
         title: "Initials Required",
         description: "Please provide the primary buyer's initials before submitting.",
@@ -238,22 +238,44 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
       });
       return;
     }
+    
+    // Save any signature currently in the active canvas
+    saveCurrentSignature();
 
     try {
       setIsSubmitting(true);
       
-      // Get all signature data
-      const signatureData = signatureRef.current.toDataURL();
-      const initialsData = initialsRef.current.toDataURL();
+      // First, ensure we have the most updated signature data
+      saveCurrentSignature();
       
-      // Get optional buyer2 signatures if provided
-      const buyer2SignatureData = buyer2SignatureRef.current && !buyer2SignatureRef.current.isEmpty() 
-        ? buyer2SignatureRef.current.toDataURL() 
-        : null;
-        
-      const buyer2InitialsData = buyer2InitialsRef.current && !buyer2InitialsRef.current.isEmpty()
-        ? buyer2InitialsRef.current.toDataURL()
-        : null;
+      // Get all signature data - use saved signatures for submission
+      // For the primary buyer's signature
+      let signatureData: string;
+      if (savedSignatures.primary) {
+        signatureData = savedSignatures.primary as string;
+      } else {
+        throw new Error("Primary signature is required");
+      }
+      
+      // For the primary buyer's initials
+      let initialsData: string;
+      if (savedSignatures.initials) {
+        initialsData = savedSignatures.initials as string;
+      } else {
+        throw new Error("Initials are required");
+      }
+      
+      // For the second buyer's signature (optional)
+      const buyer2SignatureData = savedSignatures.buyer2Primary || 
+        (buyer2SignatureRef.current && !buyer2SignatureRef.current.isEmpty() 
+          ? buyer2SignatureRef.current.toDataURL() 
+          : null);
+      
+      // For the second buyer's initials (optional)
+      const buyer2InitialsData = savedSignatures.buyer2Initials || 
+        (buyer2InitialsRef.current && !buyer2InitialsRef.current.isEmpty()
+          ? buyer2InitialsRef.current.toDataURL()
+          : null);
       
       // Submit signature to server with all signature types
       const response = await fetch("/api/global-brbc/pdf-signature", {
@@ -527,7 +549,7 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       handleSubmitSignature();
                     }, 50);
                   }} 
-                  disabled={isSubmitting || signatureIsEmpty || initialsIsEmpty}
+                  disabled={isSubmitting || (!savedSignatures.primary && signatureIsEmpty) || (!savedSignatures.initials && initialsIsEmpty)}
                   className="mr-2"
                 >
                   {isSubmitting ? (
