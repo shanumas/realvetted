@@ -5576,10 +5576,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.post("/api/global-brbc/pdf-signature", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
       const { 
-        signatureData,     // Main signature for sign1 field
-        initialsData,      // Initials for initial1 field 
+        signatureData,      // Main signature for sign1 field
+        initialsData,       // Initials for initial1 field 
         buyer2SignatureData, // Optional second buyer signature for sign2 field
         buyer2InitialsData,  // Optional second buyer initials for initial2 field
+        previewOnly,        // Flag to indicate this is just for preview (no DB save)
         details 
       } = req.body;
       
@@ -5592,18 +5593,21 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       
       const buyerId = req.user.id;
       
-      // Find the first available agent
-      const agents = await storage.getUsersByRole("agent");
-      
-      if (!agents || agents.length === 0) {
-        return res.status(404).json({
-          success: false,
-          error: "No agents available in the system",
-        });
+      // Find the first available agent (only needed for non-preview mode)
+      let defaultAgent;
+      if (!previewOnly) {
+        const agents = await storage.getUsersByRole("agent");
+        
+        if (!agents || agents.length === 0) {
+          return res.status(404).json({
+            success: false,
+            error: "No agents available in the system",
+          });
+        }
+        
+        // Use the first agent as a default (this can be improved in the future)
+        defaultAgent = agents[0];
       }
-      
-      // Use the first agent as a default (this can be improved in the future)
-      const defaultAgent = agents[0];
       
       // Generate a prefilled BRBC PDF
       const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
@@ -5611,8 +5615,12 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       
       // Add all the signatures to the PDF
       try {
+        console.log(`Adding signatures to PDF: primary=${!!signatureData}, initials=${!!initialsData}, buyer2=${!!buyer2SignatureData}, buyer2Initials=${!!buyer2InitialsData}`);
+        
         // Add primary signature
-        pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
+        if (signatureData) {
+          pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
+        }
         
         // Add primary buyer initials if provided
         if (initialsData) {
@@ -5637,15 +5645,29 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       const documentDir = path.join(process.cwd(), "uploads", "agreements");
       await fs.promises.mkdir(documentDir, { recursive: true });
       
-      // Save the PDF to the filesystem
-      const fileName = `brbc_${buyerId}_${Date.now()}.pdf`;
+      // Save the PDF to the filesystem with a unique name
+      // For previews, include 'preview' in the filename to make it easy to identify
+      const timestamp = Date.now();
+      const filePrefix = previewOnly ? 'preview_brbc' : 'brbc';
+      const fileName = `${filePrefix}_${buyerId}_${timestamp}.pdf`;
       const filePath = path.join(documentDir, fileName);
       await fs.promises.writeFile(filePath, pdfBuffer);
       
       // Document URL relative to uploads directory
       const documentUrl = `/uploads/agreements/${fileName}`;
       
-      // Create a global BRBC agreement
+      // If this is just a preview, return the URL without creating a database record
+      if (previewOnly) {
+        return res.json({
+          success: true,
+          data: {
+            pdfUrl: documentUrl, // URL to the preview PDF
+            preview: true
+          },
+        });
+      }
+      
+      // Otherwise, create a database record for the final submission
       const agreement = await storage.createAgreement({
         agentId: defaultAgent.id,
         buyerId: buyerId,

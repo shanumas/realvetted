@@ -243,16 +243,107 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
     }, 50); // Small delay to ensure canvas is ready
   };
   
-  // Check if the signature canvas is empty based on active tab
+  // Check if the signature canvas is empty based on active tab and update the PDF preview
   const checkSignature = () => {
+    // Save state for UI validation
     if (activeTab === "buyer1-signature" && signatureRef.current) {
-      setSignatureIsEmpty(signatureRef.current.isEmpty());
+      const isEmpty = signatureRef.current.isEmpty();
+      setSignatureIsEmpty(isEmpty);
+      
+      // If not empty, update PDF preview with signature
+      if (!isEmpty) {
+        const signatureData = signatureRef.current.toDataURL();
+        updatePdfPreviewWithSignature(signatureData, "primary");
+      }
+      
     } else if (activeTab === "buyer1-initials" && initialsRef.current) {
-      setInitialsIsEmpty(initialsRef.current.isEmpty());
+      const isEmpty = initialsRef.current.isEmpty();
+      setInitialsIsEmpty(isEmpty);
+      
+      // If not empty, update PDF preview with initials
+      if (!isEmpty) {
+        const initialsData = initialsRef.current.toDataURL();
+        updatePdfPreviewWithSignature(initialsData, "initials");
+      }
+      
     } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
-      setBuyer2SignatureIsEmpty(buyer2SignatureRef.current.isEmpty());
+      const isEmpty = buyer2SignatureRef.current.isEmpty();
+      setBuyer2SignatureIsEmpty(isEmpty);
+      
+      // If not empty, update PDF preview with signature
+      if (!isEmpty) {
+        const signatureData = buyer2SignatureRef.current.toDataURL();
+        updatePdfPreviewWithSignature(signatureData, "buyer2Primary");
+      }
+      
     } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
-      setBuyer2InitialsIsEmpty(buyer2InitialsRef.current.isEmpty());
+      const isEmpty = buyer2InitialsRef.current.isEmpty();
+      setBuyer2InitialsIsEmpty(isEmpty);
+      
+      // If not empty, update PDF preview with initials
+      if (!isEmpty) {
+        const initialsData = buyer2InitialsRef.current.toDataURL();
+        updatePdfPreviewWithSignature(initialsData, "buyer2Initials");
+      }
+    }
+  };
+  
+  // Function to update the PDF with the signature image in real-time
+  const updatePdfPreviewWithSignature = async (
+    signatureData: string, 
+    type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials"
+  ) => {
+    try {
+      // Save current signature to state
+      saveCurrentSignature();
+      
+      // Prepare data for server request
+      const requestData: Record<string, any> = {
+        previewOnly: true, // Flag to indicate this is just for preview
+        details: {}
+      };
+      
+      // Set the appropriate signature data based on type
+      if (type === "primary") {
+        requestData.signatureData = signatureData;
+      } else if (type === "initials") {
+        requestData.initialsData = signatureData;
+      } else if (type === "buyer2Primary") {
+        requestData.buyer2SignatureData = signatureData;
+      } else if (type === "buyer2Initials") {
+        requestData.buyer2InitialsData = signatureData;
+      }
+      
+      // Add existing signatures from state
+      if (type !== "primary" && savedSignatures.primary) {
+        requestData.signatureData = savedSignatures.primary;
+      }
+      if (type !== "initials" && savedSignatures.initials) {
+        requestData.initialsData = savedSignatures.initials;
+      }
+      if (type !== "buyer2Primary" && savedSignatures.buyer2Primary) {
+        requestData.buyer2SignatureData = savedSignatures.buyer2Primary;
+      }
+      if (type !== "buyer2Initials" && savedSignatures.buyer2Initials) {
+        requestData.buyer2InitialsData = savedSignatures.buyer2Initials;
+      }
+      
+      // Send the request to get a preview PDF with signatures
+      const response = await fetch("/api/global-brbc/pdf-signature", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      }).then(res => res.json());
+      
+      // If successful, update the PDF preview
+      if (response && response.success && response.data && response.data.pdfUrl) {
+        setPdfUrl(response.data.pdfUrl);
+      }
+    } catch (error) {
+      console.error("Error updating PDF preview:", error);
+      // Silently fail on preview errors - don't show error to user
     }
   };
 
@@ -447,7 +538,11 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       ref={signatureRef}
                       canvasProps={{
                         className: "w-full h-full signature-canvas",
+                        // Add event listeners directly to the canvas props
+                        onMouseUp: checkSignature,
+                        onTouchEnd: checkSignature
                       }}
+                      // Check signature on every stroke end (real-time update)
                       onEnd={checkSignature}
                     />
                   </div>
@@ -460,6 +555,9 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       ref={initialsRef}
                       canvasProps={{
                         className: "w-full h-full signature-canvas",
+                        // Add event listeners directly to the canvas props
+                        onMouseUp: checkSignature,
+                        onTouchEnd: checkSignature
                       }}
                       onEnd={checkSignature}
                     />
