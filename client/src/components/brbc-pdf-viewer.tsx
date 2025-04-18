@@ -670,8 +670,15 @@ export function BRBCPdfViewer({
   // Function to generate a preview of the PDF with current signatures
   const previewSignedPdf = async () => {
     try {
+      // Show loading state
+      setIsLoading(true);
+      setIsPreviewing(true);
+      
       // Save current signature data
       saveCurrentSignature();
+      
+      // Capture form field values
+      captureFormValues();
       
       // Check if we have at least one signature
       if (!savedSignatures.primary && !savedSignatures.initials && 
@@ -681,21 +688,48 @@ export function BRBCPdfViewer({
           description: "Please add at least one signature or initial before previewing.",
           variant: "default"
         });
+        setIsLoading(false);
+        setIsPreviewing(false);
         return;
       }
       
-      // Get primary signature data
-      let primarySignature = savedSignatures.primary;
-      if (!primarySignature && signatureRef.current && !signatureRef.current.isEmpty()) {
-        primarySignature = signatureRef.current.toDataURL();
+      // Prepare request data with all signatures and form fields
+      const requestData: Record<string, any> = {
+        previewOnly: true,
+        details: {},
+        formFieldValues: formFields
+      };
+      
+      // Add all available signatures
+      if (savedSignatures.primary) {
+        requestData.signatureData = savedSignatures.primary;
+      }
+      if (savedSignatures.initials) {
+        requestData.initialsData = savedSignatures.initials;
+      }
+      if (savedSignatures.buyer2Primary) {
+        requestData.buyer2SignatureData = savedSignatures.buyer2Primary;
+      }
+      if (savedSignatures.buyer2Initials) {
+        requestData.buyer2InitialsData = savedSignatures.buyer2Initials;
       }
       
-      // Update PDF with preview
-      updatePdfPreviewWithSignature(
-        primarySignature || "",
-        "primary",
-        true // This is a manual preview
-      );
+      // Send the request to get a preview PDF with signatures
+      const response = await fetch("/api/global-brbc/pdf-signature", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestData),
+      }).then((res) => res.json());
+      
+      // If successful, update the PDF preview
+      if (response && response.success && response.data && response.data.pdfUrl) {
+        // Set the PDF URL to the preview PDF
+        setPdfUrl(response.data.pdfUrl);
+      } else {
+        throw new Error("Failed to generate preview");
+      }
     } catch (error) {
       console.error("Error generating preview:", error);
       toast({
@@ -703,6 +737,9 @@ export function BRBCPdfViewer({
         description: "Could not generate preview. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsLoading(false);
+      setIsPreviewing(false);
     }
   };
 
