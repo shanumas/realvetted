@@ -906,12 +906,17 @@ export function BRBCPdfViewer({
             <DialogTitle className="text-xl font-semibold">
               <div className="flex items-center">
                 <FileText className="mr-2 h-5 w-5 text-primary" />
-                Buyer Representation Agreement
+                {existingAgreement ? "Signed Buyer Representation Agreement" : "Buyer Representation Agreement"}
               </div>
             </DialogTitle>
             <DialogDescription>
-              Please review and sign the agreement below to proceed with your
-              property search.
+              {hasSigned ? (
+                "Your completed and signed buyer representation agreement."
+              ) : isSigning ? (
+                "Please review the agreement and add your signature below."
+              ) : (
+                "Please review and sign the agreement below to proceed with your property search."
+              )}
             </DialogDescription>
           </DialogHeader>
 
