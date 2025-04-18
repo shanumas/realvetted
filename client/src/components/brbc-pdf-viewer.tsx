@@ -873,7 +873,14 @@ export function BRBCPdfViewer({
           buyer2InitialsData,
           // Include form field values to preserve user edits
           formFieldValues: formFields,
-          details: {},
+          details: {
+            buyer1: formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : ""),
+            buyer2: formFields.buyer2 || "",
+            startDate: formFields.today || new Date().toISOString().slice(0, 10),
+            endDate: formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10),
+            startDate2: formFields.today2 || formFields.today || new Date().toISOString().slice(0, 10),
+            endDate2: formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10),
+          },
         }),
       }).then((res) => res.json());
 
@@ -1022,6 +1029,49 @@ export function BRBCPdfViewer({
                   >
                     {/* Buyer 1 Signature Section */}
                     <div>
+                      {/* Buyer 1 Information Fields */}
+                      <div className="mb-4 space-y-3">
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium mb-1 text-gray-700">Full Name:</label>
+                          <input 
+                            type="text" 
+                            className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                            placeholder="Full Name"
+                            defaultValue={formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : "")}
+                            onChange={(e) => {
+                              const updatedFields = {...formFields, buyer1: e.target.value};
+                              setFormFields(updatedFields);
+                            }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col">
+                            <label className="text-sm font-medium mb-1 text-gray-700">Start Date:</label>
+                            <input 
+                              type="date" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                              defaultValue={formFields.today || new Date().toISOString().slice(0, 10)}
+                              onChange={(e) => {
+                                const updatedFields = {...formFields, today: e.target.value};
+                                setFormFields(updatedFields);
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm font-medium mb-1 text-gray-700">End Date:</label>
+                            <input 
+                              type="date" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                              defaultValue={formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10)}
+                              onChange={(e) => {
+                                const updatedFields = {...formFields, '3Months': e.target.value};
+                                setFormFields(updatedFields);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-medium">Signature - full signature</h4>
                         <Button 
@@ -1080,6 +1130,49 @@ export function BRBCPdfViewer({
                   >
                     {/* Buyer 2 Signature Section */}
                     <div>
+                      {/* Buyer 2 Information Fields */}
+                      <div className="mb-4 space-y-3">
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium mb-1 text-gray-700">Full Name:</label>
+                          <input 
+                            type="text" 
+                            className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                            placeholder="Full Name (Co-Buyer)"
+                            defaultValue={formFields.buyer2 || ""}
+                            onChange={(e) => {
+                              const updatedFields = {...formFields, buyer2: e.target.value};
+                              setFormFields(updatedFields);
+                            }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col">
+                            <label className="text-sm font-medium mb-1 text-gray-700">Start Date:</label>
+                            <input 
+                              type="date" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                              defaultValue={formFields.today2 || formFields.today || new Date().toISOString().slice(0, 10)}
+                              onChange={(e) => {
+                                const updatedFields = {...formFields, today2: e.target.value};
+                                setFormFields(updatedFields);
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-col">
+                            <label className="text-sm font-medium mb-1 text-gray-700">End Date:</label>
+                            <input 
+                              type="date" 
+                              className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm"
+                              defaultValue={formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10)}
+                              onChange={(e) => {
+                                const updatedFields = {...formFields, '3Months2': e.target.value};
+                                setFormFields(updatedFields);
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="font-medium">Signature - Full Signature</h4>
                         <Button 
