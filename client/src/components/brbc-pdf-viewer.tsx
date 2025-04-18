@@ -14,6 +14,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SignatureCanvas from "react-signature-canvas";
 
+// Utility to save and restore signature canvas data
+interface SignatureData {
+  primary: string | null;
+  initials: string | null;
+  buyer2Primary: string | null;
+  buyer2Initials: string | null;
+}
+
 interface BRBCPdfViewerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +49,14 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   const [initialsIsEmpty, setInitialsIsEmpty] = useState(true);
   const [buyer2SignatureIsEmpty, setBuyer2SignatureIsEmpty] = useState(true);
   const [buyer2InitialsIsEmpty, setBuyer2InitialsIsEmpty] = useState(true);
+  
+  // State to store signature images when switching tabs
+  const [savedSignatures, setSavedSignatures] = useState<SignatureData>({
+    primary: null,
+    initials: null,
+    buyer2Primary: null,
+    buyer2Initials: null
+  });
 
   useEffect(() => {
     // When the dialog opens, load the prefilled PDF
@@ -83,6 +99,90 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
     }
   };
 
+  // Save current signature data before switching tabs
+  const saveCurrentSignature = () => {
+    try {
+      const updatedSignatures = { ...savedSignatures };
+      
+      if (activeTab === "buyer1-signature" && signatureRef.current) {
+        if (!signatureRef.current.isEmpty()) {
+          updatedSignatures.primary = signatureRef.current.toDataURL();
+        }
+      } else if (activeTab === "buyer1-initials" && initialsRef.current) {
+        if (!initialsRef.current.isEmpty()) {
+          updatedSignatures.initials = initialsRef.current.toDataURL();
+        }
+      } else if (activeTab === "buyer2-signature" && buyer2SignatureRef.current) {
+        if (!buyer2SignatureRef.current.isEmpty()) {
+          updatedSignatures.buyer2Primary = buyer2SignatureRef.current.toDataURL();
+        }
+      } else if (activeTab === "buyer2-initials" && buyer2InitialsRef.current) {
+        if (!buyer2InitialsRef.current.isEmpty()) {
+          updatedSignatures.buyer2Initials = buyer2InitialsRef.current.toDataURL();
+        }
+      }
+      
+      setSavedSignatures(updatedSignatures);
+    } catch (err) {
+      console.error('Error saving signature:', err);
+    }
+  };
+  
+  // Helper method to restore saved signatures when switching tabs
+  const restoreSignaturesOnTabLoad = (newTab: string) => {
+    setTimeout(() => {
+      try {
+        if (newTab === "buyer1-signature" && signatureRef.current && savedSignatures.primary) {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = signatureRef.current;
+            if (canvas) {
+              canvas.clear();
+              canvas.fromDataURL(savedSignatures.primary as string);
+              setSignatureIsEmpty(false);
+            }
+          };
+          img.src = savedSignatures.primary;
+        } else if (newTab === "buyer1-initials" && initialsRef.current && savedSignatures.initials) {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = initialsRef.current;
+            if (canvas) {
+              canvas.clear();
+              canvas.fromDataURL(savedSignatures.initials as string);
+              setInitialsIsEmpty(false);
+            }
+          };
+          img.src = savedSignatures.initials;
+        } else if (newTab === "buyer2-signature" && buyer2SignatureRef.current && savedSignatures.buyer2Primary) {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = buyer2SignatureRef.current;
+            if (canvas) {
+              canvas.clear();
+              canvas.fromDataURL(savedSignatures.buyer2Primary as string);
+              setBuyer2SignatureIsEmpty(false);
+            }
+          };
+          img.src = savedSignatures.buyer2Primary;
+        } else if (newTab === "buyer2-initials" && buyer2InitialsRef.current && savedSignatures.buyer2Initials) {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = buyer2InitialsRef.current;
+            if (canvas) {
+              canvas.clear();
+              canvas.fromDataURL(savedSignatures.buyer2Initials as string);
+              setBuyer2InitialsIsEmpty(false);
+            }
+          };
+          img.src = savedSignatures.buyer2Initials;
+        }
+      } catch (err) {
+        console.error('Error restoring signature:', err);
+      }
+    }, 50); // Small delay to ensure canvas is ready
+  };
+  
   // Check if the signature canvas is empty based on active tab
   const checkSignature = () => {
     if (activeTab === "buyer1-signature" && signatureRef.current) {
@@ -236,7 +336,17 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                 Please provide your signature and initials in the tabs below.
               </p>
               
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col">
+              <Tabs 
+                value={activeTab} 
+                onValueChange={(newTab) => {
+                  // Save current signature before switching tabs
+                  saveCurrentSignature();
+                  // Update active tab
+                  setActiveTab(newTab);
+                  // Restore signature for the new tab
+                  restoreSignaturesOnTabLoad(newTab);
+                }} 
+                className="flex-grow flex flex-col">
                 <TabsList className="w-full grid grid-cols-2 mb-4">
                   <TabsTrigger value="buyer1-signature" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
@@ -308,11 +418,21 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => setActiveTab(activeTab === "buyer1-signature" ? "buyer1-initials" : (
-                      activeTab === "buyer1-initials" ? "buyer2-signature" : (
-                        activeTab === "buyer2-signature" ? "buyer2-initials" : "buyer1-signature"
-                      )
-                    ))}
+                    onClick={() => {
+                      // Save current signature before moving to next tab
+                      saveCurrentSignature();
+                      
+                      // Determine next tab
+                      const nextTab = activeTab === "buyer1-signature" ? "buyer1-initials" : (
+                        activeTab === "buyer1-initials" ? "buyer2-signature" : (
+                          activeTab === "buyer2-signature" ? "buyer2-initials" : "buyer1-signature"
+                        )
+                      );
+                      
+                      // Set new tab and restore any saved signature
+                      setActiveTab(nextTab);
+                      restoreSignaturesOnTabLoad(nextTab);
+                    }}
                     className="w-24"
                   >
                     Next
@@ -324,9 +444,17 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                     variant="outline"
                     size="sm"
                     className="w-full flex items-center justify-center"
-                    onClick={() => setActiveTab(
-                      activeTab.startsWith("buyer1") ? "buyer2-signature" : "buyer1-signature"
-                    )}
+                    onClick={() => {
+                      // Save current signature
+                      saveCurrentSignature();
+                      
+                      // Determine new tab
+                      const newTab = activeTab.startsWith("buyer1") ? "buyer2-signature" : "buyer1-signature";
+                      
+                      // Set new tab and restore any saved signature
+                      setActiveTab(newTab);
+                      restoreSignaturesOnTabLoad(newTab);
+                    }}
                   >
                     {activeTab.startsWith("buyer1") ? (
                       <>
