@@ -547,6 +547,12 @@ export default function BuyerPropertyDetail() {
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!propertyId, // Only run query if propertyId is valid
   });
+  
+  // Fetch buyer's agreements to check for signed BRBC
+  const { data: buyerAgreements = [] } = useQuery<Agreement[]>({
+    queryKey: ['/api/buyer/agreements'],
+    queryFn: getQueryFn({ on401: "throw" }),
+  });
 
   if (isLoading) {
     return (
@@ -938,10 +944,17 @@ export default function BuyerPropertyDetail() {
                             <Button
                               onClick={() => setIsViewingModalOpen(true)}
                               className="inline-flex items-center"
+                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
                             >
                               <Eye className="mr-2 h-4 w-4" />
                               Request Viewing
                             </Button>
+                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                              <p className="text-sm text-center text-amber-600 mt-2">
+                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
+                                Please sign the Buyer Representation Agreement to request viewings.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
