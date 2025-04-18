@@ -84,10 +84,10 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
       // Get the signature as base64 data
       const signatureData = signatureRef.current.toDataURL();
       
-      // Submit signature to server
-      const response = await apiRequest("/api/buyer/agreements/sign-brbc", "POST", {
+      // Submit signature to server - using the correct endpoint
+      const response = await apiRequest("/api/global-brbc/pdf-signature", "POST", {
         signatureData,
-        agreementType: "global_brbc"
+        details: {}
       });
       
       // Handle successful submission
