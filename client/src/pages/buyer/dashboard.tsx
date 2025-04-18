@@ -523,7 +523,19 @@ export default function BuyerDashboard() {
 
                   {buyerAgreements?.some(a => a.type === "global_brbc") ? (
                     <div className="bg-green-50 text-green-700 text-xs p-2 rounded-md border border-green-100 mb-2">
-                      ✓ Agreement successfully signed
+                      <div className="flex items-center">
+                        <svg className="h-4 w-4 mr-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Agreement successfully signed</span>
+                      </div>
+                      
+                      <div className="flex items-center mt-1.5 pt-1.5 border-t border-green-200">
+                        <svg className="h-3.5 w-3.5 mr-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                        </svg>
+                        <span className="text-[10px] underline cursor-pointer">Download signed document</span>
+                      </div>
                     </div>
                   ) : (
                     <div className="bg-amber-50 text-amber-700 text-xs p-2 rounded-md border border-amber-100 mb-2">
@@ -599,15 +611,12 @@ export default function BuyerDashboard() {
                   ) : (
                     <>
                       <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                        {user?.prequalificationDocUrl
-                          ? "Request manual approval of your pre-qualification document."
-                          : "Upload a pre-qualification document first to enable this option."}
+                        Request manual profile approval from our team to get verified faster.
                       </p>
                       <Button
                         className="w-full py-1.5 px-2 h-auto text-xs"
                         onClick={() => setIsManualApprovalFormOpen(true)}
-                        variant={user?.prequalificationDocUrl ? "default" : "outline"}
-                        disabled={!user?.prequalificationDocUrl}
+                        variant="default"
                       >
                         <MailCheck className="mr-1.5 h-3 w-3" />
                         Request Manual Approval
@@ -813,20 +822,33 @@ export default function BuyerDashboard() {
                             </div>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="ml-auto"
-                          onClick={() => {
-                            if (agreement.type === "global_brbc") {
-                              setSelectedAgentId(agreement.agentId);
-                              setIsBRBCModalOpen(true);
-                            }
-                            // Handle other types of agreements here
-                          }}
-                        >
-                          View
-                        </Button>
+                        <div className="ml-auto flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center"
+                            onClick={() => {
+                              if (agreement.type === "global_brbc") {
+                                setSelectedAgentId(agreement.agentId);
+                                setIsBRBCModalOpen(true);
+                              }
+                              // Handle other types of agreements here
+                            }}
+                          >
+                            <FileText className="h-3.5 w-3.5 mr-1.5" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex items-center bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+                          >
+                            <svg className="h-3.5 w-3.5 mr-1.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                            </svg>
+                            Download
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
