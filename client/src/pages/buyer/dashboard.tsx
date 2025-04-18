@@ -356,127 +356,131 @@ export default function BuyerDashboard() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-3">
-            {/* Identity verification option - removed dimming effect */}
-            <div className="relative rounded-lg">              
-              <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
-                <div className="flex items-center mb-1.5">
-                  <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                    <Shield className="h-3 w-3 text-blue-700" />
+            {/* First column - Identity verification and pre-qualification (instant methods) */}
+            <div className="md:col-span-2 grid grid-cols-2 gap-3">
+              {/* Identity verification option */}
+              <div className="relative rounded-lg">              
+                <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
+                  <div className="flex items-center mb-1.5">
+                    <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                      <Shield className="h-3 w-3 text-blue-700" />
+                    </div>
+                    <h5 className="font-medium text-blue-800 text-sm">Verify Identity</h5>
                   </div>
-                  <h5 className="font-medium text-blue-800 text-sm">Verify Identity</h5>
+                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Complete online ID verification through our secure identity verification partner.</p>
+                  <Button
+                    className="w-full py-1.5 px-2 h-auto text-xs"
+                    onClick={startVerification}
+                    disabled={isVerifyingIdentity || isVerificationStarted}
+                  >
+                    {isVerifyingIdentity ? (
+                      <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Shield className="mr-1.5 h-3 w-3" />
+                    )}
+                    {isVerificationStarted
+                      ? "In Progress..."
+                      : isVerifyingIdentity
+                        ? "Starting..."
+                        : "Verify Now"}
+                  </Button>
                 </div>
-                <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Complete online ID verification through our secure identity verification partner.</p>
-                <Button
-                  className="w-full py-1.5 px-2 h-auto text-xs"
-                  onClick={startVerification}
-                  disabled={isVerifyingIdentity || isVerificationStarted}
-                >
-                  {isVerifyingIdentity ? (
-                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+              </div>
+
+              {/* Pre-qualification upload option */}
+              <div className="relative rounded-lg">
+                <div className="h-full bg-purple-50 rounded-lg border border-purple-100 p-3 flex flex-col">
+                  <div className="flex items-center mb-1.5">
+                    <div className="bg-purple-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                      <Upload className="h-3 w-3 text-purple-700" />
+                    </div>
+                    <h5 className="font-medium text-purple-800 text-sm">Upload Pre-qualification</h5>
+                  </div>
+                  
+                  {user?.prequalificationDocUrl ? (
+                    <>
+                      <div className="mb-2 flex-grow">
+                        <div className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}>
+                          {user?.prequalificationValidated 
+                            ? "✓ Document validated successfully" 
+                            : "⚠️ Document validation pending"}
+                        </div>
+                        {user?.prequalificationMessage && !user?.prequalificationValidated && (
+                          <p className="text-xs text-red-500 mt-1">{user.prequalificationMessage}</p>
+                        )}
+                      </div>
+                      <Button
+                        className="w-full py-1.5 px-2 h-auto text-xs"
+                        onClick={() => setIsPrequalificationModalOpen(true)}
+                        disabled={isVerificationStarted}
+                        variant="outline"
+                      >
+                        <Upload className="mr-1.5 h-3 w-3" />
+                        Upload New Document
+                      </Button>
+                    </>
                   ) : (
-                    <Shield className="mr-1.5 h-3 w-3" />
+                    <>
+                      <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
+                        Upload your lender pre-qualification document as an alternative verification method.
+                      </p>
+                      <Button
+                        className="w-full py-1.5 px-2 h-auto text-xs"
+                        onClick={() => setIsPrequalificationModalOpen(true)}
+                        disabled={isVerificationStarted}
+                        variant="outline"
+                      >
+                        <Upload className="mr-1.5 h-3 w-3" />
+                        Upload Document
+                      </Button>
+                    </>
                   )}
-                  {isVerificationStarted
-                    ? "In Progress..."
-                    : isVerifyingIdentity
-                      ? "Starting..."
-                      : "Verify Now"}
-                </Button>
+                </div>
               </div>
             </div>
 
-            {/* Pre-qualification upload option - removed dimming effect */}
-            <div className="relative rounded-lg">
-              
-              <div className="h-full bg-purple-50 rounded-lg border border-purple-100 p-3 flex flex-col">
+            {/* Second column - Request Manual Approval (delayed process) */}
+            <div className="md:col-span-1">
+              <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
                 <div className="flex items-center mb-1.5">
-                  <div className="bg-purple-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                    <Upload className="h-3 w-3 text-purple-700" />
+                  <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                    <MailCheck className="h-3 w-3 text-green-700" />
                   </div>
-                  <h5 className="font-medium text-purple-800 text-sm">Upload Pre-qualification</h5>
+                  <h5 className="font-medium text-green-800 text-sm">Request Manual Approval</h5>
                 </div>
                 
-                {user?.prequalificationDocUrl ? (
-                  <>
-                    <div className="mb-2 flex-grow">
-                      <div className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}>
-                        {user?.prequalificationValidated 
-                          ? "✓ Document validated successfully" 
-                          : "⚠️ Document validation pending"}
-                      </div>
-                      {user?.prequalificationMessage && !user?.prequalificationValidated && (
-                        <p className="text-xs text-red-500 mt-1">{user.prequalificationMessage}</p>
-                      )}
+                {user?.manualApprovalRequested ? (
+                  <div className="flex-grow">
+                    <div className="text-xs font-medium text-green-600 mb-2">
+                      ✓ Request submitted
                     </div>
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
-                      onClick={() => setIsPrequalificationModalOpen(true)}
-                      disabled={isVerificationStarted}
+                      onClick={() => setIsManualApprovalFormOpen(true)}
                       variant="outline"
                     >
-                      <Upload className="mr-1.5 h-3 w-3" />
-                      Upload New Document
+                      <MailCheck className="mr-1.5 h-3 w-3" />
+                      Request Again
                     </Button>
-                  </>
+                  </div>
                 ) : (
                   <>
                     <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                      Upload your lender pre-qualification document as an alternative verification method.
+                      {user?.prequalificationDocUrl
+                        ? "Request manual approval of your pre-qualification document."
+                        : "Upload a pre-qualification document first to enable this option."}
                     </p>
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
-                      onClick={() => setIsPrequalificationModalOpen(true)}
-                      disabled={isVerificationStarted}
+                      onClick={() => setIsManualApprovalFormOpen(true)}
                       variant="outline"
                     >
-                      <Upload className="mr-1.5 h-3 w-3" />
-                      Upload Document
+                      <MailCheck className="mr-1.5 h-3 w-3" />
+                      Request Manual Approval
                     </Button>
                   </>
                 )}
               </div>
-            </div>
-
-            {/* Request Manual Approval - always visible/active */}
-            <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
-              <div className="flex items-center mb-1.5">
-                <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                  <MailCheck className="h-3 w-3 text-green-700" />
-                </div>
-                <h5 className="font-medium text-green-800 text-sm">Request Manual Approval</h5>
-              </div>
-              
-              {user?.manualApprovalRequested ? (
-                <div className="flex-grow">
-                  <div className="text-xs font-medium text-green-600 mb-2">
-                    ✓ Manual approval requested
-                  </div>
-                  <Button
-                    className="w-full py-1.5 px-2 h-auto text-xs"
-                    onClick={() => setIsManualApprovalFormOpen(true)}
-                    variant="outline"
-                  >
-                    <MailCheck className="mr-1.5 h-3 w-3" />
-                    Submit Additional Information
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                    {user?.prequalificationDocUrl
-                      ? "Request manual approval of your pre-qualification document."
-                      : "Upload a pre-qualification document first to enable this option."}
-                  </p>
-                  <Button
-                    className="w-full py-1.5 px-2 h-auto text-xs"
-                    onClick={() => setIsManualApprovalFormOpen(true)}
-                    variant="outline"
-                  >
-                    <MailCheck className="mr-1.5 h-3 w-3" />
-                    Request Manual Approval
-                  </Button>
-                </>
-              )}
             </div>
           </div>
         </div>
