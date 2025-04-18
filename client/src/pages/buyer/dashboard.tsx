@@ -278,7 +278,7 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-3">
+        <div className="grid md:grid-cols-3 gap-3" id="dashboardCards">
           {/* First column - Verification methods */}
           <div className="relative rounded-lg">
             <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
@@ -399,10 +399,11 @@ export default function BuyerDashboard() {
             </div>
           </div>
 
-          {/* Second column - BRBC Agreement Card */}
-          <div className="relative rounded-lg">
+          {/* Second column - Stacked Cards */}
+          <div className="relative rounded-lg flex flex-col gap-3">
+            {/* BRBC Agreement Card */}
             <div
-              className={`h-full ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}
+              className={`${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
@@ -556,11 +557,9 @@ export default function BuyerDashboard() {
                   : "Sign Agreement"}
               </Button>
             </div>
-          </div>
-
-          {/* Third column - Manual Approval Card */}
-          <div className="relative rounded-lg">
-            <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
+            
+            {/* Pre-Qualification Card - Added to second column */}
+            <div className="bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
                   <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
@@ -611,6 +610,45 @@ export default function BuyerDashboard() {
                   </Button>
                 </>
               )}
+            </div>
+          </div>
+
+          {/* Third column - Viewing Requests Card */}
+          <div className="relative rounded-lg">
+            <div className="h-full bg-indigo-50 rounded-lg border border-indigo-100 p-3 flex flex-col">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center">
+                  <div className="bg-indigo-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                    <CalendarRange className="h-3 w-3 text-indigo-700" />
+                  </div>
+                  <h5 className="font-medium text-indigo-800 text-sm">
+                    Viewing Requests
+                  </h5>
+                </div>
+              </div>
+
+              <div className="bg-indigo-50 text-indigo-700 text-xs p-2 rounded-md border border-indigo-100 mb-2">
+                <span>
+                  Track and manage your property viewing requests here. Schedule new viewings from property details pages.
+                </span>
+              </div>
+
+              <Button
+                className="w-full py-1.5 px-2 h-auto text-xs"
+                variant="default"
+                onClick={() => {
+                  // Set active tab to viewing requests
+                  setActiveTab("viewingRequests");
+                  // Scroll to the viewing requests tab content
+                  const element = document.getElementById("viewingRequestsSection");
+                  if (element) {
+                    element.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+              >
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+                View Requests
+              </Button>
             </div>
           </div>
         </div>
@@ -741,7 +779,7 @@ export default function BuyerDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent value="viewingRequests" className="p-0">
+            <TabsContent value="viewingRequests" className="p-0" id="viewingRequestsSection">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
                 <h3 className="text-lg leading-6 font-medium text-gray-900">
                   My Viewing Requests
