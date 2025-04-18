@@ -171,10 +171,15 @@ export async function validatePrequalificationDocument(
     if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
       console.log("Using enhanced mock validation for prequalification document (no API key)");
       
-      // Read the file and check for keywords that would indicate it's a prequalification letter
+      // Read the file and extract first 1000 characters to check for keywords
       try {
         const fileBuffer = fs.readFileSync(filePath);
-        const fileContent = fileBuffer.toString('utf-8').toLowerCase();
+        const fullContent = fileBuffer.toString('utf-8');
+        // Limit to first 1000 characters as per requirements
+        const fileContent = fullContent.substring(0, 1000).toLowerCase();
+        
+        console.log(`Analyzing first 1000 characters of document for validation:
+${fileContent.substring(0, 100)}...`);
         
         // Check for keywords that would indicate this is a prequalification letter
         const prequalKeywords = [
