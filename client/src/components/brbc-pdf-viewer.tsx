@@ -411,7 +411,7 @@ export function BRBCPdfViewer({
     }
   };
 
-  // Function to update the PDF with the signature image
+  // Function to update the PDF with the signature image using client-side processing
   // The manualPreview flag indicates if this was triggered by the user clicking "Preview"
   const updatePdfPreviewWithSignature = async (
     signatureData: string,
@@ -437,11 +437,93 @@ export function BRBCPdfViewer({
       
       // Update timestamp
       setLastPreviewTimestamp(currentTime);
+      
+      // Try to use client-side PDF processing if we have the PDF document loaded
+      if (pdfDoc && pdfArrayBuffer) {
+        try {
+          // Create a duplicate of the PDF for editing
+          const pdfBytes = await pdfDoc.save();
+          const newPdfDoc = await PDFDocument.load(pdfBytes);
+          
+          // Get form to edit
+          const form = newPdfDoc.getForm();
+          
+          // Save all form field values to preserve manual edits
+          const fields = form.getFields();
+          const updatedFormFields: Record<string, string> = {};
+          
+          for (const field of fields) {
+            if (field instanceof PDFTextField) {
+              const name = field.getName();
+              // Try to get value from iframe if it exists
+              const value = field.getText() || '';
+              updatedFormFields[name] = value;
+            }
+          }
+          
+          // Apply the current form field values
+          if (iframeRef.current) {
+            try {
+              const iframe = iframeRef.current;
+              if (iframe.contentWindow && iframe.contentWindow.document) {
+                const formElements = iframe.contentWindow.document.querySelectorAll('input');
+                formElements.forEach(input => {
+                  if (input.name && input.value) {
+                    updatedFormFields[input.name] = input.value;
+                  }
+                });
+              }
+            } catch (err) {
+              console.error("Error accessing iframe form fields:", err);
+            }
+          }
+          
+          // Apply saved form field values
+          Object.entries(updatedFormFields).forEach(([name, value]) => {
+            try {
+              const field = form.getTextField(name);
+              if (field) {
+                field.setText(value);
+              }
+            } catch (err) {
+              // Field may not exist or not be a text field
+              console.warn(`Could not set field ${name}:`, err);
+            }
+          });
+          
+          // Update formFields state for future use
+          setFormFields(updatedFormFields);
+          
+          // Save the modified PDF and update the viewer
+          const modifiedPdfBytes = await newPdfDoc.save();
+          const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+          const blobUrl = URL.createObjectURL(blob);
+          
+          if (manualPreview) {
+            setPdfUrl(blobUrl);
+          } else if (!cachedPdfUrl) {
+            setPdfUrl(blobUrl);
+            setCachedPdfUrl(blobUrl);
+          }
+          
+          if (manualPreview) {
+            setIsPreviewing(false);
+            setIsLoading(false);
+          }
+          
+          return;
+        } catch (err) {
+          console.error("Error in client-side PDF processing:", err);
+          // Fall back to server-side processing if client-side fails
+        }
+      }
 
+      // Fall back to server-side processing
       // Prepare data for server request
       const requestData: Record<string, any> = {
         previewOnly: true, // Flag to indicate this is just for preview
         details: {},
+        formFieldValues: formFields, // Send current form field values to server
       };
 
       // Set the appropriate signature data based on type
@@ -552,7 +634,32 @@ export function BRBCPdfViewer({
   };
 
   // This function validates signatures and shows the preview confirmation dialog
+  // Function to capture current form field values from the iframe
+  const captureFormValues = () => {
+    try {
+      // Get the current form field values from the iframe
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        const formElements = iframeRef.current.contentWindow.document.querySelectorAll('input');
+        const updatedFormFields: Record<string, string> = {...formFields};
+        
+        formElements.forEach(input => {
+          if (input.name && input.value) {
+            updatedFormFields[input.name] = input.value;
+          }
+        });
+        
+        // Update form fields state
+        setFormFields(updatedFormFields);
+      }
+    } catch (err) {
+      console.error("Error capturing form values:", err);
+    }
+  };
+
   const handleSubmitSignature = async () => {
+    // Capture any form field values before switching to sign mode
+    captureFormValues();
+    
     // Force an update of the current tab's signatures
     saveCurrentSignature();
 
@@ -637,7 +744,10 @@ export function BRBCPdfViewer({
           ? buyer2InitialsRef.current.toDataURL()
           : null);
 
-      // Submit signature to server with all signature types
+      // Capture latest form values before submitting
+      captureFormValues();
+      
+      // Submit signature to server with all signature types and form field data
       const response = await fetch("/api/global-brbc/pdf-signature", {
         method: "POST",
         headers: {
@@ -651,6 +761,8 @@ export function BRBCPdfViewer({
           // Optional second buyer signature and initials
           buyer2SignatureData,
           buyer2InitialsData,
+          // Include form field values to preserve user edits
+          formFieldValues: formFields,
           details: {},
         }),
       }).then((res) => res.json());
@@ -741,9 +853,14 @@ export function BRBCPdfViewer({
                 </div>
               )}
               <iframe
+                ref={iframeRef}
                 src={pdfUrl}
                 className="w-full h-full border-0"
-                onLoad={handlePdfLoad}
+                onLoad={() => {
+                  handlePdfLoad();
+                  // After loading, try to capture form field values after a delay to ensure form is ready
+                  setTimeout(captureFormValues, 500);
+                }}
                 onError={handlePdfError}
               ></iframe>
             </div>
@@ -848,9 +965,18 @@ export function BRBCPdfViewer({
                   >
                     {/* Buyer 2 Signature Section */}
                     <div>
-                      <h4 className="font-medium mb-2">
-                        Signature - Full Signature
-                      </h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">Signature - Full Signature</h4>
+                        <Button 
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => clearSignature("buyer2Primary")}
+                          disabled={buyer2SignatureIsEmpty}
+                          className="h-8 px-2 py-0"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                       <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
                         <SignatureCanvas
                           ref={buyer2SignatureRef}
@@ -864,10 +990,18 @@ export function BRBCPdfViewer({
                       </div>
 
                       {/* Buyer 2 Initials Section */}
-
-                      <h4 className="font-medium mb-2">
-                        Initials - Short Signature
-                      </h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium">Initials - Short Signature</h4>
+                        <Button 
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => clearSignature("buyer2Initials")}
+                          disabled={buyer2InitialsIsEmpty}
+                          className="h-8 px-2 py-0"
+                        >
+                          Clear
+                        </Button>
+                      </div>
                       <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
                         <SignatureCanvas
                           ref={buyer2InitialsRef}
@@ -882,16 +1016,7 @@ export function BRBCPdfViewer({
                     </div>
                   </TabsContent>
 
-                  <div className="mt-2 flex justify-between items-center">
-                    <Button
-                      variant="outline"
-                      onClick={clearSignature}
-                      size="sm"
-                      className="w-24"
-                    >
-                      Clear
-                    </Button>
-
+                  <div className="mt-2 flex justify-end items-center">
                     <Button
                       variant="outline"
                       size="sm"
