@@ -294,6 +294,23 @@ ${fileContent.substring(0, 100)}...`);
     const fileBuffer = fs.readFileSync(filePath);
     let fileContent = fileBuffer.toString('utf-8');
     
+    // Check if content looks like binary data (common in some PDFs)
+    const printableChars = fileContent.replace(/[^\x20-\x7E]/g, '').length;
+    const totalChars = fileContent.length;
+    const percentPrintable = totalChars > 0 ? (printableChars / totalChars) * 100 : 0;
+    
+    console.log(`Document analysis: ${Math.round(percentPrintable)}% of characters are printable text`);
+    
+    // If less than 30% of characters are printable, it's likely a binary file
+    if (percentPrintable < 30) {
+      console.log("Document appears to be a binary/encoded PDF file that cannot be read as text");
+      return {
+        validated: false,
+        data: {},
+        message: "The document appears to be in a format that cannot be read. Please upload a text-based PDF or document file that contains your pre-qualification letter."
+      };
+    }
+    
     // Take only the first 1000 characters of the document for analysis
     // This helps with large documents and keeps within OpenAI limits
     const contentPreview = fileContent.substring(0, 1000);
