@@ -227,8 +227,8 @@ export async function addSignatureToPdf(
           sigHeight = 30;
           break;
         case "initial2":
-          sigX = width * 0.6;
-          sigY = height * 0.7;
+          sigX = width * 0.6; 
+          sigY = height * 0.4; // Changed position to be vertically separated from initial1
           // For initials, make the signature smaller
           sigWidth = 80;
           sigHeight = 30;
