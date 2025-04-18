@@ -452,6 +452,87 @@ export async function fillAgencyDisclosureForm(
 }
 
 /**
+ * Fills out the BRBC form with the provided data
+ * 
+ * @param buyerName The name of the buyer to fill in
+ * @returns Buffer containing the filled PDF document
+ */
+export async function fillBrbcForm(
+  buyerName: string,
+  existingPdfBuffer?: Buffer
+): Promise<Buffer> {
+  let pdfBuffer;
+
+  // If existing PDF buffer is provided, use it
+  if (existingPdfBuffer) {
+    console.log("Using existing PDF buffer for BRBC");
+    pdfBuffer = existingPdfBuffer;
+  } else {
+    // Load the template PDF
+    console.log("Loading BRBC template from file system");
+    const templatePath = path.join(process.cwd(), "uploads", "pdf", "brbc.pdf");
+    
+    try {
+      pdfBuffer = fs.readFileSync(templatePath);
+    } catch (error) {
+      console.error("Error reading BRBC template PDF:", error);
+      throw new Error("Could not read BRBC template PDF");
+    }
+  }
+
+  // Load the PDF document
+  const pdfDoc = await PDFDocument.load(pdfBuffer);
+  const form = pdfDoc.getForm();
+  
+  // Get current date for 'today' field
+  const today = new Date();
+  const formattedToday = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+  
+  // Calculate date 89 days from today for '3Months' field
+  const threeMonthsLater = new Date(today);
+  threeMonthsLater.setDate(today.getDate() + 89);
+  const formattedThreeMonths = `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
+  
+  // Extract initials from buyerName
+  let buyerInitials = "";
+  if (buyerName) {
+    // Split the name into parts and get the first letter of each part
+    buyerInitials = buyerName
+      .split(" ")
+      .map(part => part.charAt(0).toUpperCase())
+      .join("");
+  }
+  
+  // Fill in all instances of each field
+  const fields = form.getFields();
+  
+  for (const field of fields) {
+    const fieldName = field.getName();
+    
+    try {
+      if (fieldName === 'buyer1' && field instanceof PDFTextField) {
+        field.setText(buyerName);
+      } else if (fieldName === 'today' && field instanceof PDFTextField) {
+        field.setText(formattedToday);
+      } else if (fieldName === '3Months' && field instanceof PDFTextField) {
+        field.setText(formattedThreeMonths);
+      } else if (fieldName === 'initial1' && field instanceof PDFTextField) {
+        field.setText(buyerInitials);
+      }
+    } catch (error) {
+      console.warn(`Could not set field ${fieldName}:`, error);
+    }
+  }
+  
+  // Save the modified PDF
+  const modifiedPdfBytes = await pdfDoc.save({
+    updateFieldAppearances: true
+  });
+  
+  return Buffer.from(modifiedPdfBytes);
+}
+
+/**
  * Fills out the agent referral fee agreement with the provided data
  *
  * @param formData Data to fill into the form fields

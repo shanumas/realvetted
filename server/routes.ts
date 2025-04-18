@@ -106,12 +106,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log(" - Uploads dir path:", uploadsDir);
   console.log(" - Prequalification dir path:", prequalificationDir);
   
-  // Serve PDF files with optional fillable mode
-  app.get("/api/docs/:filename", (req, res) => {
+  // Serve PDF files with optional fillable mode and prefilling capabilities
+  app.get("/api/docs/:filename", async (req, res) => {
     try {
       const { filename } = req.params;
       const fillable = req.query.fillable === 'true';
       const prefill = req.query.prefill as string || '';
+      const inline = req.query.inline !== 'false'; // Default to inline viewing unless specified
       
       // Only allow specific PDF files to be served
       if (!['brbc.pdf', 'brsr.pdf'].includes(filename)) {
@@ -133,22 +134,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Read the PDF file
-      const pdfBuffer = fs.readFileSync(filePath);
+      let pdfBuffer = fs.readFileSync(filePath);
+      
+      // Handle BRBC PDF prefilling
+      if (filename === 'brbc.pdf' && prefill === 'buyer' && req.user) {
+        // Get buyer name from user object
+        const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+        
+        // Fill the BRBC form with buyer information
+        try {
+          pdfBuffer = await fillBrbcForm(buyerName);
+          console.log(`Prefilled BRBC form for buyer: ${buyerName}`);
+        } catch (error) {
+          console.error("Error prefilling BRBC form:", error);
+          // If prefilling fails, use the original PDF
+        }
+      }
       
       // Set headers for PDF viewing
       res.setHeader("Content-Type", "application/pdf");
       
-      // If fillable mode is requested, set inline disposition to open in browser
-      if (fillable) {
+      // Set appropriate content disposition
+      if (inline) {
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      } else {
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      }
+      
+      // Add headers for fillable PDFs
+      if (fillable) {
         // Add headers to prevent caching for editable PDFs
         res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
         // Set custom header to indicate this is editable
         res.setHeader("X-PDF-Editable", "true");
-      } else {
-        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       }
       
       // Send the PDF directly to the client
