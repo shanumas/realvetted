@@ -348,23 +348,36 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
   };
 
   const handleSubmitSignature = async () => {
+    // Force an update of the current tab's signatures
+    saveCurrentSignature();
+    
     // Manual check for primary buyer's signature using saved signature data
-    if (!savedSignatures.primary && (signatureRef.current?.isEmpty() || !signatureRef.current)) {
+    if (!savedSignatures.primary) {
       toast({
         title: "Primary Signature Required",
         description: "Please provide the primary buyer's signature before submitting.",
         variant: "destructive",
       });
+      // Switch to buyer 1 tab if needed
+      if (activeTab !== "buyer1-signature") {
+        setActiveTab("buyer1-signature");
+        restoreSignaturesOnTabLoad("buyer1-signature");
+      }
       return;
     }
     
     // Manual check for initials using saved data
-    if (!savedSignatures.initials && (initialsRef.current?.isEmpty() || !initialsRef.current)) {
+    if (!savedSignatures.initials) {
       toast({
         title: "Initials Required",
         description: "Please provide the primary buyer's initials before submitting.",
         variant: "destructive",
       });
+      // Switch to buyer 1 tab if needed 
+      if (activeTab !== "buyer1-signature") {
+        setActiveTab("buyer1-signature");
+        restoreSignaturesOnTabLoad("buyer1-signature");
+      }
       return;
     }
     
@@ -520,79 +533,89 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                   restoreSignaturesOnTabLoad(newTab);
                 }} 
                 className="flex-grow flex flex-col">
+                {/* Main tabs for Buyer 1 and Buyer 2 */}
                 <TabsList className="w-full grid grid-cols-2 mb-4">
                   <TabsTrigger value="buyer1-signature" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
-                    Signature
+                    Buyer 1
                   </TabsTrigger>
-                  <TabsTrigger value="buyer1-initials" className="flex items-center">
-                    <User className="mr-2 h-4 w-4" />
-                    Initials
+                  <TabsTrigger value="buyer2-signature" className="flex items-center">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Buyer 2
                   </TabsTrigger>
                 </TabsList>
                 
-                <TabsContent value="buyer1-signature" className="flex-grow flex flex-col">
-                  <p className="text-xs text-gray-500 mb-2">Your full signature for main signature fields</p>
-                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
-                    <SignatureCanvas
-                      ref={signatureRef}
-                      canvasProps={{
-                        className: "w-full h-full signature-canvas",
-                        // Add event listeners directly to the canvas props
-                        onMouseUp: checkSignature,
-                        onTouchEnd: checkSignature
-                      }}
-                      // Check signature on every stroke end (real-time update)
-                      onEnd={checkSignature}
-                    />
+                {/* Buyer 1 Tab Content */}
+                <TabsContent value="buyer1-signature" className="flex-grow flex flex-col space-y-6">
+                  {/* Buyer 1 Signature Section */}
+                  <div>
+                    <h4 className="font-medium mb-2">Signature</h4>
+                    <p className="text-xs text-gray-500 mb-2">Your full signature for main signature fields</p>
+                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                      <SignatureCanvas
+                        ref={signatureRef}
+                        canvasProps={{
+                          className: "w-full h-full signature-canvas",
+                          onMouseUp: checkSignature,
+                          onTouchEnd: checkSignature
+                        }}
+                        onEnd={checkSignature}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Buyer 1 Initials Section */}
+                  <div>
+                    <h4 className="font-medium mb-2">Initials</h4>
+                    <p className="text-xs text-gray-500 mb-2">Your initials for document pages</p>
+                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24">
+                      <SignatureCanvas
+                        ref={initialsRef}
+                        canvasProps={{
+                          className: "w-full h-full signature-canvas",
+                          onMouseUp: checkSignature,
+                          onTouchEnd: checkSignature
+                        }}
+                        onEnd={checkSignature}
+                      />
+                    </div>
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="buyer1-initials" className="flex-grow flex flex-col">
-                  <p className="text-xs text-gray-500 mb-2">Your initials for document pages</p>
-                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
-                    <SignatureCanvas
-                      ref={initialsRef}
-                      canvasProps={{
-                        className: "w-full h-full signature-canvas",
-                        // Add event listeners directly to the canvas props
-                        onMouseUp: checkSignature,
-                        onTouchEnd: checkSignature
-                      }}
-                      onEnd={checkSignature}
-                    />
+                {/* Buyer 2 Tab Content */}
+                <TabsContent value="buyer2-signature" className="flex-grow flex flex-col space-y-6">
+                  {/* Buyer 2 Signature Section */}
+                  <div>
+                    <h4 className="font-medium mb-2">Signature (optional)</h4>
+                    <p className="text-xs text-gray-500 mb-2">Second buyer's full signature</p>
+                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                      <SignatureCanvas
+                        ref={buyer2SignatureRef}
+                        canvasProps={{
+                          className: "w-full h-full signature-canvas",
+                          onMouseUp: checkSignature,
+                          onTouchEnd: checkSignature
+                        }}
+                        onEnd={checkSignature}
+                      />
+                    </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="buyer2-signature" className="flex-grow flex flex-col">
-                  <p className="text-xs text-gray-500 mb-2">Second buyer's full signature (optional)</p>
-                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
-                    <SignatureCanvas
-                      ref={buyer2SignatureRef}
-                      canvasProps={{
-                        className: "w-full h-full signature-canvas",
-                        // Add event listeners directly to the canvas props
-                        onMouseUp: checkSignature,
-                        onTouchEnd: checkSignature
-                      }}
-                      onEnd={checkSignature}
-                    />
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="buyer2-initials" className="flex-grow flex flex-col">
-                  <p className="text-xs text-gray-500 mb-2">Second buyer's initials (optional)</p>
-                  <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white">
-                    <SignatureCanvas
-                      ref={buyer2InitialsRef}
-                      canvasProps={{
-                        className: "w-full h-full signature-canvas",
-                        // Add event listeners directly to the canvas props
-                        onMouseUp: checkSignature,
-                        onTouchEnd: checkSignature
-                      }}
-                      onEnd={checkSignature}
-                    />
+                  
+                  {/* Buyer 2 Initials Section */}
+                  <div>
+                    <h4 className="font-medium mb-2">Initials (optional)</h4>
+                    <p className="text-xs text-gray-500 mb-2">Second buyer's initials</p>
+                    <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24">
+                      <SignatureCanvas
+                        ref={buyer2InitialsRef}
+                        canvasProps={{
+                          className: "w-full h-full signature-canvas",
+                          onMouseUp: checkSignature,
+                          onTouchEnd: checkSignature
+                        }}
+                        onEnd={checkSignature}
+                      />
+                    </div>
                   </div>
                 </TabsContent>
                 
@@ -605,15 +628,11 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                     variant="outline" 
                     size="sm"
                     onClick={() => {
-                      // Save current signature before moving to next tab
+                      // Save current signature before switching tabs
                       saveCurrentSignature();
                       
-                      // Determine next tab
-                      const nextTab = activeTab === "buyer1-signature" ? "buyer1-initials" : (
-                        activeTab === "buyer1-initials" ? "buyer2-signature" : (
-                          activeTab === "buyer2-signature" ? "buyer2-initials" : "buyer1-signature"
-                        )
-                      );
+                      // Toggle between Buyer 1 and Buyer 2 tabs
+                      const nextTab = activeTab === "buyer1-signature" ? "buyer2-signature" : "buyer1-signature";
                       
                       // Set new tab and restore any saved signature
                       setActiveTab(nextTab);
@@ -621,38 +640,7 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                     }}
                     className="w-24"
                   >
-                    Next
-                  </Button>
-                </div>
-                
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full flex items-center justify-center"
-                    onClick={() => {
-                      // Save current signature
-                      saveCurrentSignature();
-                      
-                      // Determine new tab
-                      const newTab = activeTab.startsWith("buyer1") ? "buyer2-signature" : "buyer1-signature";
-                      
-                      // Set new tab and restore any saved signature
-                      setActiveTab(newTab);
-                      restoreSignaturesOnTabLoad(newTab);
-                    }}
-                  >
-                    {activeTab.startsWith("buyer1") ? (
-                      <>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add Second Buyer (Optional)
-                      </>
-                    ) : (
-                      <>
-                        <User className="mr-2 h-4 w-4" />
-                        Back to Primary Buyer
-                      </>
-                    )}
+                    {activeTab === "buyer1-signature" ? "Buyer 2" : "Buyer 1"}
                   </Button>
                 </div>
               </Tabs>
