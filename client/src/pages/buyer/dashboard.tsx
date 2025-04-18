@@ -344,287 +344,299 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
-        {/* Verification Options - 50% less height, dimmed when verified */}
-        <div className="mt-5 bg-white px-4 py-3 rounded-lg border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="text-base font-medium text-gray-800">
-              Verification Options
-            </h4>
-            {user?.profileStatus === "verified" && (
-              <div className="bg-green-50 px-2 py-1 rounded-full text-xs font-medium text-green-700 border border-green-100 flex items-center">
-                <svg
-                  className="h-3 w-3 mr-1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-                Verification Complete
+        <div className="grid md:grid-cols-3 gap-3">
+          {/* First column - Verification methods */}
+          <div className="relative rounded-lg">
+            <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-medium text-blue-800 text-sm">
+                  Verification Methods
+                </h5>
+                {user?.verificationMethod && (
+                  <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
+                    ✓ Verified
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-3">
-            {/* First column - Verification methods (Identity & Pre-qualification) */}
-            <div className="md:col-span-2 grid grid-cols-1 gap-3">
-              <div className="relative rounded-lg">
-                <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
-                  <div className="flex items-center justify-between mb-2">
-                    <h5 className="font-medium text-blue-800 text-sm">
-                      Verification Methods
+              
+              {/* Identity verification section - smaller */}
+              <div className="bg-white rounded-md border border-gray-200 p-2 mb-2">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center">
+                    <div className="bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
+                      <Shield className="h-2.5 w-2.5 text-blue-700" />
+                    </div>
+                    <h5 className="font-medium text-gray-800 text-xs">
+                      Verify Identity
                     </h5>
-                    {user?.verificationMethod && (
-                      <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
-                        ✓ Verified
-                      </div>
-                    )}
                   </div>
                   
-                  {/* Identity verification section - smaller */}
-                  <div className="bg-white rounded-md border border-gray-200 p-2 mb-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center">
-                        <div className="bg-blue-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
-                          <Shield className="h-2.5 w-2.5 text-blue-700" />
-                        </div>
-                        <h5 className="font-medium text-gray-800 text-xs">
-                          Verify Identity
-                        </h5>
-                      </div>
-                      
-                      {/* Veriff logo */}
-                      <div className="h-5 ml-1 flex items-center">
-                        <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
-                          by <span className="font-bold ml-0.5 text-blue-800">VERIFF</span>
-                        </div>
-                      </div>
+                  {/* Veriff logo */}
+                  <div className="h-5 ml-1 flex items-center">
+                    <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
+                      by <span className="font-bold ml-0.5 text-blue-800">VERIFF</span>
                     </div>
-                    
-                    {user?.verificationMethod === "kyc" ? (
-                      <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
-                        ✓ Identity verified successfully
-                      </div>
-                    ) : (
-                      <Button
-                        className="w-full py-1 px-2 h-auto text-[10px]"
-                        onClick={startVerification}
-                        disabled={isVerifyingIdentity || isVerificationStarted}
-                      >
-                        {isVerifyingIdentity ? (
-                          <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />
-                        ) : (
-                          <Shield className="mr-1 h-2.5 w-2.5" />
-                        )}
-                        {isVerificationStarted
-                          ? "In Progress..."
-                          : isVerifyingIdentity
-                            ? "Starting..."
-                            : "Verify Now"}
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {/* "OR" divider */}
-                  <div className="flex items-center justify-center mb-2">
-                    <div className="border-t border-gray-200 flex-grow"></div>
-                    <div className="mx-2 text-xs text-gray-500 font-medium">OR</div>
-                    <div className="border-t border-gray-200 flex-grow"></div>
-                  </div>
-                  
-                  {/* Pre-qualification upload section - smaller */}
-                  <div className="bg-white rounded-md border border-gray-200 p-2">
-                    <div className="flex items-center mb-1">
-                      <div className="bg-purple-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
-                        <Upload className="h-2.5 w-2.5 text-purple-700" />
-                      </div>
-                      <h5 className="font-medium text-gray-800 text-xs">
-                        Upload Pre-qualification
-                      </h5>
-                    </div>
-                    
-                    {user?.prequalificationDocUrl ? (
-                      <>
-                        <div className="mb-1 flex-grow">
-                          <div
-                            className={`text-[10px] font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
-                          >
-                            {user?.prequalificationValidated
-                              ? "✓ Document validated successfully"
-                              : "⚠️ Document validation pending"}
-                          </div>
-                          {user?.prequalificationMessage &&
-                            !user?.prequalificationValidated && (
-                              <p className="text-[10px] text-red-500 mt-0.5">
-                                {user.prequalificationMessage}
-                              </p>
-                            )}
-                        </div>
-                        <Button
-                          className="w-full py-1 px-2 h-auto text-[10px]"
-                          onClick={() => setIsPrequalificationModalOpen(true)}
-                          disabled={isVerificationStarted}
-                          variant="outline"
-                        >
-                          <Upload className="mr-1 h-2.5 w-2.5" />
-                          Upload New Document
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-[10px] text-gray-600 mb-1 flex-grow line-clamp-2">
-                          Upload lender pre-qualification document as verification alternative.
-                        </p>
-                        <Button
-                          className="w-full py-1 px-2 h-auto text-[10px]"
-                          onClick={() => setIsPrequalificationModalOpen(true)}
-                          disabled={isVerificationStarted}
-                          variant="outline"
-                        >
-                          <Upload className="mr-1 h-2.5 w-2.5" />
-                          Upload Document
-                        </Button>
-                      </>
-                    )}
                   </div>
                 </div>
+                
+                {user?.verificationMethod === "kyc" ? (
+                  <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
+                    ✓ Identity verified successfully
+                  </div>
+                ) : (
+                  <Button
+                    className="w-full py-1 px-2 h-auto text-[10px]"
+                    onClick={startVerification}
+                    disabled={isVerifyingIdentity || isVerificationStarted}
+                  >
+                    {isVerifyingIdentity ? (
+                      <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />
+                    ) : (
+                      <Shield className="mr-1 h-2.5 w-2.5" />
+                    )}
+                    {isVerificationStarted
+                      ? "In Progress..."
+                      : isVerifyingIdentity
+                        ? "Starting..."
+                        : "Verify Now"}
+                  </Button>
+                )}
+              </div>
+              
+              {/* "OR" divider */}
+              <div className="flex items-center justify-center mb-2">
+                <div className="border-t border-gray-200 flex-grow"></div>
+                <div className="mx-2 text-xs text-gray-500 font-medium">OR</div>
+                <div className="border-t border-gray-200 flex-grow"></div>
+              </div>
+              
+              {/* Pre-qualification upload section - smaller */}
+              <div className="bg-white rounded-md border border-gray-200 p-2">
+                <div className="flex items-center mb-1">
+                  <div className="bg-purple-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
+                    <Upload className="h-2.5 w-2.5 text-purple-700" />
+                  </div>
+                  <h5 className="font-medium text-gray-800 text-xs">
+                    Upload Pre-qualification
+                  </h5>
+                </div>
+                
+                {user?.prequalificationDocUrl ? (
+                  <>
+                    <div className="mb-1 flex-grow">
+                      <div
+                        className={`text-[10px] font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
+                      >
+                        {user?.prequalificationValidated
+                          ? "✓ Document validated successfully"
+                          : "⚠️ Document validation pending"}
+                      </div>
+                      {user?.prequalificationMessage &&
+                        !user?.prequalificationValidated && (
+                          <p className="text-[10px] text-red-500 mt-0.5">
+                            {user.prequalificationMessage}
+                          </p>
+                        )}
+                    </div>
+                    <Button
+                      className="w-full py-1 px-2 h-auto text-[10px]"
+                      onClick={() => setIsPrequalificationModalOpen(true)}
+                      disabled={isVerificationStarted}
+                      variant="outline"
+                    >
+                      <Upload className="mr-1 h-2.5 w-2.5" />
+                      Upload New Document
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-gray-600 mb-1 flex-grow line-clamp-2">
+                      Upload lender pre-qualification document as verification alternative.
+                    </p>
+                    <Button
+                      className="w-full py-1 px-2 h-auto text-[10px]"
+                      onClick={() => setIsPrequalificationModalOpen(true)}
+                      disabled={isVerificationStarted}
+                      variant="outline"
+                    >
+                      <Upload className="mr-1 h-2.5 w-2.5" />
+                      Upload Document
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Second column - Contains both BRBC and Manual Approval cards */}
-            <div className="md:col-span-1 grid grid-cols-1 gap-3">
-              {/* BRBC Agreement Card */}
-              <div className="relative rounded-lg">
-                <div className={`h-full ${buyerAgreements?.some(a => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center">
-                      <div className={`${buyerAgreements?.some(a => a.type === "global_brbc") ? "bg-green-100" : "bg-amber-100"} rounded-full w-6 h-6 flex items-center justify-center mr-2`}>
-                        <FileText className={`h-3 w-3 ${buyerAgreements?.some(a => a.type === "global_brbc") ? "text-green-700" : "text-amber-700"}`} />
-                      </div>
-                      <h5 className={`font-medium ${buyerAgreements?.some(a => a.type === "global_brbc") ? "text-green-800" : "text-amber-800"} text-sm`}>
-                        Buyer Representation Agreement
-                      </h5>
-                    </div>
-                    
-                    {buyerAgreements?.some(a => a.type === "global_brbc") ? (
-                      <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
-                        ✓ Signed
-                      </div>
-                    ) : (
-                      <div className="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-medium text-amber-700 border border-amber-200">
-                        Required
-                      </div>
-                    )}
+          {/* Second column - BRBC Agreement Card */}
+          <div className="relative rounded-lg">
+            <div
+              className={`h-full ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center">
+                  <div
+                    className={`${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-100" : "bg-amber-100"} rounded-full w-6 h-6 flex items-center justify-center mr-2`}
+                  >
+                    <FileText
+                      className={`h-3 w-3 ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "text-green-700" : "text-amber-700"}`}
+                    />
+                  </div>
+                  <h5
+                    className={`font-medium ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "text-green-800" : "text-amber-800"} text-sm`}
+                  >
+                    Buyer Representation Agreement
+                  </h5>
+                </div>
+
+                {buyerAgreements?.some((a) => a.type === "global_brbc") ? (
+                  <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
+                    ✓ Signed
+                  </div>
+                ) : (
+                  <div className="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-medium text-amber-700 border border-amber-200">
+                    Required
+                  </div>
+                )}
+              </div>
+
+              {buyerAgreements?.some((a) => a.type === "global_brbc") ? (
+                <div className="bg-green-50 text-green-700 text-xs p-2 rounded-md border border-green-100 mb-2">
+                  <div className="flex items-center">
+                    <svg
+                      className="h-4 w-4 mr-1 text-green-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    <span>Agreement successfully signed</span>
                   </div>
 
-                  {buyerAgreements?.some(a => a.type === "global_brbc") ? (
-                    <div className="bg-green-50 text-green-700 text-xs p-2 rounded-md border border-green-100 mb-2">
-                      <div className="flex items-center">
-                        <svg className="h-4 w-4 mr-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span>Agreement successfully signed</span>
-                      </div>
-                      
-                      <div className="flex items-center mt-1.5 pt-1.5 border-t border-green-200">
-                        <svg className="h-3.5 w-3.5 mr-1 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                        </svg>
-                        <span className="text-[10px] underline cursor-pointer">Download signed document</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-amber-50 text-amber-700 text-xs p-2 rounded-md border border-amber-100 mb-2">
-                      ⚠️ This agreement must be signed before you can request property viewings
-                    </div>
-                  )}
-                  
+                  <div className="flex items-center mt-1.5 pt-1.5 border-t border-green-200">
+                    <svg
+                      className="h-3.5 w-3.5 mr-1 text-green-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                      />
+                    </svg>
+                    <span className="text-[10px] underline cursor-pointer">
+                      Download signed document
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 text-amber-700 text-xs p-2 rounded-md border border-amber-100 mb-2">
+                  ⚠️ This agreement must be signed before you can request
+                  property viewings
+                </div>
+              )}
+
+              <Button
+                className="w-full py-1.5 px-2 h-auto text-xs"
+                onClick={() => {
+                  // If the agreement is already signed, just open it for viewing
+                  if (
+                    buyerAgreements?.some((a) => a.type === "global_brbc")
+                  ) {
+                    // Get the agent ID from the existing agreement
+                    const existingAgreement = buyerAgreements.find(
+                      (a) => a.type === "global_brbc",
+                    );
+                    setSelectedAgentId(existingAgreement?.agentId || 0);
+                    setIsBRBCModalOpen(true);
+                    return;
+                  }
+
+                  // Try to find an agent ID from different sources
+                  const firstAgent =
+                    properties?.find((p) => p.agentId)?.agentId ||
+                    buyerAgreements?.find((a) => a.agentId)?.agentId ||
+                    19; // Default agent ID as fallback
+
+                  setSelectedAgentId(firstAgent);
+                  setIsBRBCModalOpen(true);
+                }}
+                variant={
+                  buyerAgreements?.some((a) => a.type === "global_brbc")
+                    ? "outline"
+                    : "default"
+                }
+              >
+                <FileText className="mr-1.5 h-3 w-3" />
+                {buyerAgreements?.some((a) => a.type === "global_brbc")
+                  ? "View Signed Agreement"
+                  : "Sign Agreement"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Third column - Manual Approval Card */}
+          <div className="relative rounded-lg">
+            <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center">
+                  <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                    <MailCheck className="h-3 w-3 text-green-700" />
+                  </div>
+                  <h5 className="font-medium text-green-800 text-sm">
+                    Request Manual Approval
+                  </h5>
+                </div>
+
+                {user?.manualApprovalRequested && (
+                  <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
+                    ✓ Sent
+                  </div>
+                )}
+              </div>
+
+              {user?.manualApprovalRequested ? (
+                <div className="flex-grow">
+                  <div className="text-xs text-gray-600 mb-2 flex-grow">
+                    <p>
+                      Your request has been submitted and is being reviewed.
+                      You may submit a new request if needed.
+                    </p>
+                  </div>
                   <Button
                     className="w-full py-1.5 px-2 h-auto text-xs"
-                    onClick={() => {
-                      // If the agreement is already signed, just open it for viewing
-                      if (buyerAgreements?.some(a => a.type === "global_brbc")) {
-                        // Get the agent ID from the existing agreement
-                        const existingAgreement = buyerAgreements.find(a => a.type === "global_brbc");
-                        setSelectedAgentId(existingAgreement?.agentId || 0);
-                        setIsBRBCModalOpen(true);
-                        return;
-                      }
-                      
-                      // Try to find an agent ID from different sources
-                      const firstAgent = 
-                        properties?.find(p => p.agentId)?.agentId || 
-                        buyerAgreements?.find(a => a.agentId)?.agentId || 
-                        19; // Default agent ID as fallback
-                        
-                      setSelectedAgentId(firstAgent);
-                      setIsBRBCModalOpen(true);
-                    }}
-                    variant={buyerAgreements?.some(a => a.type === "global_brbc") ? "outline" : "default"}
+                    onClick={() => setIsManualApprovalFormOpen(true)}
+                    variant="outline"
                   >
-                    <FileText className="mr-1.5 h-3 w-3" />
-                    {buyerAgreements?.some(a => a.type === "global_brbc") 
-                      ? "View Signed Agreement" 
-                      : "Sign Agreement"}
+                    <MailCheck className="mr-1.5 h-3 w-3" />
+                    Submit New Request
                   </Button>
                 </div>
-              </div>
-
-              {/* Manual Approval Card */}
-              <div className="relative rounded-lg">
-                <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center">
-                      <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                        <MailCheck className="h-3 w-3 text-green-700" />
-                      </div>
-                      <h5 className="font-medium text-green-800 text-sm">
-                        Request Manual Approval
-                      </h5>
-                    </div>
-                    
-                    {user?.manualApprovalRequested && (
-                      <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
-                        ✓ Sent
-                      </div>
-                    )}
-                  </div>
-
-                  {user?.manualApprovalRequested ? (
-                    <div className="flex-grow">
-                      <div className="text-xs text-gray-600 mb-2 flex-grow">
-                        <p>Your request has been submitted and is being reviewed. You may submit a new request if needed.</p>
-                      </div>
-                      <Button
-                        className="w-full py-1.5 px-2 h-auto text-xs"
-                        onClick={() => setIsManualApprovalFormOpen(true)}
-                        variant="outline"
-                      >
-                        <MailCheck className="mr-1.5 h-3 w-3" />
-                        Submit New Request
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                        Request manual profile approval from our team to get verified faster.
-                      </p>
-                      <Button
-                        className="w-full py-1.5 px-2 h-auto text-xs"
-                        onClick={() => setIsManualApprovalFormOpen(true)}
-                        variant="default"
-                      >
-                        <MailCheck className="mr-1.5 h-3 w-3" />
-                        Request Manual Approval
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
+                    Request manual profile approval from our team to get
+                    verified faster.
+                  </p>
+                  <Button
+                    className="w-full py-1.5 px-2 h-auto text-xs"
+                    onClick={() => setIsManualApprovalFormOpen(true)}
+                    variant="default"
+                  >
+                    <MailCheck className="mr-1.5 h-3 w-3" />
+                    Request Manual Approval
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -843,8 +855,18 @@ export default function BuyerDashboard() {
                             variant="outline"
                             className="flex items-center bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
                           >
-                            <svg className="h-3.5 w-3.5 mr-1.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                            <svg
+                              className="h-3.5 w-3.5 mr-1.5 text-blue-600"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                              />
                             </svg>
                             Download
                           </Button>
