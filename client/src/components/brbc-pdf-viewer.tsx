@@ -91,7 +91,7 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
       });
       
       // Handle successful submission
-      if (response.success) {
+      if (response && response.success) {
         setHasSigned(true);
         toast({
           title: "Agreement Signed",
@@ -103,7 +103,8 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
           onSigned();
         }
       } else {
-        throw new Error(response.error || "Failed to sign agreement");
+        const errorMessage = response && (response.error as string) ? response.error as string : "Failed to sign agreement";
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error("Error signing agreement:", error);
