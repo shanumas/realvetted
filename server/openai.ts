@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import fs from "fs";
 import { extractTextFromPdf } from "./pdf-util";
 // Import pdf-parse properly for ESM compatibility
-import pdfParse from 'pdf-parse';
+import pdfParse from "pdf-parse";
 
 // Initialize the OpenAI client
 const openai = new OpenAI({
@@ -361,6 +361,8 @@ ${fileContent.substring(0, 100)}...`);
 
     // Extract text properly using pdf-parse
     const { text: fileContent } = await pdfParse(fileBuffer);
+
+    console.log("FileContent: " + fileContent.substring(0, 30));
 
     // If no text was extracted or file is empty
     if (!fileContent || fileContent.trim().length === 0) {
