@@ -4,6 +4,7 @@ import { Property, User } from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
 import { extractTextFromPdf } from "./pdf-util";
+import pdfParse from "pdf-parse";
 
 // Initialize the OpenAI client
 const openai = new OpenAI({
@@ -91,10 +92,16 @@ export async function extractPropertyData(
 }
 
 // Extract data from ID images
-export async function extractIDData(idFrontBase64: string, idBackBase64: string): Promise<ExtractedIDData> {
+export async function extractIDData(
+  idFrontBase64: string,
+  idBackBase64: string,
+): Promise<ExtractedIDData> {
   try {
     // If there's no API key, return empty data for development
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
       console.log("Cannot extract ID data (no API key)");
       return {};
     }
@@ -118,7 +125,7 @@ export async function extractIDData(idFrontBase64: string, idBackBase64: string)
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${idFrontBase64 || ''}`,
+                url: `data:image/jpeg;base64,${idFrontBase64 || ""}`,
               },
             },
           ],
@@ -127,7 +134,9 @@ export async function extractIDData(idFrontBase64: string, idBackBase64: string)
       response_format: { type: "json_object" },
     });
 
-    const frontData = JSON.parse(frontResponse.choices[0].message.content || '{}');
+    const frontData = JSON.parse(
+      frontResponse.choices[0].message.content || "{}",
+    );
 
     // Process back of ID card to get any additional info
     const backResponse = await openai.chat.completions.create({
@@ -148,7 +157,7 @@ export async function extractIDData(idFrontBase64: string, idBackBase64: string)
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${idBackBase64 || ''}`,
+                url: `data:image/jpeg;base64,${idBackBase64 || ""}`,
               },
             },
           ],
@@ -157,7 +166,9 @@ export async function extractIDData(idFrontBase64: string, idBackBase64: string)
       response_format: { type: "json_object" },
     });
 
-    const backData = JSON.parse(backResponse.choices[0].message.content || '{}');
+    const backData = JSON.parse(
+      backResponse.choices[0].message.content || "{}",
+    );
 
     // Merge data from front and back, prioritizing front data if there are conflicts
     return {
@@ -176,8 +187,12 @@ export async function validatePrequalificationDocument(
   userData: {
     firstName: string | null;
     lastName: string | null;
-  }
-): Promise<{ validated: boolean; data: PrequalificationData; message: string }> {
+  },
+): Promise<{
+  validated: boolean;
+  data: PrequalificationData;
+  message: string;
+}> {
   try {
     // If there's no API key, check if the file is likely a prequalification letter based on basic validation
     if (
@@ -185,166 +200,211 @@ export async function validatePrequalificationDocument(
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
       console.log(
-        "Using enhanced mock validation for prequalification document (no API key)"
+        "Using enhanced mock validation for prequalification document (no API key)",
       );
-      
+
       // Read the file and extract first 1000 characters to check for keywords
       try {
         const fileBuffer = fs.readFileSync(filePath);
-        const fullContent = fileBuffer.toString('utf-8');
+        const fullContent = fileBuffer.toString("utf-8");
         // Limit to first 1000 characters as per requirements
         const fileContent = fullContent.substring(0, 1000).toLowerCase();
-        
+
         console.log(`Analyzing first 1000 characters of document for validation:
 ${fileContent.substring(0, 100)}...`);
-        
+
         // Check for keywords that would indicate this is a prequalification letter
         const prequalKeywords = [
-          'pre-qualification', 'prequalification', 
-          'pre-approval', 'preapproval',
-          'pre qualify', 'prequalify',
-          'mortgage', 'loan approval',
-          'lender', 'qualification letter'
+          "pre-qualification",
+          "prequalification",
+          "pre-approval",
+          "preapproval",
+          "pre qualify",
+          "prequalify",
+          "mortgage",
+          "loan approval",
+          "lender",
+          "qualification letter",
         ];
-        
+
         // Check for lender names or terms
         const lenderKeywords = [
-          'bank', 'mortgage', 'financial', 'credit union', 
-          'lending', 'capital', 'home loan'
+          "bank",
+          "mortgage",
+          "financial",
+          "credit union",
+          "lending",
+          "capital",
+          "home loan",
         ];
-        
+
         // Check if the document contains mortgage-related terms
         const mortgageKeywords = [
-          'loan amount', 'interest rate', 'down payment',
-          'approval', 'borrower', 'property', 'purchase'
+          "loan amount",
+          "interest rate",
+          "down payment",
+          "approval",
+          "borrower",
+          "property",
+          "purchase",
         ];
-        
+
         // Count the number of matching keywords to determine validity
         let keywordMatches = 0;
         let prequalFound = false;
         let lenderFound = false;
         let mortgageFound = false;
-        
+
         for (const keyword of prequalKeywords) {
           if (fileContent.includes(keyword)) {
             prequalFound = true;
             keywordMatches++;
           }
         }
-        
+
         for (const keyword of lenderKeywords) {
           if (fileContent.includes(keyword)) {
-            lenderFound = true; 
+            lenderFound = true;
             keywordMatches++;
           }
         }
-        
+
         for (const keyword of mortgageKeywords) {
           if (fileContent.includes(keyword)) {
             mortgageFound = true;
             keywordMatches++;
           }
         }
-        
+
         // Check for user name in the document
-        const userFullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim().toLowerCase();
+        const userFullName =
+          `${userData.firstName || ""} ${userData.lastName || ""}`
+            .trim()
+            .toLowerCase();
         const nameFound = userFullName && fileContent.includes(userFullName);
-        
+
         // For validation to pass, the document should:
         // 1. Contain at least one prequalification term
         // 2. Contain at least one lender term
         // 3. Contain user's name
         // 4. Have a reasonable number of relevant keywords (3+)
-        
-        const isValid = prequalFound && (lenderFound || mortgageFound) && nameFound && keywordMatches >= 3;
-        
+
+        const isValid =
+          prequalFound &&
+          (lenderFound || mortgageFound) &&
+          nameFound &&
+          keywordMatches >= 3;
+
         const mockData: PrequalificationData = {
-          documentType: prequalFound ? "Pre-Approval Letter" : "Unknown Document",
-          buyerName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim(),
+          documentType: prequalFound
+            ? "Pre-Approval Letter"
+            : "Unknown Document",
+          buyerName:
+            `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
           firstName: userData.firstName || undefined,
           lastName: userData.lastName || undefined,
           lenderName: lenderFound ? "Detected Lender" : undefined,
           loanAmount: mortgageFound ? "$500,000" : undefined,
           loanType: mortgageFound ? "Conventional" : undefined,
-          approvalDate: new Date().toISOString().split('T')[0],
-          expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          approvalDate: new Date().toISOString().split("T")[0],
+          expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
         };
-        
-        const validationMessage = isValid 
-          ? "Document validated successfully" 
-          : `Document doesn't appear to be a valid prequalification letter. Missing ${!prequalFound ? 'prequalification terms' : ''}${!lenderFound && !mortgageFound ? ', lender information' : ''}${!nameFound ? ', matching name' : ''}.`;
-        
-        console.log(`Mock validation result: ${isValid ? 'VALID' : 'INVALID'} - ${validationMessage}`);
-        
-        return { 
-          validated: Boolean(isValid), 
+
+        const validationMessage = isValid
+          ? "Document validated successfully"
+          : `Document doesn't appear to be a valid prequalification letter. Missing ${!prequalFound ? "prequalification terms" : ""}${!lenderFound && !mortgageFound ? ", lender information" : ""}${!nameFound ? ", matching name" : ""}.`;
+
+        console.log(
+          `Mock validation result: ${isValid ? "VALID" : "INVALID"} - ${validationMessage}`,
+        );
+
+        return {
+          validated: Boolean(isValid),
           data: mockData,
-          message: validationMessage
+          message: validationMessage,
         };
       } catch (error) {
         console.error("Error performing basic document validation:", error);
         return {
           validated: false,
           data: {},
-          message: "Error analyzing document content. Please try again with a different file."
+          message:
+            "Error analyzing document content. Please try again with a different file.",
         };
       }
     }
-    
+
     console.log(`Processing file: ${filePath}`);
-    
+
     // Extract text using our utility function
-    let fileContent = '';
     try {
       // Use our PDF utility that works with both PDF and non-PDF files
-      fileContent = await extractTextFromPdf(filePath);
-      console.log(`Text extraction successful, extracted ${fileContent.length} characters`);
+      const fileContent = await extractTextFromPdf(filePath);
+      console.log(
+        `Text extraction successful, extracted ${fileContent.length} characters`,
+      );
     } catch (extractError) {
       console.error("Error extracting text from document:", extractError);
       return {
         validated: false,
         data: {},
-        message: "Unable to read the document file. Please make sure it contains readable text and try again."
+        message:
+          "Unable to read the document file. Please make sure it contains readable text and try again.",
       };
     }
-    
+
+    const fileBuffer = fs.readFileSync(filePath);
+    console.log(filePath);
+
+    // Extract text properly using pdf-parse
+    const { text: fileContent } = await pdfParse(fileBuffer);
+
     // If no text was extracted or file is empty
     if (!fileContent || fileContent.trim().length === 0) {
       console.log("No text content could be extracted from the document");
       return {
         validated: false,
         data: {},
-        message: "The document appears to be empty or contains no readable text. Please upload a valid pre-qualification letter."
+        message:
+          "The document appears to be empty or contains no readable text. Please upload a valid pre-qualification letter.",
       };
     }
-    
+
     // Check if the extracted content is actually an error message from our extractor
-    if (fileContent.startsWith('Unable to extract') || 
-        fileContent.startsWith('This document appears to be') || 
-        fileContent.includes('cannot be read as text')) {
+    if (
+      fileContent.startsWith("Unable to extract") ||
+      fileContent.startsWith("This document appears to be") ||
+      fileContent.includes("cannot be read as text")
+    ) {
       console.log("Text extraction returned an error message");
       return {
         validated: false,
         data: {},
-        message: fileContent
+        message: fileContent,
       };
     }
-    
+
     // Take only the first 1000 characters of the document for analysis
     // This helps with large documents and keeps within OpenAI limits
     const contentPreview = fileContent.substring(0, 1000);
-    console.log("Using OpenAI to analyze and validate the prequalification document");
-    
+    console.log(
+      "Using OpenAI to analyze and validate the prequalification document",
+    );
+
     // Construct the buyer's full name
-    const buyerFullName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim();
-    
+    const buyerFullName =
+      `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
+
     // Call OpenAI API to validate the document
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
           role: "system",
-          content: "You are a financial document validator specializing in pre-qualification and pre-approval letters for mortgages and property purchases. Your task is to analyze document content and determine if it's a valid pre-qualification document."
+          content:
+            "You are a financial document validator specializing in pre-qualification and pre-approval letters for mortgages and property purchases. Your task is to analyze document content and determine if it's a valid pre-qualification document.",
         },
         {
           role: "user",
@@ -366,15 +426,15 @@ Respond with JSON containing these fields:
 - loanAmount: string (the loan amount mentioned, if any)
 - approvalDate: string (the approval date, if found)
 - expirationDate: string (the expiration date, if found)
-- message: string (explanation of validation result, especially if validation failed)`
-        }
+- message: string (explanation of validation result, especially if validation failed)`,
+        },
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
     });
-    
+
     // Parse the API response
     const result = JSON.parse(response.choices[0].message.content || "{}");
-    
+
     // Convert to our expected format if needed
     const validationData: PrequalificationData = {
       documentType: result.documentType || "Pre-Qualification Document",
@@ -384,62 +444,69 @@ Respond with JSON containing these fields:
       lenderName: result.lenderName,
       loanAmount: result.loanAmount,
       approvalDate: result.approvalDate,
-      expirationDate: result.expirationDate
+      expirationDate: result.expirationDate,
     };
-    
+
     // Check if the name was found
-    const nameFound = result.validated && result.buyerName && (
-      buyerFullName.toLowerCase().includes(result.buyerName.toLowerCase()) || 
-      result.buyerName.toLowerCase().includes(buyerFullName.toLowerCase())
-    );
-    
+    const nameFound =
+      result.validated &&
+      result.buyerName &&
+      (buyerFullName.toLowerCase().includes(result.buyerName.toLowerCase()) ||
+        result.buyerName.toLowerCase().includes(buyerFullName.toLowerCase()));
+
     // If the document is valid but the name doesn't match, override validation
     if (result.validated && !nameFound) {
       return {
         validated: false,
         data: validationData,
-        message: `The document does not contain your name (${buyerFullName}). Please ensure your name appears in the pre-qualification document.`
+        message: `The document does not contain your name (${buyerFullName}). Please ensure your name appears in the pre-qualification document.`,
       };
     }
-    
+
     return {
       validated: result.validated || false,
-      data: validationData, 
-      message: result.message || (result.validated ? 
-        "Document validated successfully" : 
-        "Document doesn't appear to be a valid pre-qualification letter.")
+      data: validationData,
+      message:
+        result.message ||
+        (result.validated
+          ? "Document validated successfully"
+          : "Document doesn't appear to be a valid pre-qualification letter."),
     };
   } catch (error) {
     console.error("Error validating prequalification document:", error);
     return {
       validated: false,
       data: {},
-      message: "Error processing document. Please try again with a clearer image."
+      message:
+        "Error processing document. Please try again with a clearer image.",
     };
   }
 }
 
 // Verify KYC documents
 export async function verifyKYCDocuments(
-  userId: number, 
-  idFrontUrl: string, 
+  userId: number,
+  idFrontUrl: string,
   idBackUrl: string,
   userData: {
     firstName: string;
     lastName: string;
     dateOfBirth: string;
     addressLine1: string;
-  }
+  },
 ): Promise<{ verified: boolean; message: string }> {
   // In a real implementation, this would:
   // 1. Download the ID images
   // 2. Use OpenAI Vision API to extract information
   // 3. Compare with user-provided info
   // 4. Return verification result
-  
+
   try {
     // If there's no API key, simulate verification for development
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
       console.log("Using mock verification (no API key)");
       return { verified: true, message: "ID verified successfully" };
     }
@@ -464,44 +531,51 @@ export async function verifyKYCDocuments(
 
     return {
       verified: nameMatches && addressMatches && dobMatches,
-      message: nameMatches && addressMatches && dobMatches
-        ? "ID verified successfully"
-        : "Verification failed, information doesn't match provided details",
+      message:
+        nameMatches && addressMatches && dobMatches
+          ? "ID verified successfully"
+          : "Verification failed, information doesn't match provided details",
     };
   } catch (error) {
     console.error("Error verifying KYC documents:", error);
     return {
       verified: false,
-      message: "Error processing ID documents. Please try again with clearer images.",
+      message:
+        "Error processing ID documents. Please try again with clearer images.",
     };
   }
 }
 
 // Find matching agents for a property
-export async function findAgentsForProperty(property: Property): Promise<User[]> {
+export async function findAgentsForProperty(
+  property: Property,
+): Promise<User[]> {
   try {
     // Get all agents from database
     const allAgents = await storage.getUsersByRole("agent");
-    
+
     // If no agents, return empty array
     if (!allAgents || allAgents.length === 0) {
       return [];
     }
-    
+
     // If there's no OpenAI API key, return random set of agents
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
       console.log("Using random agent selection (no API key)");
-      
+
       // Return up to 5 random agents
       if (allAgents.length <= 5) {
         return allAgents;
       }
-      
+
       // Shuffle the array and take first 5
       const shuffled = [...allAgents].sort(() => 0.5 - Math.random());
       return shuffled.slice(0, 5);
     }
-    
+
     // Get details of the property
     const propertyText = `
       Property at ${property.address}, ${property.city}, ${property.state}
@@ -511,21 +585,21 @@ export async function findAgentsForProperty(property: Property): Promise<User[]>
       Bathrooms: ${property.bathrooms || "Not specified"}
       Square footage: ${property.squareFeet || "Not specified"}
     `;
-    
+
     // Analyze each agent and rate their match for this property
     const rankedAgents = await rankAgentsByExpertise(property, allAgents);
-    
+
     // Return top 5 matching agents
     return rankedAgents.slice(0, 5);
   } catch (error) {
     console.error("Error finding agents for property:", error);
-    
+
     // Return a random selection of agents in case of error
     const agents = await storage.getUsersByRole("agent");
     if (agents.length <= 5) {
       return agents;
     }
-    
+
     // Shuffle and return first 5
     const shuffled = [...agents].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, 5);
@@ -534,14 +608,17 @@ export async function findAgentsForProperty(property: Property): Promise<User[]>
 
 // Helper function to rank agents by expertise
 async function rankAgentsByExpertise(
-  property: Property, 
-  agents: User[]
+  property: Property,
+  agents: User[],
 ): Promise<User[]> {
   // If there's no OpenAI API key, return original array
-  if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+  if (
+    !process.env.OPENAI_API_KEY ||
+    process.env.OPENAI_API_KEY === "dummy_key_for_development"
+  ) {
     return agents;
   }
-  
+
   try {
     // Prepare property details
     const propertyDetails = `
@@ -553,14 +630,14 @@ async function rankAgentsByExpertise(
       - Bathrooms: ${property.bathrooms || "Not specified"}
       - Square Footage: ${property.squareFeet || "Not specified"}
     `;
-    
+
     // Create an array of all agents with match scores
     // Instead of using any, we'll ignore the expertise property for now
     const scoredAgents = agents.map((agent) => {
       // In a real implementation, this would be actual agent info
       return agent;
     });
-    
+
     // Since we can't properly assign expertise, just return the original array
     return agents;
   } catch (error) {
@@ -570,17 +647,22 @@ async function rankAgentsByExpertise(
 }
 
 // Extract property data from URL
-export async function extractPropertyFromUrl(url: string): Promise<PropertyAIData> {
+export async function extractPropertyFromUrl(
+  url: string,
+): Promise<PropertyAIData> {
   try {
     // If there's no API key, use mock data for development
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === "dummy_key_for_development") {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
       console.log("Using mock data for URL extraction (no API key)");
       return generateMockPropertyData("123 Main St, Springfield, IL");
     }
-    
+
     // In a real implementation, we would scrape the URL and extract data
     console.log(`Extracting property data from URL: ${url}`);
-    
+
     try {
       // Mock implementation for testing
       const basicPropertyData: PropertyAIData = {
@@ -599,10 +681,10 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
           "Hardwood floors",
           "Updated kitchen",
           "Large backyard",
-          "Two-car garage"
-        ]
+          "Two-car garage",
+        ],
       };
-      
+
       return basicPropertyData;
     } catch (error) {
       console.error("Error extracting from URL:", error);
