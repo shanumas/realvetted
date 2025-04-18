@@ -877,9 +877,9 @@ export function BRBCPdfViewer({
             buyer1: formFields.buyer1 || (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}`.trim() : ""),
             buyer2: formFields.buyer2 || "",
             startDate: formFields.today || new Date().toISOString().slice(0, 10),
-            endDate: formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10),
+            endDate: formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10),
             startDate2: formFields.today2 || formFields.today || new Date().toISOString().slice(0, 10),
-            endDate2: formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString().slice(0, 10),
+            endDate2: formFields['3Months2'] || formFields['3Months'] || new Date(new Date().setDate(new Date().getDate() + 90)).toISOString().slice(0, 10),
           },
         }),
       }).then((res) => res.json());
