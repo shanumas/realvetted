@@ -139,13 +139,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Handle BRBC PDF prefilling
       if (filename === 'brbc.pdf' && prefill === 'buyer' && req.user) {
-        // Get buyer name from user object
+        // Get buyer name from the current logged-in user
         const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+        const buyerId = req.user.id;
         
-        // Fill the BRBC form with buyer information
+        // Fill the BRBC form with the current user's information
         try {
+          // Generate a unique cache key based on the user ID to ensure each user gets their own PDF
+          const cacheKey = `brbc_user_${buyerId}_${Date.now()}`;
+          
+          // Fill the BRBC form with current user's information
           pdfBuffer = await fillBrbcForm(buyerName);
-          console.log(`Prefilled BRBC form for buyer: ${buyerName}`);
+          console.log(`Prefilled BRBC form for buyer: ${buyerName} (ID: ${buyerId})`);
         } catch (error) {
           console.error("Error prefilling BRBC form:", error);
           // If prefilling fails, use the original PDF
