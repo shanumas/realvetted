@@ -5572,10 +5572,16 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
   
-  // API Endpoint to save a BRBC PDF with signature (original)
+  // API Endpoint to save a BRBC PDF with signature (with multiple signature fields support)
   app.post("/api/global-brbc/pdf-signature", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
     try {
-      const { signatureData, details } = req.body;
+      const { 
+        signatureData,     // Main signature for sign1 field
+        initialsData,      // Initials for initial1 field 
+        buyer2SignatureData, // Optional second buyer signature for sign2 field
+        buyer2InitialsData,  // Optional second buyer initials for initial2 field
+        details 
+      } = req.body;
       
       if (!req.user) {
         return res.status(401).json({
@@ -5603,9 +5609,25 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
       let pdfBuffer = await fillBrbcForm(buyerName);
       
-      // Add the signature to the PDF
+      // Add all the signatures to the PDF
       try {
+        // Add primary signature
         pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
+        
+        // Add primary buyer initials if provided
+        if (initialsData) {
+          pdfBuffer = await addSignatureToPdf(pdfBuffer, initialsData, "initial1");
+        }
+        
+        // Add second buyer signature if provided
+        if (buyer2SignatureData) {
+          pdfBuffer = await addSignatureToPdf(pdfBuffer, buyer2SignatureData, "sign2");
+        }
+        
+        // Add second buyer initials if provided
+        if (buyer2InitialsData) {
+          pdfBuffer = await addSignatureToPdf(pdfBuffer, buyer2InitialsData, "initial2");
+        }
       } catch (error) {
         console.error("Error adding signature to PDF:", error);
         // Continue with the process even if signature addition fails

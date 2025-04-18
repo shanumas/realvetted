@@ -364,7 +364,7 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
               ) : (
                 <Button 
                   onClick={handleSubmitSignature} 
-                  disabled={isSubmitting || signatureIsEmpty}
+                  disabled={isSubmitting || signatureIsEmpty || initialsIsEmpty}
                   className="mr-2"
                 >
                   {isSubmitting ? (
@@ -373,7 +373,7 @@ export function BRBCPdfViewer({ isOpen, onClose, onSigned }: BRBCPdfViewerProps)
                       Submitting...
                     </>
                   ) : (
-                    'Submit Signature'
+                    'Submit Signatures'
                   )}
                 </Button>
               )}

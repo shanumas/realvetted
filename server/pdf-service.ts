@@ -69,7 +69,7 @@ export interface AgentReferralFormData {
 export async function addSignatureToPdf(
   pdfBuffer: Buffer,
   signatureData: string,
-  signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent" | "sign1" | "sign2",
+  signatureField: "buyer1" | "buyer2" | "seller1" | "seller2" | "agent" | "sign1" | "sign2" | "initial1" | "initial2",
 ): Promise<Buffer> {
   try {
     // Load the PDF document
@@ -110,6 +110,12 @@ export async function addSignatureToPdf(
         break;
       case "sign2":
         fieldName = "sign2";
+        break;
+      case "initial1":
+        fieldName = "initial1";
+        break;
+      case "initial2":
+        fieldName = "initial2";
         break;
     }
 
@@ -178,8 +184,8 @@ export async function addSignatureToPdf(
       );
       // If field not found, add signature in a default position
       const { width, height } = firstPage.getSize();
-      const sigWidth = 150;
-      const sigHeight = 50;
+      let sigWidth = 150;
+      let sigHeight = 50;
       let sigX = 100;
       let sigY = 100;
 
@@ -212,6 +218,20 @@ export async function addSignatureToPdf(
         case "sign2":
           sigX = width * 0.6;
           sigY = height * 0.2;
+          break;
+        case "initial1":
+          sigX = width * 0.2;
+          sigY = height * 0.7;
+          // For initials, make the signature smaller
+          sigWidth = 80;
+          sigHeight = 30;
+          break;
+        case "initial2":
+          sigX = width * 0.6;
+          sigY = height * 0.7;
+          // For initials, make the signature smaller
+          sigWidth = 80;
+          sigHeight = 30;
           break;
       }
 
