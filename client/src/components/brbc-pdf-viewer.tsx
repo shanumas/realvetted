@@ -240,6 +240,48 @@ export function BRBCPdfViewer({
     if (isPreviewing) {
       setIsPreviewing(false);
     }
+    
+    // Check if we have a PDF document loaded
+    try {
+      if (iframeRef.current && iframeRef.current.contentWindow) {
+        const win = iframeRef.current.contentWindow as any;
+        const doc = iframeRef.current.contentWindow.document;
+        
+        // Add event listeners to capture form field changes
+        try {
+          // Add input event listeners to form fields
+          doc.addEventListener('input', () => {
+            console.log("Input event detected in PDF form");
+            // Capture form values when user inputs data
+            captureFormValues();
+          });
+          
+          // Also listen for change events
+          doc.addEventListener('change', () => {
+            console.log("Change event detected in PDF form");
+            captureFormValues();
+          });
+          
+          // Add click listener that might trigger form field interactions
+          doc.addEventListener('click', () => {
+            // Use a slight delay to allow form field to update first
+            setTimeout(captureFormValues, 100);
+          });
+          
+          // Add key listeners for form fields
+          doc.addEventListener('keyup', () => {
+            console.log("Key up event detected in PDF form");
+            setTimeout(captureFormValues, 100);
+          });
+          
+          console.log("Added PDF form field change listeners");
+        } catch (e) {
+          console.warn("Could not add form field change listeners:", e);
+        }
+      }
+    } catch (err) {
+      console.error("Error accessing PDF viewer", err);
+    }
   };
 
   const handlePdfError = () => {
@@ -758,23 +800,43 @@ export function BRBCPdfViewer({
       // Get the current form field values from the iframe
       if (iframeRef.current && iframeRef.current.contentWindow) {
         const doc = iframeRef.current.contentWindow.document;
+        const win = iframeRef.current.contentWindow as any;
         
         // Try to get all form elements - check for different selectors 
         // as PDF viewers render forms differently
         const formElements = [
           ...Array.from(doc.querySelectorAll('input')),
+          ...Array.from(doc.querySelectorAll('input[type="text"]')), // Specifically target text fields
           ...Array.from(doc.querySelectorAll('textarea')),
           ...Array.from(doc.querySelectorAll('.textLayer > div')), // PDF.js text layers
           ...Array.from(doc.querySelectorAll('[data-field-name]')), // Some PDF viewers add data attributes
-          ...Array.from(doc.querySelectorAll('.form-field, .form-widget')) // Common classes for form fields
+          ...Array.from(doc.querySelectorAll('.form-field, .form-widget')), // Common classes for form fields
+          ...Array.from(doc.querySelectorAll('[contenteditable="true"]')), // Editable elements
+          ...Array.from(doc.querySelectorAll('[role="textbox"]')), // ARIA role for text input
+          ...Array.from(doc.querySelectorAll('div.textEditable')), // Common class for editable text
+          ...Array.from(doc.querySelectorAll('span.textEditable')), // Common class for editable text
         ];
         
+        // Start with existing form fields
         const updatedFormFields: Record<string, string> = {...formFields};
         
         console.log("Capturing form fields from PDF viewer, found elements:", formElements.length);
         
+        // Browser-specific check for PDF.js form fields
+        try {
+          if (win.PDFViewerApplication) {
+            const pdfDocument = win.PDFViewerApplication.pdfDocument;
+            if (pdfDocument && pdfDocument._transport && pdfDocument._transport._formInfo) {
+              console.log("Detected PDF.js viewer with form info");
+            }
+          }
+        } catch (e) {
+          console.log("PDF.js detection failed:", e);
+        }
+        
         // First try to capture from standard form elements
-        formElements.forEach(element => {
+        formElements.forEach((element, index) => {
+          // Check for standard form fields with name attribute
           if ((element as HTMLInputElement).name && (element as HTMLInputElement).value) {
             const input = element as HTMLInputElement;
             updatedFormFields[input.name] = input.value;
@@ -787,6 +849,24 @@ export function BRBCPdfViewer({
             if (fieldName) {
               updatedFormFields[fieldName] = fieldValue;
               console.log(`Captured form field from data attribute: ${fieldName} = ${fieldValue}`);
+            }
+          }
+          // Check for text content in elements that might represent form fields
+          else if (element.textContent && element.textContent.trim() !== '') {
+            // Create a pseudo-name based on element properties or position
+            const id = element.id || `field_${index}`;
+            // Only add if it looks like a form field (not just generic text)
+            const isSmall = element.clientWidth < 250 && element.clientHeight < 50;
+            const hasSpecialClasses = element.className && (
+              element.className.includes('field') || 
+              element.className.includes('form') || 
+              element.className.includes('text') ||
+              element.className.includes('input')
+            );
+            
+            if (isSmall || hasSpecialClasses) {
+              updatedFormFields[id] = element.textContent;
+              console.log(`Captured text content as field: ${id} = ${element.textContent}`);
             }
           }
         });
