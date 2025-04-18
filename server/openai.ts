@@ -224,14 +224,14 @@ export async function validatePrequalificationDocument(
       messages: [
         {
           role: "system",
-          content: "You are a financial document parser specialized in pre-qualification and pre-approval letters."
+          content: "You are a financial document parser specialized in pre-qualification and pre-approval letters for property purchases."
         },
         {
           role: "user",
           content: [
             { 
               type: "text", 
-              text: "Extract all information from this pre-qualification document." 
+              text: "Check if the content corresponds to a pre-qualification document for ${userData.firstName} ${userData.lastName} for buying property in the USA. Letter is issued by a lender. Extract all information from this pre-qualification document." 
             },
             {
               type: "image_url",
