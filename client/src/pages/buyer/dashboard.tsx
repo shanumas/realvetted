@@ -49,7 +49,8 @@ export default function BuyerDashboard() {
   const [isPrequalificationModalOpen, setIsPrequalificationModalOpen] =
     useState(false);
   const [isRequestingApproval, setIsRequestingApproval] = useState(false);
-  const [isManualApprovalFormOpen, setIsManualApprovalFormOpen] = useState(false);
+  const [isManualApprovalFormOpen, setIsManualApprovalFormOpen] =
+    useState(false);
 
   // Get stored verification session ID if it exists
   const storedSessionId = localStorage.getItem("veriffSessionId");
@@ -261,9 +262,11 @@ export default function BuyerDashboard() {
                 <h3 className="text-lg font-semibold text-gray-900">
                   Welcome, {user?.firstName || "Buyer"}!
                 </h3>
-                
+
                 <div className="flex items-center mt-1">
-                  <div className={`flex items-center ${user?.profileStatus === "verified" ? "text-green-600" : "text-yellow-600"} text-xs font-medium`}>
+                  <div
+                    className={`flex items-center ${user?.profileStatus === "verified" ? "text-green-600" : "text-yellow-600"} text-xs font-medium`}
+                  >
                     {checking ? (
                       <RefreshCw className="h-3.5 w-3.5 text-blue-400 animate-spin mr-1" />
                     ) : user?.profileStatus === "verified" ? (
@@ -294,36 +297,33 @@ export default function BuyerDashboard() {
                       </svg>
                     )}
                     <span>
-                      Status: <span className="font-semibold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
-                      
+                      Status:{" "}
+                      <span className="font-semibold">
+                        {user?.profileStatus === "verified"
+                          ? "Verified"
+                          : "Pending"}
+                      </span>
                       {user?.profileStatus === "verified" && (
                         <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                          {user?.verificationMethod === "kyc" && user?.prequalificationValidated
+                          {user?.verificationMethod === "kyc" &&
+                          user?.prequalificationValidated
                             ? "Verified through both KYC and pre-qualification letter"
                             : user?.verificationMethod === "kyc"
-                            ? "Verified through KYC"
-                            : "Verified through pre-qualification letter"}
+                              ? "Verified through KYC"
+                              : "Verified through pre-qualification letter"}
                         </span>
                       )}
                     </span>
-                    
+
                     {/* Show pre-qualification validation message/rejection reason if applicable */}
-                    {!user?.prequalificationValidated && 
-                     user?.prequalificationDocUrl && 
-                     user?.prequalificationMessage && 
-                     user?.prequalificationMessage !== "Document validated successfully" && (
-                      <span className="ml-2 text-xs text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
-                        {user.prequalificationMessage}
-                      </span>
-                    )}
-                    
+
                     {storedSessionId && user?.profileStatus !== "verified" && (
                       <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full text-[10px]">
                         {checking ? "Checking..." : "Auto-checking"}
                       </span>
                     )}
                   </div>
-                  
+
                   {isVerificationStarted && (
                     <div className="ml-3 text-blue-600 text-xs flex items-center">
                       <Loader2 className="h-3 w-3 animate-spin mr-1" />
@@ -333,7 +333,7 @@ export default function BuyerDashboard() {
                 </div>
               </div>
             </div>
-            
+
             <Button onClick={() => setIsModalOpen(true)} size="sm">
               <PlusIcon className="mr-1.5 h-3.5 w-3.5" />
               Add Property
@@ -344,30 +344,46 @@ export default function BuyerDashboard() {
         {/* Verification Options - 50% less height, dimmed when verified */}
         <div className="mt-5 bg-white px-4 py-3 rounded-lg border border-gray-100 shadow-sm">
           <div className="flex justify-between items-center mb-2">
-            <h4 className="text-base font-medium text-gray-800">Verification Options</h4>
+            <h4 className="text-base font-medium text-gray-800">
+              Verification Options
+            </h4>
             {user?.profileStatus === "verified" && (
               <div className="bg-green-50 px-2 py-1 rounded-full text-xs font-medium text-green-700 border border-green-100 flex items-center">
-                <svg className="h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                <svg
+                  className="h-3 w-3 mr-1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
                 </svg>
                 Verification Complete
               </div>
             )}
           </div>
-          
+
           <div className="grid md:grid-cols-3 gap-3">
             {/* First column - Identity verification and pre-qualification (instant methods) */}
             <div className="md:col-span-2 grid grid-cols-2 gap-3">
               {/* Identity verification option */}
-              <div className="relative rounded-lg">              
+              <div className="relative rounded-lg">
                 <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
                   <div className="flex items-center mb-1.5">
                     <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
                       <Shield className="h-3 w-3 text-blue-700" />
                     </div>
-                    <h5 className="font-medium text-blue-800 text-sm">Verify Identity</h5>
+                    <h5 className="font-medium text-blue-800 text-sm">
+                      Verify Identity
+                    </h5>
                   </div>
-                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">Complete online ID verification through our secure identity verification partner.</p>
+                  <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
+                    Complete online ID verification through our secure identity
+                    verification partner.
+                  </p>
                   <Button
                     className="w-full py-1.5 px-2 h-auto text-xs"
                     onClick={startVerification}
@@ -394,20 +410,27 @@ export default function BuyerDashboard() {
                     <div className="bg-purple-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
                       <Upload className="h-3 w-3 text-purple-700" />
                     </div>
-                    <h5 className="font-medium text-purple-800 text-sm">Upload Pre-qualification</h5>
+                    <h5 className="font-medium text-purple-800 text-sm">
+                      Upload Pre-qualification
+                    </h5>
                   </div>
-                  
+
                   {user?.prequalificationDocUrl ? (
                     <>
                       <div className="mb-2 flex-grow">
-                        <div className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}>
-                          {user?.prequalificationValidated 
-                            ? "✓ Document validated successfully" 
+                        <div
+                          className={`text-xs font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
+                        >
+                          {user?.prequalificationValidated
+                            ? "✓ Document validated successfully"
                             : "⚠️ Document validation pending"}
                         </div>
-                        {user?.prequalificationMessage && !user?.prequalificationValidated && (
-                          <p className="text-xs text-red-500 mt-1">{user.prequalificationMessage}</p>
-                        )}
+                        {user?.prequalificationMessage &&
+                          !user?.prequalificationValidated && (
+                            <p className="text-xs text-red-500 mt-1">
+                              {user.prequalificationMessage}
+                            </p>
+                          )}
                       </div>
                       <Button
                         className="w-full py-1.5 px-2 h-auto text-xs"
@@ -422,7 +445,8 @@ export default function BuyerDashboard() {
                   ) : (
                     <>
                       <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                        Upload your lender pre-qualification document as an alternative verification method.
+                        Upload your lender pre-qualification document as an
+                        alternative verification method.
                       </p>
                       <Button
                         className="w-full py-1.5 px-2 h-auto text-xs"
@@ -442,17 +466,27 @@ export default function BuyerDashboard() {
             {/* Second column - Request Manual Approval (delayed process) */}
             <div className="md:col-span-1">
               <div className="h-full bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
-                <div className="flex items-center mb-1.5">
-                  <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                    <MailCheck className="h-3 w-3 text-green-700" />
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center">
+                    <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
+                      <MailCheck className="h-3 w-3 text-green-700" />
+                    </div>
+                    <h5 className="font-medium text-green-800 text-sm">
+                      Request Manual Approval
+                    </h5>
                   </div>
-                  <h5 className="font-medium text-green-800 text-sm">Request Manual Approval</h5>
+                  
+                  {user?.manualApprovalRequested && (
+                    <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
+                      ✓ Sent
+                    </div>
+                  )}
                 </div>
-                
+
                 {user?.manualApprovalRequested ? (
                   <div className="flex-grow">
-                    <div className="text-xs font-medium text-green-600 mb-2">
-                      ✓ Request submitted
+                    <div className="text-xs text-gray-600 mb-2 flex-grow">
+                      <p>Your request has been submitted and is being reviewed. You may submit a new request if needed.</p>
                     </div>
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
@@ -460,7 +494,7 @@ export default function BuyerDashboard() {
                       variant="outline"
                     >
                       <MailCheck className="mr-1.5 h-3 w-3" />
-                      Request Again
+                      Submit New Request
                     </Button>
                   </div>
                 ) : (
@@ -473,7 +507,8 @@ export default function BuyerDashboard() {
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
                       onClick={() => setIsManualApprovalFormOpen(true)}
-                      variant="outline"
+                      variant={user?.prequalificationDocUrl ? "default" : "outline"}
+                      disabled={!user?.prequalificationDocUrl}
                     >
                       <MailCheck className="mr-1.5 h-3 w-3" />
                       Request Manual Approval
@@ -494,21 +529,21 @@ export default function BuyerDashboard() {
           >
             <div className="px-6 pt-4 border-b border-gray-200">
               <TabsList className="grid w-full max-w-2xl grid-cols-3 gap-4">
-                <TabsTrigger 
+                <TabsTrigger
                   value="properties"
                   className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
                 >
                   <PlusIcon className="h-4 w-4 mr-2" />
                   Properties
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="viewingRequests"
                   className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
                 >
                   <CalendarRange className="h-4 w-4 mr-2" />
                   Viewing Requests
                 </TabsTrigger>
-                <TabsTrigger 
+                <TabsTrigger
                   value="agreements"
                   className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
                 >
