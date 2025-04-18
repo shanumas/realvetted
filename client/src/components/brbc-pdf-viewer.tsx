@@ -6,13 +6,24 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FileText, Check, User, UserPlus } from "lucide-react";
+import { Loader2, FileText, Check, User, UserPlus, Eye } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SignatureCanvas from "react-signature-canvas";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 // Utility to save and restore signature canvas data
 interface SignatureData {
@@ -37,10 +48,14 @@ export function BRBCPdfViewer({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState("");
+  const [cachedPdfUrl, setCachedPdfUrl] = useState<string | null>(null); // Store last valid PDF to avoid losing form data
   const [isSigning, setIsSigning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
+  const [lastPreviewTimestamp, setLastPreviewTimestamp] = useState<number | null>(null);
 
   // Signature refs for different signature types
   const signatureRef = useRef<SignatureCanvas>(null);
@@ -65,26 +80,48 @@ export function BRBCPdfViewer({
   useEffect(() => {
     // When the dialog opens, load the prefilled PDF
     if (isOpen) {
+      // Reset states
+      setHasSigned(false);
+      setIsSigning(false);
+      setIsPreviewing(false);
+      setShowSubmitConfirm(false);
+      setCachedPdfUrl(null);
+      
+      // Load fresh PDF
       const url = `/api/docs/brbc.pdf?fillable=true&prefill=buyer&inline=true&t=${Date.now()}`;
       setPdfUrl(url);
       setIsLoading(true);
-      setHasSigned(false);
-      setIsSigning(false);
     }
   }, [isOpen]);
 
   const handlePdfLoad = () => {
     setIsLoading(false);
+    
+    // After successful load, cache the current PDF URL if it's not a preview
+    if (!isPreviewing && pdfUrl && !pdfUrl.includes('preview')) {
+      setCachedPdfUrl(pdfUrl);
+    }
+    
+    // If we were previewing, turn off preview mode after load
+    if (isPreviewing) {
+      setIsPreviewing(false);
+    }
   };
 
   const handlePdfError = () => {
     setIsLoading(false);
-    toast({
-      title: "Error Loading PDF",
-      description:
-        "There was a problem loading the agreement. Please try again.",
-      variant: "destructive",
-    });
+    
+    // If load fails and we have a cached PDF, use it
+    if (cachedPdfUrl) {
+      setPdfUrl(cachedPdfUrl);
+    } else {
+      toast({
+        title: "Error Loading PDF",
+        description:
+          "There was a problem loading the agreement. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Clear the signature canvas based on active tab
@@ -313,14 +350,32 @@ export function BRBCPdfViewer({
     }
   };
 
-  // Function to update the PDF with the signature image in real-time
+  // Function to update the PDF with the signature image
+  // The manualPreview flag indicates if this was triggered by the user clicking "Preview"
   const updatePdfPreviewWithSignature = async (
     signatureData: string,
     type: "primary" | "initials" | "buyer2Primary" | "buyer2Initials",
+    manualPreview = false
   ) => {
     try {
       // Save current signature to state
       saveCurrentSignature();
+      
+      // Only update PDF in real-time if manually previewing or if enough time has passed since last update
+      // This prevents excessive reloading when signing quickly
+      const currentTime = Date.now();
+      if (!manualPreview && lastPreviewTimestamp && currentTime - lastPreviewTimestamp < 1000) {
+        return; // Skip automatic preview updates if less than 1 second since last update
+      }
+      
+      // If this is a manual preview, show loading state
+      if (manualPreview) {
+        setIsLoading(true);
+        setIsPreviewing(true);
+      }
+      
+      // Update timestamp
+      setLastPreviewTimestamp(currentTime);
 
       // Prepare data for server request
       const requestData: Record<string, any> = {
@@ -369,14 +424,73 @@ export function BRBCPdfViewer({
         response.data &&
         response.data.pdfUrl
       ) {
-        setPdfUrl(response.data.pdfUrl);
+        // If we're coming from a manual preview, we want to reload
+        if (manualPreview) {
+          setPdfUrl(response.data.pdfUrl);
+        } 
+        // For auto-updates, only update if we don't have a cached PDF yet 
+        // or if this is a manual preview request
+        else if (!cachedPdfUrl) {
+          setPdfUrl(response.data.pdfUrl);
+          setCachedPdfUrl(response.data.pdfUrl);
+        }
       }
     } catch (error) {
       console.error("Error updating PDF preview:", error);
-      // Silently fail on preview errors - don't show error to user
+      
+      // For manual previews, show error
+      if (manualPreview) {
+        setIsPreviewing(false);
+        setIsLoading(false);
+        toast({
+          title: "Preview Error",
+          description: "Could not generate PDF preview. Please try again.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+  
+  // Function to generate a preview of the PDF with current signatures
+  const previewSignedPdf = async () => {
+    try {
+      // Save current signature data
+      saveCurrentSignature();
+      
+      // Check if we have at least one signature
+      if (!savedSignatures.primary && !savedSignatures.initials && 
+          !savedSignatures.buyer2Primary && !savedSignatures.buyer2Initials) {
+        toast({
+          title: "No Signatures",
+          description: "Please add at least one signature or initial before previewing.",
+          variant: "default"
+        });
+        return;
+      }
+      
+      // Get primary signature data
+      let primarySignature = savedSignatures.primary;
+      if (!primarySignature && signatureRef.current && !signatureRef.current.isEmpty()) {
+        primarySignature = signatureRef.current.toDataURL();
+      }
+      
+      // Update PDF with preview
+      updatePdfPreviewWithSignature(
+        primarySignature || "",
+        "primary",
+        true // This is a manual preview
+      );
+    } catch (error) {
+      console.error("Error generating preview:", error);
+      toast({
+        title: "Preview Failed",
+        description: "Could not generate preview. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
+  // This function validates signatures and shows the preview confirmation dialog
   const handleSubmitSignature = async () => {
     // Force an update of the current tab's signatures
     saveCurrentSignature();
@@ -413,6 +527,15 @@ export function BRBCPdfViewer({
       return;
     }
 
+    // Show a preview before submitting
+    await previewSignedPdf();
+    
+    // Open confirmation dialog once preview is loaded
+    setShowSubmitConfirm(true);
+  };
+  
+  // Actually submit the signature after confirmation
+  const confirmAndSubmitSignature = async () => {
     // Save any signature currently in the active canvas
     saveCurrentSignature();
 
@@ -503,6 +626,7 @@ export function BRBCPdfViewer({
       });
     } finally {
       setIsSubmitting(false);
+      setShowSubmitConfirm(false);
     }
   };
 
@@ -723,7 +847,7 @@ export function BRBCPdfViewer({
               Successfully signed
             </div>
           ) : (
-            <div className="flex-1">
+            <div className="flex-1 flex items-center">
               {!isSigning ? (
                 <Button
                   className="mr-2 mt-0"
@@ -732,37 +856,61 @@ export function BRBCPdfViewer({
                   Sign Agreement
                 </Button>
               ) : (
-                <Button
-                  onClick={() => {
-                    // Force a final check of all signatures before submission
-                    if (signatureRef.current) {
-                      setSignatureIsEmpty(signatureRef.current.isEmpty());
-                    }
-                    if (initialsRef.current) {
-                      setInitialsIsEmpty(initialsRef.current.isEmpty());
-                    }
+                <>
+                  {/* Preview button - shows PDF with signatures without submitting */}
+                  <Button
+                    variant="outline"
+                    onClick={previewSignedPdf}
+                    disabled={isPreviewing || isSubmitting}
+                    className="mr-2"
+                  >
+                    {isPreviewing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Previewing...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Submit button - now shows confirmation dialog */}
+                  <Button
+                    onClick={() => {
+                      // Force a final check of all signatures before submission
+                      if (signatureRef.current) {
+                        setSignatureIsEmpty(signatureRef.current.isEmpty());
+                      }
+                      if (initialsRef.current) {
+                        setInitialsIsEmpty(initialsRef.current.isEmpty());
+                      }
 
-                    // Use a short timeout to let state update before submitting
-                    setTimeout(() => {
-                      handleSubmitSignature();
-                    }, 50);
-                  }}
-                  disabled={
-                    isSubmitting ||
-                    (!savedSignatures.primary && signatureIsEmpty) ||
-                    (!savedSignatures.initials && initialsIsEmpty)
-                  }
-                  className="mr-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    "Submit Signatures"
-                  )}
-                </Button>
+                      // Use a short timeout to let state update before submitting
+                      setTimeout(() => {
+                        handleSubmitSignature();
+                      }, 50);
+                    }}
+                    disabled={
+                      isSubmitting ||
+                      isPreviewing ||
+                      (!savedSignatures.primary && signatureIsEmpty) ||
+                      (!savedSignatures.initials && initialsIsEmpty)
+                    }
+                    className="mr-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Signatures"
+                    )}
+                  </Button>
+                </>
               )}
 
               <Button variant="outline" onClick={handleClose}>
@@ -773,5 +921,31 @@ export function BRBCPdfViewer({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    
+    {/* Confirmation Alert Dialog - shown before final submission */}
+    <AlertDialog open={showSubmitConfirm} onOpenChange={setShowSubmitConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm Submission</AlertDialogTitle>
+          <AlertDialogDescription>
+            Please review the document with your signatures above.
+            Are you sure you want to submit this agreement?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmAndSubmitSignature}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit Agreement"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
