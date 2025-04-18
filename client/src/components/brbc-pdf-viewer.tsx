@@ -291,9 +291,12 @@ export function BRBCPdfViewer({
     }
   };
 
-  // Save current signature data before switching tabs
+  // Save current signature data and form values before switching tabs
   const saveCurrentSignature = () => {
     try {
+      // Save form values first
+      captureFormValues();
+      
       const updatedSignatures = { ...savedSignatures };
 
       if (activeTab === "buyer1-signature") {
@@ -433,6 +436,9 @@ export function BRBCPdfViewer({
 
   // Check if the signature canvas is empty based on active tab and update the PDF preview
   const checkSignature = () => {
+    // Capture form values before checking signature
+    captureFormValues();
+    
     if (activeTab === "buyer1-signature") {
       // Check primary buyer's signature if available
       if (signatureRef.current) {
@@ -492,8 +498,9 @@ export function BRBCPdfViewer({
     manualPreview = false
   ) => {
     try {
-      // Save current signature to state
+      // Save current signature and form values to state
       saveCurrentSignature();
+      captureFormValues();
       
       // Only update PDF in real-time if manually previewing or if enough time has passed since last update
       // This prevents excessive reloading when signing quickly
