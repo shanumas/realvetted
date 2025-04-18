@@ -295,6 +295,16 @@ export default function BuyerDashboard() {
                     )}
                     <span>
                       Status: <span className="font-semibold">{user?.profileStatus === "verified" ? "Verified" : "Pending"}</span>
+                      
+                      {user?.profileStatus === "verified" && (
+                        <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
+                          {user?.verificationMethod === "kyc" && user?.prequalificationValidated
+                            ? "Verified through both KYC and pre-qualification letter"
+                            : user?.verificationMethod === "kyc"
+                            ? "Verified through KYC"
+                            : "Verified through pre-qualification letter"}
+                        </span>
+                      )}
                     </span>
                     
                     {/* Show pre-qualification validation message/rejection reason if applicable */}
@@ -346,12 +356,8 @@ export default function BuyerDashboard() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-3">
-            {/* Apply dimming effect with overlay when verification is successful */}
-            <div className={`relative rounded-lg ${user?.profileStatus === "verified" ? "overflow-hidden" : ""}`}>
-              {user?.profileStatus === "verified" && (
-                <div className="absolute inset-0 bg-white/70 z-10 pointer-events-none"></div>
-              )}
-              
+            {/* Identity verification option - removed dimming effect */}
+            <div className="relative rounded-lg">              
               <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
                 <div className="flex items-center mb-1.5">
                   <div className="bg-blue-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
@@ -363,7 +369,7 @@ export default function BuyerDashboard() {
                 <Button
                   className="w-full py-1.5 px-2 h-auto text-xs"
                   onClick={startVerification}
-                  disabled={isVerifyingIdentity || isVerificationStarted || user?.profileStatus === "verified"}
+                  disabled={isVerifyingIdentity || isVerificationStarted}
                 >
                   {isVerifyingIdentity ? (
                     <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
@@ -379,10 +385,8 @@ export default function BuyerDashboard() {
               </div>
             </div>
 
-            <div className={`relative rounded-lg ${user?.profileStatus === "verified" ? "overflow-hidden" : ""}`}>
-              {user?.profileStatus === "verified" && (
-                <div className="absolute inset-0 bg-white/70 z-10 pointer-events-none"></div>
-              )}
+            {/* Pre-qualification upload option - removed dimming effect */}
+            <div className="relative rounded-lg">
               
               <div className="h-full bg-purple-50 rounded-lg border border-purple-100 p-3 flex flex-col">
                 <div className="flex items-center mb-1.5">
@@ -407,7 +411,7 @@ export default function BuyerDashboard() {
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
                       onClick={() => setIsPrequalificationModalOpen(true)}
-                      disabled={isVerificationStarted || user?.profileStatus === "verified"}
+                      disabled={isVerificationStarted}
                       variant="outline"
                     >
                       <Upload className="mr-1.5 h-3 w-3" />
@@ -422,7 +426,7 @@ export default function BuyerDashboard() {
                     <Button
                       className="w-full py-1.5 px-2 h-auto text-xs"
                       onClick={() => setIsPrequalificationModalOpen(true)}
-                      disabled={isVerificationStarted || user?.profileStatus === "verified"}
+                      disabled={isVerificationStarted}
                       variant="outline"
                     >
                       <Upload className="mr-1.5 h-3 w-3" />
