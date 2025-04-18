@@ -498,34 +498,57 @@ export default function BuyerDashboard() {
             <div className="md:col-span-1 grid grid-cols-1 gap-3">
               {/* BRBC Agreement Card */}
               <div className="relative rounded-lg">
-                <div className="h-full bg-amber-50 rounded-lg border border-amber-100 p-3 flex flex-col">
+                <div className={`h-full ${buyerAgreements?.some(a => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center">
-                      <div className="bg-amber-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
-                        <FileText className="h-3 w-3 text-amber-700" />
+                      <div className={`${buyerAgreements?.some(a => a.type === "global_brbc") ? "bg-green-100" : "bg-amber-100"} rounded-full w-6 h-6 flex items-center justify-center mr-2`}>
+                        <FileText className={`h-3 w-3 ${buyerAgreements?.some(a => a.type === "global_brbc") ? "text-green-700" : "text-amber-700"}`} />
                       </div>
-                      <h5 className="font-medium text-amber-800 text-sm">
+                      <h5 className={`font-medium ${buyerAgreements?.some(a => a.type === "global_brbc") ? "text-green-800" : "text-amber-800"} text-sm`}>
                         Buyer Representation Agreement
                       </h5>
                     </div>
                     
-                    {buyerAgreements?.some(a => a.type === "global_brbc") && (
-                      <div className="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-medium text-amber-700 border border-amber-200">
+                    {buyerAgreements?.some(a => a.type === "global_brbc") ? (
+                      <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
                         ✓ Signed
+                      </div>
+                    ) : (
+                      <div className="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-medium text-amber-700 border border-amber-200">
+                        Required
                       </div>
                     )}
                   </div>
 
-                  <p className="text-xs text-gray-600 mb-2 flex-grow">
-                    Sign the Buyer Representation Agreement (BRBC) to formalize your relationship with your agent. This agreement is required for viewing requests.
-                  </p>
+                  {buyerAgreements?.some(a => a.type === "global_brbc") ? (
+                    <div className="bg-green-50 text-green-700 text-xs p-2 rounded-md border border-green-100 mb-2">
+                      ✓ Agreement successfully signed
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 text-amber-700 text-xs p-2 rounded-md border border-amber-100 mb-2">
+                      ⚠️ This agreement must be signed before you can request property viewings
+                    </div>
+                  )}
                   
                   <Button
                     className="w-full py-1.5 px-2 h-auto text-xs"
                     onClick={() => {
-                      // Get first agent if available in agreements
-                      const firstAvailableAgent = buyerAgreements?.find(a => a.agentId)?.agentId || null;
-                      setSelectedAgentId(firstAvailableAgent);
+                      // If the agreement is already signed, just open it for viewing
+                      if (buyerAgreements?.some(a => a.type === "global_brbc")) {
+                        // Get the agent ID from the existing agreement
+                        const existingAgreement = buyerAgreements.find(a => a.type === "global_brbc");
+                        setSelectedAgentId(existingAgreement?.agentId || 0);
+                        setIsBRBCModalOpen(true);
+                        return;
+                      }
+                      
+                      // Try to find an agent ID from different sources
+                      const firstAgent = 
+                        properties?.find(p => p.agentId)?.agentId || 
+                        buyerAgreements?.find(a => a.agentId)?.agentId || 
+                        19; // Default agent ID as fallback
+                        
+                      setSelectedAgentId(firstAgent);
                       setIsBRBCModalOpen(true);
                     }}
                     variant={buyerAgreements?.some(a => a.type === "global_brbc") ? "outline" : "default"}
@@ -868,14 +891,12 @@ export default function BuyerDashboard() {
       />
 
       {/* BRBC Agreement Form */}
-      {selectedAgentId && (
-        <BuyerRepresentationAgreement
-          isOpen={isBRBCModalOpen}
-          onClose={() => setIsBRBCModalOpen(false)}
-          agentId={selectedAgentId}
-          isGlobal={true}
-        />
-      )}
+      <BuyerRepresentationAgreement
+        isOpen={isBRBCModalOpen}
+        onClose={() => setIsBRBCModalOpen(false)}
+        agentId={selectedAgentId || 0}
+        isGlobal={true}
+      />
     </div>
   );
 }

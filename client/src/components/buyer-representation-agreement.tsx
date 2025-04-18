@@ -6,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, FileText, Check, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Check, AlertTriangle, RefreshCw } from "lucide-react";
 import SignatureCanvas from 'react-signature-canvas';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface BuyerRepresentationAgreementProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ export function BuyerRepresentationAgreement({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [agent, setAgent] = useState<any>(null);
   const [agreementText, setAgreementText] = useState<string>('');
+  const [signingSuccess, setSigningSuccess] = useState<boolean>(false);
 
   // Load agent details
   useEffect(() => {
@@ -170,6 +172,9 @@ By signing below, Buyer acknowledges understanding and accepting the terms of th
         throw new Error(result.error || "Failed to create the BRBC agreement");
       }
       
+      // Set success state to show success alert
+      setSigningSuccess(true);
+      
       toast({
         title: "Agreement Submitted",
         description: "Buyer Representation Agreement has been successfully signed and saved.",
@@ -178,8 +183,10 @@ By signing below, Buyer acknowledges understanding and accepting the terms of th
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['/api/buyer/agreements'] });
       
-      // Close the dialog
-      onClose();
+      // We'll wait a bit to show the success message before closing
+      setTimeout(() => {
+        onClose();
+      }, 2000);
     } catch (error: any) {
       console.error("Error saving BRBC agreement:", error);
       toast({
@@ -207,6 +214,16 @@ By signing below, Buyer acknowledges understanding and accepting the terms of th
             </TabsList>
             
             <TabsContent value="agreement" className="mt-4">
+              <Alert className="mb-4 bg-amber-50 border-amber-200">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertTitle className="text-amber-800">Important Notice</AlertTitle>
+                <AlertDescription className="text-amber-700">
+                  By signing this agreement, you are entering into a legally binding representation 
+                  agreement with your agent. This agreement will be required for requesting property viewings.
+                  Please read the entire document carefully before signing.
+                </AlertDescription>
+              </Alert>
+              
               <div className="bg-white p-6 rounded-lg border border-gray-200 text-sm max-h-[60vh] overflow-auto">
                 <pre className="whitespace-pre-wrap font-sans">{agreementText}</pre>
               </div>
@@ -214,6 +231,25 @@ By signing below, Buyer acknowledges understanding and accepting the terms of th
             
             <TabsContent value="signature" className="mt-4">
               <div className="space-y-4">
+                {signingSuccess ? (
+                  <Alert className="bg-green-50 border-green-200 mb-4">
+                    <Check className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800">Agreement Successfully Signed!</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      Your Buyer Representation Agreement has been signed and saved. You can now request property viewings.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert className="mb-4 bg-amber-50 border-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <AlertTitle className="text-amber-800">Warning</AlertTitle>
+                    <AlertDescription className="text-amber-700">
+                      By signing below, you confirm that you've read and agree to the terms of this Buyer
+                      Representation Agreement. This is a legally binding document.
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
                 <div className="border border-gray-300 rounded-md p-4">
                   <h4 className="text-sm font-medium mb-2">Your Signature</h4>
                   <div className="border border-gray-200 rounded">
