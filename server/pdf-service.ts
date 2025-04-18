@@ -301,11 +301,20 @@ export async function fillAgencyDisclosureForm(
 /**
  * Fills out the BRBC form with the provided data
  *
- * @param buyerName The name of the buyer to fill in
+ * @param buyerName The name of the primary buyer to fill in
+ * @param formData Optional additional form data (buyer2, custom dates, etc.)
  * @returns Buffer containing the filled PDF document
  */
 export async function fillBrbcForm(
   buyerName: string,
+  formData?: {
+    buyer2?: string;
+    startDate?: string;
+    endDate?: string;
+    startDate2?: string;
+    endDate2?: string;
+    formFieldValues?: Record<string, string>;
+  },
   existingPdfBuffer?: Buffer,
 ): Promise<Buffer> {
   let pdfBuffer;
@@ -333,12 +342,18 @@ export async function fillBrbcForm(
 
   // Get current date for 'today' field
   const today = new Date();
-  const formattedToday = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+  const formattedToday = formatDate(formData?.startDate) || 
+    `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
   // Calculate date 89 days from today for '3Months' field
   const threeMonthsLater = new Date(today);
   threeMonthsLater.setDate(today.getDate() + 89);
-  const formattedThreeMonths = `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
+  const formattedThreeMonths = formatDate(formData?.endDate) || 
+    `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
+
+  // Format dates for buyer2 if provided
+  const formattedToday2 = formatDate(formData?.startDate2) || formattedToday;
+  const formattedThreeMonths2 = formatDate(formData?.endDate2) || formattedThreeMonths;
 
   // Extract initials from buyerName
   let buyerInitials = "";
@@ -350,6 +365,33 @@ export async function fillBrbcForm(
       .join("");
   }
 
+  // Get second buyer name if provided
+  const buyer2Name = formData?.buyer2 || "";
+
+  // Extract initials from buyer2Name if provided
+  let buyer2Initials = "";
+  if (buyer2Name) {
+    // Split the name into parts and get the first letter of each part
+    buyer2Initials = buyer2Name
+      .split(" ")
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("");
+  }
+
+  // Handle custom form field values first if provided
+  if (formData?.formFieldValues) {
+    for (const [fieldName, fieldValue] of Object.entries(formData.formFieldValues)) {
+      try {
+        const field = form.getTextField(fieldName);
+        if (field) {
+          field.setText(fieldValue);
+        }
+      } catch (error) {
+        console.warn(`Could not set custom field ${fieldName}:`, error);
+      }
+    }
+  }
+
   // Fill in all instances of each field
   const fields = form.getFields();
 
@@ -359,13 +401,33 @@ export async function fillBrbcForm(
     try {
       if (fieldName === "buyer1" && field instanceof PDFTextField) {
         field.setText(buyerName);
+      } else if (fieldName === "buyer2" && field instanceof PDFTextField && buyer2Name) {
+        field.setText(buyer2Name);
       } else if (fieldName === "today" && field instanceof PDFTextField) {
         field.setText(formattedToday);
       } else if (fieldName === "3Months" && field instanceof PDFTextField) {
         field.setText(formattedThreeMonths);
+      } else if (fieldName === "today2" && field instanceof PDFTextField && buyer2Name) {
+        field.setText(formattedToday2);
+      } else if (fieldName === "3Months2" && field instanceof PDFTextField && buyer2Name) {
+        field.setText(formattedThreeMonths2);
       }
     } catch (error) {
       console.warn(`Could not set field ${fieldName}:`, error);
+    }
+  }
+
+  // Helper function to format date strings
+  function formatDate(dateString?: string): string | null {
+    if (!dateString) return null;
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return null;
+      return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+    } catch (error) {
+      console.warn("Error formatting date:", error);
+      return null;
     }
   }
 

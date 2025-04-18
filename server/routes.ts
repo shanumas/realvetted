@@ -5585,6 +5585,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         buyer2SignatureData, // Optional second buyer signature for sign2 field
         buyer2InitialsData,  // Optional second buyer initials for initial2 field
         previewOnly,        // Flag to indicate this is just for preview (no DB save)
+        formFieldValues,    // Form field values from the client
         details 
       } = req.body;
       
@@ -5613,9 +5614,22 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         defaultAgent = agents[0];
       }
       
-      // Generate a prefilled BRBC PDF
-      const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
-      let pdfBuffer = await fillBrbcForm(buyerName);
+      // Get the buyer name from form fields or user data
+      const defaultBuyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+      const buyer1Name = details?.buyer1 || (formFieldValues?.buyer1) || defaultBuyerName;
+      
+      // Prepare form data for PDF generation
+      const formData = {
+        buyer2: details?.buyer2 || formFieldValues?.buyer2,
+        startDate: details?.startDate || formFieldValues?.today,
+        endDate: details?.endDate || formFieldValues?.['3Months'],
+        startDate2: details?.startDate2 || formFieldValues?.today2,
+        endDate2: details?.endDate2 || formFieldValues?.['3Months2'],
+        formFieldValues: formFieldValues
+      };
+      
+      // Generate a prefilled BRBC PDF with the specified buyer name and form data
+      let pdfBuffer = await fillBrbcForm(buyer1Name, formData);
       
       // Add all the signatures to the PDF
       try {
