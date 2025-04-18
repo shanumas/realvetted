@@ -352,16 +352,13 @@ export default function BuyerDashboard() {
           <div className="relative rounded-lg">
             <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
               <div className="flex items-center justify-between mb-2">
-                <h5 className="font-medium text-blue-800 text-sm">
-                  Verification Methods
-                </h5>
                 {user?.verificationMethod && (
                   <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
                     ✓ Verified
                   </div>
                 )}
               </div>
-              
+
               {/* Identity verification section - smaller */}
               <div className="bg-white rounded-md border border-gray-200 p-2 mb-2">
                 <div className="flex items-center justify-between mb-1">
@@ -370,18 +367,21 @@ export default function BuyerDashboard() {
                       <Shield className="h-2.5 w-2.5 text-blue-700" />
                     </div>
                     <h5 className="font-medium text-gray-800 text-xs">
-                      Verify Identity
+                      Submit KYC
                     </h5>
                   </div>
-                  
+
                   {/* Veriff logo */}
                   <div className="h-5 ml-1 flex items-center">
                     <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
-                      by <span className="font-bold ml-0.5 text-blue-800">VERIFF</span>
+                      by{" "}
+                      <span className="font-bold ml-0.5 text-blue-800">
+                        VERIFF
+                      </span>
                     </div>
                   </div>
                 </div>
-                
+
                 {user?.verificationMethod === "kyc" ? (
                   <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
                     ✓ Identity verified successfully
@@ -405,14 +405,14 @@ export default function BuyerDashboard() {
                   </Button>
                 )}
               </div>
-              
+
               {/* "OR" divider */}
               <div className="flex items-center justify-center mb-2">
                 <div className="border-t border-gray-200 flex-grow"></div>
                 <div className="mx-2 text-xs text-gray-500 font-medium">OR</div>
                 <div className="border-t border-gray-200 flex-grow"></div>
               </div>
-              
+
               {/* Pre-qualification upload section - smaller */}
               <div className="bg-white rounded-md border border-gray-200 p-2">
                 <div className="flex items-center mb-1">
@@ -423,7 +423,7 @@ export default function BuyerDashboard() {
                     Upload Pre-qualification
                   </h5>
                 </div>
-                
+
                 {user?.prequalificationDocUrl ? (
                   <>
                     <div className="mb-1 flex-grow">
@@ -453,9 +453,6 @@ export default function BuyerDashboard() {
                   </>
                 ) : (
                   <>
-                    <p className="text-[10px] text-gray-600 mb-1 flex-grow line-clamp-2">
-                      Upload lender pre-qualification document as verification alternative.
-                    </p>
                     <Button
                       className="w-full py-1 px-2 h-auto text-[10px]"
                       onClick={() => setIsPrequalificationModalOpen(true)}
@@ -536,31 +533,35 @@ export default function BuyerDashboard() {
                         d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
                       />
                     </svg>
-                    <span 
+                    <span
                       className="text-[10px] underline cursor-pointer"
                       onClick={() => {
                         // Find the global BRBC agreement
-                        const brbcAgreement = buyerAgreements?.find(a => a.type === "global_brbc");
+                        const brbcAgreement = buyerAgreements?.find(
+                          (a) => a.type === "global_brbc",
+                        );
                         if (brbcAgreement && brbcAgreement.documentUrl) {
                           // Format the URL properly if needed
-                          let documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
-                                            brbcAgreement.documentUrl.startsWith('http') ? 
-                                            brbcAgreement.documentUrl : 
-                                            `/uploads/${brbcAgreement.documentUrl}`;
-                          
+                          let documentUrl =
+                            brbcAgreement.documentUrl.startsWith("/uploads") ||
+                            brbcAgreement.documentUrl.startsWith("http")
+                              ? brbcAgreement.documentUrl
+                              : `/uploads/${brbcAgreement.documentUrl}`;
+
                           // Add a timestamp and download parameter to force non-editable mode and prevent caching
-                          if (documentUrl.includes('?')) {
-                            documentUrl += '&download=true&t=' + Date.now();
+                          if (documentUrl.includes("?")) {
+                            documentUrl += "&download=true&t=" + Date.now();
                           } else {
-                            documentUrl += '?download=true&t=' + Date.now();
+                            documentUrl += "?download=true&t=" + Date.now();
                           }
-                          
+
                           console.log("Opening document URL:", documentUrl);
                           window.open(documentUrl, "_blank");
                         } else {
                           toast({
                             title: "Document Not Available",
-                            description: "The signed document is not available for download at this time.",
+                            description:
+                              "The signed document is not available for download at this time.",
                             variant: "destructive",
                           });
                         }
@@ -583,21 +584,24 @@ export default function BuyerDashboard() {
                   // If already signed, open a non-editable view, otherwise open signing modal
                   if (buyerAgreements?.some((a) => a.type === "global_brbc")) {
                     // Find the signed agreement
-                    const brbcAgreement = buyerAgreements.find(a => a.type === "global_brbc");
+                    const brbcAgreement = buyerAgreements.find(
+                      (a) => a.type === "global_brbc",
+                    );
                     if (brbcAgreement && brbcAgreement.documentUrl) {
                       // Format the URL properly if needed
-                      let documentUrl = brbcAgreement.documentUrl.startsWith('/uploads') || 
-                                        brbcAgreement.documentUrl.startsWith('http') ? 
-                                        brbcAgreement.documentUrl : 
-                                        `/uploads/${brbcAgreement.documentUrl}`;
-                      
+                      let documentUrl =
+                        brbcAgreement.documentUrl.startsWith("/uploads") ||
+                        brbcAgreement.documentUrl.startsWith("http")
+                          ? brbcAgreement.documentUrl
+                          : `/uploads/${brbcAgreement.documentUrl}`;
+
                       // Add a timestamp and download parameter to force non-editable mode and prevent caching
-                      if (documentUrl.includes('?')) {
-                        documentUrl += '&download=true&t=' + Date.now();
+                      if (documentUrl.includes("?")) {
+                        documentUrl += "&download=true&t=" + Date.now();
                       } else {
-                        documentUrl += '?download=true&t=' + Date.now();
+                        documentUrl += "?download=true&t=" + Date.now();
                       }
-                      
+
                       console.log("Opening document URL:", documentUrl);
                       window.open(documentUrl, "_blank");
                     } else {
@@ -632,7 +636,7 @@ export default function BuyerDashboard() {
                     <MailCheck className="h-3 w-3 text-green-700" />
                   </div>
                   <h5 className="font-medium text-green-800 text-sm">
-                    Request Manual Approval
+                    Get Pre-Qualification from Lender
                   </h5>
                 </div>
 
@@ -647,8 +651,8 @@ export default function BuyerDashboard() {
                 <div className="flex-grow">
                   <div className="text-xs text-gray-600 mb-2 flex-grow">
                     <p>
-                      Your request has been submitted and is being reviewed.
-                      You may submit a new request if needed.
+                      Your request has been submitted and is being reviewed. You
+                      may submit a new request if needed.
                     </p>
                   </div>
                   <Button
@@ -663,8 +667,8 @@ export default function BuyerDashboard() {
               ) : (
                 <>
                   <p className="text-xs text-gray-600 mb-2 flex-grow line-clamp-2">
-                    Request manual profile approval from our team to get
-                    verified faster.
+                    Submit form and supporting documents to get
+                    pre-qualification
                   </p>
                   <Button
                     className="w-full py-1.5 px-2 h-auto text-xs"
@@ -672,7 +676,7 @@ export default function BuyerDashboard() {
                     variant="default"
                   >
                     <MailCheck className="mr-1.5 h-3 w-3" />
-                    Request Manual Approval
+                    Request Pre-Qual from Lender
                   </Button>
                 </>
               )}
@@ -702,13 +706,6 @@ export default function BuyerDashboard() {
                 >
                   <CalendarRange className="h-4 w-4 mr-2" />
                   Viewing Requests
-                </TabsTrigger>
-                <TabsTrigger
-                  value="agreements"
-                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-b-0"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Agreements
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -759,11 +756,13 @@ export default function BuyerDashboard() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                          
+
                           <div className="flex space-x-2 items-center">
-                            {buyerAgreements?.some(a => a.type === "global_brbc") ? (
-                              <Button 
-                                variant="outline" 
+                            {buyerAgreements?.some(
+                              (a) => a.type === "global_brbc",
+                            ) ? (
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="bg-green-50 text-green-600 hover:bg-green-100 w-full"
                                 onClick={() => {
@@ -775,8 +774,8 @@ export default function BuyerDashboard() {
                               </Button>
                             ) : (
                               <div className="flex flex-col space-y-1 w-full">
-                                <Button 
-                                  variant="outline" 
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   className="bg-gray-100 text-gray-400 w-full cursor-not-allowed"
                                   disabled={true}
@@ -825,135 +824,6 @@ export default function BuyerDashboard() {
                   <ViewingRequestsList userId={user.id} role="buyer" />
                 </div>
               )}
-            </TabsContent>
-
-            <TabsContent value="agreements" className="p-0">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  My Signed Agreements
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Documents and agreements you've signed during your home buying
-                  journey
-                </p>
-              </div>
-
-              <div className="p-4">
-                {isLoadingAgreements ? (
-                  <div className="flex justify-center my-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : !buyerAgreements || buyerAgreements.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <File className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                    <p>No signed agreements yet.</p>
-                    <p className="text-sm mt-2">
-                      When you sign documents related to a property, they will
-                      appear here.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-y">
-                    {buyerAgreements.map((agreement: any) => (
-                      <div
-                        key={agreement.id}
-                        className="py-4 flex items-center justify-between"
-                      >
-                        <div className="flex items-start space-x-3">
-                          <div className="bg-blue-50 p-2 rounded-lg">
-                            <FileText className="h-6 w-6 text-blue-500" />
-                          </div>
-                          <div>
-                            <span className="font-medium">
-                              {agreement.type === "agency_disclosure"
-                                ? "Agency Disclosure Form"
-                                : agreement.type === "representation_agreement"
-                                  ? "Buyer Representation Agreement"
-                                  : agreement.type === "standard"
-                                    ? "Buyer Representation Agreement"
-                                    : agreement.type === "global_brbc"
-                                      ? "Global Buyer Representation Agreement"
-                                      : "Agreement Document"}
-                            </span>
-                            <div className="text-xs text-gray-500 mt-1">
-                              <div className="flex flex-col">
-                                <span>
-                                  {agreement.isGlobal
-                                    ? "Type: Global (All Properties)"
-                                    : `Property: ${agreement.property ? agreement.property.address : "Unknown"}`}
-                                </span>
-                                {agreement.isGlobal && (
-                                  <span className="text-blue-600">
-                                    Agent: {agreement.agentName || "Your Agent"}
-                                  </span>
-                                )}
-                                <span>
-                                  Signed:{" "}
-                                  {new Date(
-                                    agreement.date,
-                                  ).toLocaleDateString()}
-                                </span>
-                                <span
-                                  className={`mt-1 inline-flex items-center px-2 py-0.5 text-xs rounded-full ${
-                                    agreement.status === "signed_by_buyer"
-                                      ? "bg-green-100 text-green-800"
-                                      : agreement.status === "signed_by_all"
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-blue-100 text-blue-800"
-                                  }`}
-                                >
-                                  {agreement.status === "signed_by_buyer"
-                                    ? "Signed by You"
-                                    : agreement.status === "signed_by_all"
-                                      ? "Fully Signed"
-                                      : agreement.status}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="ml-auto flex space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex items-center"
-                            onClick={() => {
-                              if (agreement.type === "global_brbc") {
-                                setSelectedAgentId(agreement.agentId);
-                                setIsBRBCModalOpen(true);
-                              }
-                              // Handle other types of agreements here
-                            }}
-                          >
-                            <FileText className="h-3.5 w-3.5 mr-1.5" />
-                            View
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="flex items-center bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
-                          >
-                            <svg
-                              className="h-3.5 w-3.5 mr-1.5 text-blue-600"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
-                              />
-                            </svg>
-                            Download
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -1020,14 +890,16 @@ export default function BuyerDashboard() {
         agentId={selectedAgentId || 0}
         isGlobal={true}
       />
-      
+
       {/* BRBC PDF Viewer */}
-      <BRBCPdfViewer 
+      <BRBCPdfViewer
         isOpen={isBRBCPdfViewerOpen}
         onClose={() => setIsBRBCPdfViewerOpen(false)}
         onSigned={() => {
           // Refresh agreements after signing
-          queryClient.invalidateQueries({ queryKey: ["/api/buyer/agreements"] });
+          queryClient.invalidateQueries({
+            queryKey: ["/api/buyer/agreements"],
+          });
           toast({
             title: "Agreement Signed",
             description: "Your buyer representation agreement has been signed.",

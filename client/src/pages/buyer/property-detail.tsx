@@ -5,7 +5,10 @@ import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
-import { PropertyWithParticipants, ViewingRequestWithParticipants } from "@shared/types";
+import {
+  PropertyWithParticipants,
+  ViewingRequestWithParticipants,
+} from "@shared/types";
 
 // Define the Agreement interface for checking BRBC agreements
 interface Agreement {
@@ -26,10 +29,31 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AgencyDisclosureForm } from "@/components/agency-disclosure-form";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
-import { 
-  Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, 
-  Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, UserPlus, Users, MessageCircle, Eye, Calendar as CalendarIcon, AlertTriangle
+import {
+  Loader2,
+  Home,
+  Bed,
+  Bath,
+  Square,
+  Tag,
+  Calendar,
+  Building,
+  Phone,
+  Briefcase,
+  Award,
+  Link,
+  FileText,
+  ListTodo,
+  ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  Activity,
+  UserPlus,
+  Users,
+  MessageCircle,
+  Eye,
+  Calendar as CalendarIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
@@ -75,10 +99,16 @@ export default function BuyerPropertyDetail() {
   const [viewingTime, setViewingTime] = useState<string>("");
   const [viewingEndTime, setViewingEndTime] = useState<string>("");
   const [viewingNotes, setViewingNotes] = useState<string>("");
-  const [isDisclosureFormOpen, setIsDisclosureFormOpen] = useState<boolean>(false);
+  const [isDisclosureFormOpen, setIsDisclosureFormOpen] =
+    useState<boolean>(false);
   const [isBrbcModalOpen, setIsBrbcModalOpen] = useState<boolean>(false);
-  const [viewingRequestData, setViewingRequestData] = useState<{ date: string; time: string; endTime: string; notes: string } | null>(null);
-  
+  const [viewingRequestData, setViewingRequestData] = useState<{
+    date: string;
+    time: string;
+    endTime: string;
+    notes: string;
+  } | null>(null);
+
   // State for override confirmation dialog
   const [showOverrideDialog, setShowOverrideDialog] = useState<boolean>(false);
   const [pendingRequestData, setPendingRequestData] = useState<{
@@ -91,39 +121,48 @@ export default function BuyerPropertyDetail() {
     existingRequestId?: number;
     existingRequestDate?: string;
   } | null>(null);
-  
+
   const { toast } = useToast();
   const { user } = useAuth();
-  
+
   // Fetch available agents
-  const { data: agents } = useQuery<Array<{
-    id: number;
-    firstName: string | null;
-    lastName: string | null;
-    state: string | null;
-    city: string | null;
-    email: string;
-    phone: string | null;
-    profilePhotoUrl: string | null;
-    profileStatus: string;
-  }>>({
+  const { data: agents } = useQuery<
+    Array<{
+      id: number;
+      firstName: string | null;
+      lastName: string | null;
+      state: string | null;
+      city: string | null;
+      email: string;
+      phone: string | null;
+      profilePhotoUrl: string | null;
+      profileStatus: string;
+    }>
+  >({
     queryKey: ["/api/agents"],
     queryFn: getQueryFn({ on401: "throw" }),
   });
-  
+
   // Mutation to choose an agent
   const chooseAgentMutation = useMutation({
     mutationFn: async (agentId: number) => {
-      const res = await apiRequest("PUT", `/api/properties/${propertyId}/choose-agent`, { agentId });
+      const res = await apiRequest(
+        "PUT",
+        `/api/properties/${propertyId}/choose-agent`,
+        { agentId },
+      );
       return await res.json();
     },
     onSuccess: () => {
       toast({
         title: "Agent assigned",
-        description: "The agent has been assigned to your property and notified.",
+        description:
+          "The agent has been assigned to your property and notified.",
         variant: "default",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}`],
+      });
       setIsAgentDialogOpen(false);
       setSelectedAgentId(null);
     },
@@ -133,9 +172,9 @@ export default function BuyerPropertyDetail() {
         description: error.message,
         variant: "destructive",
       });
-    }
+    },
   });
-  
+
   const handleChooseAgent = () => {
     if (selectedAgentId) {
       chooseAgentMutation.mutate(selectedAgentId);
@@ -148,16 +187,14 @@ export default function BuyerPropertyDetail() {
     }
   };
 
-
-  
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
-    mutationFn: async (data: { 
-      date: string, 
-      time: string, 
-      endTime: string, 
-      notes: string, 
-      override?: boolean 
+    mutationFn: async (data: {
+      date: string;
+      time: string;
+      endTime: string;
+      notes: string;
+      override?: boolean;
     }) => {
       console.log("Requesting property viewing with data:", {
         propertyId,
@@ -165,20 +202,22 @@ export default function BuyerPropertyDetail() {
         time: data.time,
         endTime: data.endTime,
         notes: data.notes,
-        override: data.override
+        override: data.override,
       });
-      
+
       // Create request payload with proper date formatting
       const payload = {
         propertyId: propertyId,
         requestedDate: `${data.date}T${data.time}:00`,
-        requestedEndDate: data.endTime ? `${data.date}T${data.endTime}:00` : undefined,
+        requestedEndDate: data.endTime
+          ? `${data.date}T${data.endTime}:00`
+          : undefined,
         notes: data.notes,
-        override: data.override || false
+        override: data.override || false,
       };
-      
+
       console.log("Sending viewing request payload:", payload);
-      
+
       try {
         const res = await apiRequest("POST", `/api/viewing-requests`, payload);
         const responseData = await res.json();
@@ -200,24 +239,32 @@ export default function BuyerPropertyDetail() {
       setViewingTime("");
       setViewingEndTime("");
       setViewingNotes("");
-      
+
       // Reset override dialog state
       setShowOverrideDialog(false);
       setPendingRequestData(null);
       setExistingRequestInfo(null);
-      
+
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/logs`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/viewing-requests/buyer"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/properties/${propertyId}/viewing-requests`] });
-      
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}`],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}/logs`],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/viewing-requests/buyer"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+      });
+
       // Switch to the viewings tab
       setActiveTab("viewings");
     },
     onError: (error: any) => {
       console.error("Viewing request error:", error);
-      
+
       // Detailed error logging for debugging
       console.log("Error details:", {
         message: error.message,
@@ -226,31 +273,36 @@ export default function BuyerPropertyDetail() {
         data: error.response?.data,
         status: error.response?.status,
       });
-      
+
       // Check if we need to sign a global BRBC agreement
       if (error.response?.data?.requiresBrbc && error.response?.data?.agentId) {
-        console.log("Global BRBC agreement required with agent:", error.response.data.agentId);
-        
+        console.log(
+          "Global BRBC agreement required with agent:",
+          error.response.data.agentId,
+        );
+
         toast({
           title: "Agreement Required",
-          description: "You need to sign a Buyer Representation Agreement with this agent before requesting a viewing.",
+          description:
+            "You need to sign a Buyer Representation Agreement with this agent before requesting a viewing.",
           variant: "default",
         });
-        
+
         // Check if the global BRBC already exists but is not signed
         apiRequest("GET", `/api/global-brbc/${error.response.data.agentId}`)
-          .then(res => res.json())
-          .then(data => {
+          .then((res) => res.json())
+          .then((data) => {
             if (data.success) {
               if (data.exists) {
                 // BRBC exists but needs to be completed, open it
                 // TODO: implement a component to display the existing agreement
                 console.log("Existing global BRBC found:", data.agreement);
-                
+
                 // For now, just alert the user
                 toast({
                   title: "Agreement Exists",
-                  description: "You have already started a global BRBC agreement with this agent. Please check your agreements page to complete it.",
+                  description:
+                    "You have already started a global BRBC agreement with this agent. Please check your agreements page to complete it.",
                   variant: "default",
                 });
               } else {
@@ -262,38 +314,43 @@ export default function BuyerPropertyDetail() {
               }
             }
           })
-          .catch(err => {
+          .catch((err) => {
             console.error("Error checking for global BRBC:", err);
             toast({
               title: "Error",
-              description: "Could not check for existing agreements. Please try again.",
+              description:
+                "Could not check for existing agreements. Please try again.",
               variant: "destructive",
             });
           });
-        
+
         return;
       }
-      
+
       // Since buyers should be able to make multiple viewing requests,
       // we'll bypass the "already exists" error by adding the property here
       if (error.message?.includes("already exists")) {
-        console.log("Bypassing 'already exists' error - allowing multiple viewing requests");
-        
+        console.log(
+          "Bypassing 'already exists' error - allowing multiple viewing requests",
+        );
+
         // Switch to the viewings tab to show existing requests
         setActiveTab("viewings");
       } else if (error.response?.status === 403) {
         // Specific handling for permission errors
         toast({
           title: "Permission Error",
-          description: error.message || "You don't have permission to request a viewing for this property.",
+          description:
+            error.message ||
+            "You don't have permission to request a viewing for this property.",
           variant: "destructive",
         });
-        
+
         console.log("Property status:", property?.status);
         console.log("Current user role:", user?.role);
-        
+
         // Check property status
-        if (property?.status !== 'active' && property?.status !== 'pending') {
+        if (property?.status !== "active" && property?.status !== "pending") {
           toast({
             title: "Property Not Available",
             description: `This property is currently ${property?.status} and not available for viewing requests.`,
@@ -304,13 +361,13 @@ export default function BuyerPropertyDetail() {
         // Generic error handler with more details
         toast({
           title: "Could not request viewing",
-          description: `Error: ${error.message || "Unknown error"}${error.response?.status ? ` (Status: ${error.response.status})` : ''}`,
+          description: `Error: ${error.message || "Unknown error"}${error.response?.status ? ` (Status: ${error.response.status})` : ""}`,
           variant: "destructive",
         });
       }
-    }
+    },
   });
-  
+
   const handleRequestViewing = () => {
     if (!viewingDate) {
       toast({
@@ -320,7 +377,7 @@ export default function BuyerPropertyDetail() {
       });
       return;
     }
-    
+
     if (!viewingTime) {
       toast({
         title: "Time required",
@@ -329,7 +386,7 @@ export default function BuyerPropertyDetail() {
       });
       return;
     }
-    
+
     if (viewingEndTime && viewingEndTime <= viewingTime) {
       toast({
         title: "Invalid end time",
@@ -338,7 +395,7 @@ export default function BuyerPropertyDetail() {
       });
       return;
     }
-    
+
     // Check if agent is assigned
     if (!property?.agentId) {
       toast({
@@ -349,55 +406,65 @@ export default function BuyerPropertyDetail() {
       setIsAgentDialogOpen(true);
       return;
     }
-    
+
     // Store viewing request data for later submission after signing the disclosure form
     const requestData = {
       date: viewingDate,
       time: viewingTime,
       endTime: viewingEndTime,
-      notes: viewingNotes
+      notes: viewingNotes,
     };
-    
+
     setViewingRequestData(requestData);
-    
+
     // Close the viewing modal
     setIsViewingModalOpen(false);
-    
+
     // For first-time viewing requests, we show the disclosure form regardless
     // For subsequent requests, we check if user has already signed a form
-    const isFirstViewingRequest = !(viewingRequests && viewingRequests.length > 0);
-    
+    const isFirstViewingRequest = !(
+      viewingRequests && viewingRequests.length > 0
+    );
+
     if (isFirstViewingRequest) {
       // This is the first viewing request - always show the disclosure form
       console.log("First viewing request, showing disclosure form");
       setIsDisclosureFormOpen(true);
       return;
     }
-    
+
     // Not the first request - check if user already signed a disclosure
-    console.log("Not first viewing request, checking for existing disclosure form");
+    console.log(
+      "Not first viewing request, checking for existing disclosure form",
+    );
     apiRequest("GET", `/api/properties/${propertyId}/agreements`)
-      .then(response => response.json())
-      .then(data => {
+      .then((response) => response.json())
+      .then((data) => {
         if (data.success && data.data) {
           // Check for ANY previous agency disclosure agreement for this property and user
-          const previousAgreements = data.data.filter((agreement: any) => 
-            agreement.type === "agency_disclosure" && 
-            (agreement.status === "completed" || agreement.status === "pending" || 
-            agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
-            user?.id && agreement.buyerId === user.id
+          const previousAgreements = data.data.filter(
+            (agreement: any) =>
+              agreement.type === "agency_disclosure" &&
+              (agreement.status === "completed" ||
+                agreement.status === "pending" ||
+                agreement.status === "signed_by_buyer" ||
+                agreement.status === "signed_buyer") &&
+              user?.id &&
+              agreement.buyerId === user.id,
           );
-          
+
           if (previousAgreements.length > 0) {
             // User has already signed a disclosure for this property, skip showing the form
-            console.log("User already signed disclosure form for this property, skipping");
+            console.log(
+              "User already signed disclosure form for this property, skipping",
+            );
             requestViewingMutation.mutate({
               ...requestData,
-              override: true
+              override: true,
             });
             return;
           }
-          
+
           // No previous disclosure form signed, show the form even for subsequent requests
           console.log("No previous disclosure form signed, showing the form");
           setIsDisclosureFormOpen(true);
@@ -406,47 +473,59 @@ export default function BuyerPropertyDetail() {
           setIsDisclosureFormOpen(true);
         }
       })
-      .catch(error => {
+      .catch((error) => {
         console.error("Error checking for existing agreements:", error);
         // On error, just show the form
         setIsDisclosureFormOpen(true);
       });
   };
-  
+
   // Handle submission after the disclosure form is signed
-  const handleDisclosureFormComplete = useCallback((shouldOverrideOrEvent: boolean | React.MouseEvent = false) => {
-    // Close the disclosure form
-    setIsDisclosureFormOpen(false);
-    
-    // Determine if we should override (true if boolean parameter is true)
-    const shouldOverride = typeof shouldOverrideOrEvent === 'boolean' ? shouldOverrideOrEvent : false;
-    
-    // Submit the viewing request if we have stored data
-    if (viewingRequestData) {
-      requestViewingMutation.mutate({
-        date: viewingRequestData.date,
-        time: viewingRequestData.time,
-        endTime: viewingRequestData.endTime,
-        notes: viewingRequestData.notes,
-        override: shouldOverride // Allow override if explicitly requested
-      });
-      
-      // Clear the stored data
-      setViewingRequestData(null);
-    }
-  }, [viewingRequestData, requestViewingMutation, setViewingRequestData, setIsDisclosureFormOpen]);
-  
+  const handleDisclosureFormComplete = useCallback(
+    (shouldOverrideOrEvent: boolean | React.MouseEvent = false) => {
+      // Close the disclosure form
+      setIsDisclosureFormOpen(false);
+
+      // Determine if we should override (true if boolean parameter is true)
+      const shouldOverride =
+        typeof shouldOverrideOrEvent === "boolean"
+          ? shouldOverrideOrEvent
+          : false;
+
+      // Submit the viewing request if we have stored data
+      if (viewingRequestData) {
+        requestViewingMutation.mutate({
+          date: viewingRequestData.date,
+          time: viewingRequestData.time,
+          endTime: viewingRequestData.endTime,
+          notes: viewingRequestData.notes,
+          override: shouldOverride, // Allow override if explicitly requested
+        });
+
+        // Clear the stored data
+        setViewingRequestData(null);
+      }
+    },
+    [
+      viewingRequestData,
+      requestViewingMutation,
+      setViewingRequestData,
+      setIsDisclosureFormOpen,
+    ],
+  );
+
   // Handle cancellation of the disclosure form
   const handleDisclosureFormCancel = useCallback(() => {
     setViewingRequestData(null);
-    
+
     toast({
       title: "Viewing request cancelled",
-      description: "You can try again when you're ready to sign the disclosure form.",
+      description:
+        "You can try again when you're ready to sign the disclosure form.",
       variant: "default",
     });
   }, [toast, setViewingRequestData]);
-  
+
   // Monitor disclosure form closing
   useEffect(() => {
     // When disclosure form is closed (isDisclosureFormOpen changes from true to false)
@@ -456,35 +535,45 @@ export default function BuyerPropertyDetail() {
       if (viewingRequestData && propertyId) {
         // Check if the user has ever signed a disclosure form for this property
         apiRequest("GET", `/api/properties/${propertyId}/agreements`)
-          .then(response => response.json())
-          .then(data => {
+          .then((response) => response.json())
+          .then((data) => {
             if (data.success && data.data) {
               // Check for ANY previous agency disclosure agreement for this property and user
               // Not just recent ones - if they've ever signed one, they don't need to sign again
-              const previousAgreements = data.data.filter((agreement: any) => 
-                agreement.type === "agency_disclosure" && 
-                (agreement.status === "completed" || agreement.status === "pending" || 
-                agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
-                user?.id && agreement.buyerId === user.id
+              const previousAgreements = data.data.filter(
+                (agreement: any) =>
+                  agreement.type === "agency_disclosure" &&
+                  (agreement.status === "completed" ||
+                    agreement.status === "pending" ||
+                    agreement.status === "signed_by_buyer" ||
+                    agreement.status === "signed_buyer") &&
+                  user?.id &&
+                  agreement.buyerId === user.id,
               );
-              
+
               if (previousAgreements.length > 0) {
-                // If the user has signed a disclosure form for this property before, 
+                // If the user has signed a disclosure form for this property before,
                 // allow them to submit a new viewing request without signing again
-                console.log("Found existing disclosure agreement for this property, proceeding with viewing request");
+                console.log(
+                  "Found existing disclosure agreement for this property, proceeding with viewing request",
+                );
                 handleDisclosureFormComplete(true); // Proceed with override
                 return;
               }
-              
+
               // Check for a recently signed agency disclosure agreement (within the last minute)
-              const recentDisclosures = data.data.filter((agreement: any) => 
-                agreement.type === "agency_disclosure" && 
-                (agreement.status === "completed" || agreement.status === "pending" || 
-                agreement.status === "signed_by_buyer" || agreement.status === "signed_buyer") &&
-                user?.id && agreement.buyerId === user.id &&
-                new Date(agreement.date).getTime() > Date.now() - 60000 // Within the last minute
+              const recentDisclosures = data.data.filter(
+                (agreement: any) =>
+                  agreement.type === "agency_disclosure" &&
+                  (agreement.status === "completed" ||
+                    agreement.status === "pending" ||
+                    agreement.status === "signed_by_buyer" ||
+                    agreement.status === "signed_buyer") &&
+                  user?.id &&
+                  agreement.buyerId === user.id &&
+                  new Date(agreement.date).getTime() > Date.now() - 60000, // Within the last minute
               );
-              
+
               if (recentDisclosures.length > 0) {
                 // If we found a recent disclosure, proceed with the viewing request
                 handleDisclosureFormComplete();
@@ -492,20 +581,21 @@ export default function BuyerPropertyDetail() {
                 // Instead of auto-canceling, ask the user what they want to do
                 toast({
                   title: "Disclosure Form Not Signed",
-                  description: "Do you want to proceed with your viewing request anyway? You'll need to sign the disclosure form later.",
+                  description:
+                    "Do you want to proceed with your viewing request anyway? You'll need to sign the disclosure form later.",
                   duration: 8000,
                   action: (
                     <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={handleDisclosureFormCancel}
                       >
                         Cancel Request
                       </Button>
-                      <Button 
-                        variant="default" 
-                        size="sm" 
+                      <Button
+                        variant="default"
+                        size="sm"
                         onClick={() => handleDisclosureFormComplete(true)}
                       >
                         Continue Anyway
@@ -518,20 +608,21 @@ export default function BuyerPropertyDetail() {
               // If the API call fails or returns no data, show a toast with options
               toast({
                 title: "Unable to verify form signature",
-                description: "Do you want to proceed with your viewing request anyway?",
+                description:
+                  "Do you want to proceed with your viewing request anyway?",
                 duration: 8000,
                 action: (
                   <div className="flex space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleDisclosureFormCancel}
                     >
                       Cancel Request
                     </Button>
-                    <Button 
-                      variant="default" 
-                      size="sm" 
+                    <Button
+                      variant="default"
+                      size="sm"
                       onClick={() => handleDisclosureFormComplete(true)}
                     >
                       Continue Anyway
@@ -541,32 +632,41 @@ export default function BuyerPropertyDetail() {
               });
             }
           })
-          .catch(error => {
+          .catch((error) => {
             console.error("Error fetching agreements:", error);
             handleDisclosureFormComplete(true); // Proceed anyway if we can't check
           });
       }
     }
-  }, [isDisclosureFormOpen, viewingRequestData, propertyId, user?.id, handleDisclosureFormComplete, handleDisclosureFormCancel, toast]);
+  }, [
+    isDisclosureFormOpen,
+    viewingRequestData,
+    propertyId,
+    user?.id,
+    handleDisclosureFormComplete,
+    handleDisclosureFormCancel,
+    toast,
+  ]);
 
   const { data: property, isLoading } = useQuery<PropertyWithParticipants>({
     queryKey: [`/api/properties/${propertyId}`],
     queryFn: getQueryFn({ on401: "throw" }),
   });
-  
+
   // Fetch buyer agreements (including BRBC)
   const { data: buyerAgreements = [] } = useQuery<Agreement[]>({
     queryKey: ["/api/buyer/agreements"],
     queryFn: getQueryFn({ on401: "throw" }),
     enabled: !!user?.id,
   });
-  
+
   // Fetch viewing requests for this property
-  const { data: viewingRequests = [], isLoading: isLoadingViewingRequests } = useQuery<ViewingRequestWithParticipants[]>({
-    queryKey: [`/api/properties/${propertyId}/viewing-requests`],
-    queryFn: getQueryFn({ on401: "throw" }),
-    enabled: !!propertyId, // Only run query if propertyId is valid
-  });
+  const { data: viewingRequests = [], isLoading: isLoadingViewingRequests } =
+    useQuery<ViewingRequestWithParticipants[]>({
+      queryKey: [`/api/properties/${propertyId}/viewing-requests`],
+      queryFn: getQueryFn({ on401: "throw" }),
+      enabled: !!propertyId, // Only run query if propertyId is valid
+    });
 
   if (isLoading) {
     return (
@@ -582,8 +682,13 @@ export default function BuyerPropertyDetail() {
         <SiteHeader />
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900">Property not found</h3>
-            <p className="mt-1 text-gray-500">The property you're looking for doesn't exist or you don't have access to it.</p>
+            <h3 className="text-lg font-medium text-gray-900">
+              Property not found
+            </h3>
+            <p className="mt-1 text-gray-500">
+              The property you're looking for doesn't exist or you don't have
+              access to it.
+            </p>
           </div>
         </main>
       </div>
@@ -593,7 +698,7 @@ export default function BuyerPropertyDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <SiteHeader />
-      
+
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="lg:grid lg:grid-cols-3 lg:gap-8">
           {/* Property Details Section */}
@@ -611,35 +716,38 @@ export default function BuyerPropertyDetail() {
                   </div>
                   <div>
                     <span className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                      {property.status === "active" ? "Active" : property.status}
+                      {property.status === "active"
+                        ? "Active"
+                        : property.status}
                     </span>
                   </div>
                 </div>
-                
+
                 {/* Property Images */}
                 <div className="px-4 py-5 sm:px-6">
                   {property.imageUrls && property.imageUrls.length > 0 ? (
                     <div className="relative">
                       {/* Image Carousel */}
                       <div className="relative overflow-x-hidden">
-                        <div 
-                          className="flex transition-transform duration-300 ease-in-out" 
-                          style={{ 
+                        <div
+                          className="flex transition-transform duration-300 ease-in-out"
+                          style={{
                             transform: `translateX(-${currentImageIndex * 100}%)`,
-                            width: `${property.imageUrls.length * 100}%` 
+                            width: `${property.imageUrls.length * 100}%`,
                           }}
                         >
                           {property.imageUrls.map((url, index) => (
                             <div key={index} className="w-full flex-shrink-0">
                               <div className="h-64 mx-auto rounded-lg overflow-hidden">
-                                <img 
-                                  src={url} 
-                                  alt={`Property image ${index + 1}`} 
+                                <img
+                                  src={url}
+                                  alt={`Property image ${index + 1}`}
                                   className="w-full h-full object-cover"
                                   onError={(e) => {
                                     // If image fails to load, show placeholder
                                     const target = e.target as HTMLImageElement;
-                                    target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
+                                    target.src =
+                                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
                                     target.onerror = null; // Prevent infinite error loop
                                   }}
                                 />
@@ -648,27 +756,39 @@ export default function BuyerPropertyDetail() {
                           ))}
                         </div>
                       </div>
-                      
+
                       {/* Navigation Arrows */}
                       {property.imageUrls.length > 1 && (
                         <>
-                          <button 
+                          <button
                             className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-r-md hover:bg-black/70 transition-colors"
-                            onClick={() => setCurrentImageIndex(prev => (prev > 0 ? prev - 1 : property.imageUrls!.length - 1))}
+                            onClick={() =>
+                              setCurrentImageIndex((prev) =>
+                                prev > 0
+                                  ? prev - 1
+                                  : property.imageUrls!.length - 1,
+                              )
+                            }
                             aria-label="Previous image"
                           >
                             <ChevronLeft className="h-6 w-6" />
                           </button>
-                          <button 
+                          <button
                             className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-l-md hover:bg-black/70 transition-colors"
-                            onClick={() => setCurrentImageIndex(prev => (prev < property.imageUrls!.length - 1 ? prev + 1 : 0))}
+                            onClick={() =>
+                              setCurrentImageIndex((prev) =>
+                                prev < property.imageUrls!.length - 1
+                                  ? prev + 1
+                                  : 0,
+                              )
+                            }
                             aria-label="Next image"
                           >
                             <ChevronRight className="h-6 w-6" />
                           </button>
                         </>
                       )}
-                      
+
                       {/* Image Indicators */}
                       {property.imageUrls.length > 1 && (
                         <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
@@ -676,7 +796,9 @@ export default function BuyerPropertyDetail() {
                             <button
                               key={index}
                               className={`h-2 w-2 rounded-full transition-colors ${
-                                currentImageIndex === index ? 'bg-white' : 'bg-white/50'
+                                currentImageIndex === index
+                                  ? "bg-white"
+                                  : "bg-white/50"
                               }`}
                               onClick={() => setCurrentImageIndex(index)}
                               aria-label={`Go to image ${index + 1}`}
@@ -693,11 +815,13 @@ export default function BuyerPropertyDetail() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Property Details */}
                 <div className="border-t border-gray-200">
                   <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Property Details</h3>
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Property Details
+                    </h3>
                   </div>
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -713,7 +837,9 @@ export default function BuyerPropertyDetail() {
                         <Tag className="mr-2 h-4 w-4" /> Price
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.price ? `$${property.price.toLocaleString()}` : "Not specified"}
+                        {property.price
+                          ? `$${property.price.toLocaleString()}`
+                          : "Not specified"}
                       </dd>
                     </div>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -737,7 +863,9 @@ export default function BuyerPropertyDetail() {
                         <Square className="mr-2 h-4 w-4" /> Square footage
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.squareFeet ? `${property.squareFeet.toLocaleString()} sqft` : "Not specified"}
+                        {property.squareFeet
+                          ? `${property.squareFeet.toLocaleString()} sqft`
+                          : "Not specified"}
                       </dd>
                     </div>
                     <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -778,9 +906,9 @@ export default function BuyerPropertyDetail() {
                           <Link className="mr-2 h-4 w-4" /> Original listing
                         </dt>
                         <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                          <a 
-                            href={property.propertyUrl} 
-                            target="_blank" 
+                          <a
+                            href={property.propertyUrl}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
                           >
@@ -790,13 +918,18 @@ export default function BuyerPropertyDetail() {
                       </div>
                     )}
                   </dl>
-                  
+
                   {/* Listing Agent Information */}
-                  {(property.sellerName || property.sellerEmail || property.sellerPhone || 
-                    property.sellerCompany || property.sellerLicenseNo) && (
+                  {(property.sellerName ||
+                    property.sellerEmail ||
+                    property.sellerPhone ||
+                    property.sellerCompany ||
+                    property.sellerLicenseNo) && (
                     <>
                       <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Listing Agent Information</h3>
+                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                          Listing Agent Information
+                        </h3>
                       </div>
                       <dl>
                         {property.sellerName && (
@@ -816,7 +949,7 @@ export default function BuyerPropertyDetail() {
                               <Phone className="mr-2 h-4 w-4" /> Phone
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a 
+                              <a
                                 href={`tel:${property.sellerPhone}`}
                                 className="text-blue-600 hover:underline"
                               >
@@ -852,7 +985,7 @@ export default function BuyerPropertyDetail() {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Chat Section */}
           <div className="lg:col-span-1">
             <Card>
@@ -865,91 +998,127 @@ export default function BuyerPropertyDetail() {
                     Chat with seller and your agent
                   </p>
                 </div>
-                
-                <Tabs 
-                  defaultValue={activeTab} 
-                  value={activeTab} 
-                  onValueChange={setActiveTab} 
+
+                <Tabs
+                  defaultValue={activeTab}
+                  value={activeTab}
+                  onValueChange={setActiveTab}
                   className="w-full"
                 >
                   <div className="border-b border-gray-200">
                     <TabsList className="w-full grid grid-cols-4">
-                      <TabsTrigger value="viewings" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="viewings"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         <span className="flex items-center">
-                          <Eye className="mr-1 h-4 w-4" /> 
+                          <Eye className="mr-1 h-4 w-4" />
                           Viewings
                         </span>
                       </TabsTrigger>
-                      <TabsTrigger value="activity" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="activity"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         <span className="flex items-center">
-                          <Activity className="mr-1 h-4 w-4" /> 
+                          <Activity className="mr-1 h-4 w-4" />
                           Activity
                         </span>
                       </TabsTrigger>
-                      <TabsTrigger value="seller" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="seller"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         Seller Chat
                       </TabsTrigger>
-                      <TabsTrigger value="agent" className="data-[state=active]:border-b-2 data-[state=active]:border-primary">
+                      <TabsTrigger
+                        value="agent"
+                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                      >
                         Agent Chat
                       </TabsTrigger>
                     </TabsList>
                   </div>
-                  
+
                   <TabsContent value="viewings">
                     <div className="p-4">
                       <div className="mb-4">
                         <h3 className="text-lg font-medium flex items-center text-gray-900">
                           <Eye className="mr-2 h-5 w-5 text-primary" />
-                          Schedule a Viewing
+                          Schedule a tour
                         </h3>
                         <p className="text-sm text-gray-500 mt-1">
-                          Request a property viewing with your agent at your preferred date and time.
+                          Request a property tour with your agent at your
+                          preferred date and time.
                         </p>
                       </div>
-                      
+
                       {/* Viewing Request Button */}
                       <div className="mb-6">
                         {/* Always allow creating viewing requests, but show a note if there's a pending one */}
-                        {viewingRequests.some(request => request.status === 'pending') ? (
+                        {viewingRequests.some(
+                          (request) => request.status === "pending",
+                        ) ? (
                           <div className="flex flex-col gap-3">
-                            <Button 
+                            <Button
                               className="w-full flex items-center justify-center"
                               onClick={() => setIsViewingModalOpen(true)}
-                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
+                              disabled={
+                                !buyerAgreements?.some(
+                                  (a) => a.type === "global_brbc",
+                                )
+                              }
                             >
-                              <Eye className="mr-2 h-5 w-5" /> Request Another Viewing
+                              <Eye className="mr-2 h-5 w-5" /> Request Another
+                              Tour
                             </Button>
-                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                            {!buyerAgreements?.some(
+                              (a) => a.type === "global_brbc",
+                            ) && (
                               <p className="text-sm text-center text-amber-600 mt-2">
-                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                                Please sign the Buyer Representation Agreement to request viewings.
+                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                                Please sign the Buyer Representation Agreement
+                                to request viewings.
                               </p>
                             )}
                             <p className="text-sm text-center text-amber-600">
-                              <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                              Note: You already have a pending viewing request for this property.
+                              <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                              Note: You already have a pending viewing request
+                              for this property.
                             </p>
                           </div>
                         ) : (
                           <div className="flex flex-col gap-3">
-                            <Button 
-                              className="w-full flex items-center justify-center" 
+                            <Button
+                              className="w-full flex items-center justify-center"
                               onClick={() => setIsViewingModalOpen(true)}
-                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
+                              disabled={
+                                !buyerAgreements?.some(
+                                  (a) => a.type === "global_brbc",
+                                )
+                              }
                             >
-                              <Eye className="mr-2 h-5 w-5" /> Request Viewing
+                              <Eye className="mr-2 h-5 w-5" /> Request Tour
                             </Button>
-                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                            {!buyerAgreements?.some(
+                              (a) => a.type === "global_brbc",
+                            ) && (
                               <div className="text-sm text-center text-amber-600 mt-2">
                                 <p className="mb-1">
-                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                                  Please sign the Buyer Representation Agreement to request viewings.
+                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                                  Please sign the Buyer Representation Agreement
+                                  to request viewings.
                                 </p>
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="text-amber-700 p-0 h-auto font-medium underline"
-                                  onClick={() => window.open('/api/docs/brsr.pdf?fillable=true&prefill=buyer', '_blank')}
+                                  onClick={() =>
+                                    window.open(
+                                      "/api/docs/brsr.pdf?fillable=true&prefill=buyer",
+                                      "_blank",
+                                    )
+                                  }
                                 >
                                   Sign Representation Agreement
                                 </Button>
@@ -958,19 +1127,21 @@ export default function BuyerPropertyDetail() {
                           </div>
                         )}
                       </div>
-                      
-                      {/* Viewing Requests List */}
+
+                      {/* Tour Requests List */}
                       <div className="mt-6">
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-lg font-medium text-gray-900">Viewing Requests</h3>
+                          <h3 className="text-lg font-medium text-gray-900">
+                            Tour Requests
+                          </h3>
                         </div>
                         {isLoadingViewingRequests ? (
                           <div className="flex justify-center py-8">
                             <Loader2 className="h-8 w-8 animate-spin text-primary" />
                           </div>
                         ) : viewingRequests.length > 0 ? (
-                          <PropertyViewingRequestsList 
-                            viewingRequests={viewingRequests} 
+                          <PropertyViewingRequestsList
+                            viewingRequests={viewingRequests}
                             showPropertyDetails={false}
                             propertyName={property.address}
                             propertyId={propertyId}
@@ -979,26 +1150,26 @@ export default function BuyerPropertyDetail() {
                         ) : (
                           <div className="text-center py-8 text-gray-500">
                             <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                            <p className="mb-3">No viewing requests yet</p>
-                            <Button
-                              onClick={() => setIsViewingModalOpen(true)}
-                              className="inline-flex items-center"
-                              disabled={!buyerAgreements?.some(a => a.type === "global_brbc")}
-                            >
-                              <Eye className="mr-2 h-4 w-4" />
-                              Request Viewing
-                            </Button>
-                            {!buyerAgreements?.some(a => a.type === "global_brbc") && (
+                            <p className="mb-3">No tour requests yet</p>
+                            {!buyerAgreements?.some(
+                              (a) => a.type === "global_brbc",
+                            ) && (
                               <div className="text-sm text-center text-amber-600 mt-2">
                                 <p className="mb-1">
-                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" /> 
-                                  Please sign the Buyer Representation Agreement to request viewings.
+                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                                  Please sign the Buyer Representation Agreement
+                                  to request viewings.
                                 </p>
                                 <Button
                                   variant="link"
                                   size="sm"
                                   className="text-amber-700 p-0 h-auto font-medium underline"
-                                  onClick={() => window.open('/api/docs/brsr.pdf?fillable=true&prefill=buyer', '_blank')}
+                                  onClick={() =>
+                                    window.open(
+                                      "/api/docs/brsr.pdf?fillable=true&prefill=buyer",
+                                      "_blank",
+                                    )
+                                  }
                                 >
                                   Sign Representation Agreement
                                 </Button>
@@ -1010,23 +1181,6 @@ export default function BuyerPropertyDetail() {
                     </div>
                   </TabsContent>
 
-                  <TabsContent value="activity">
-                    <div className="p-4">
-                      <div className="mb-4">
-                        <h3 className="text-lg font-medium flex items-center text-gray-900">
-                          <Activity className="mr-2 h-5 w-5 text-primary" />
-                          Property Activity
-                        </h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Track all interactions and updates related to this property.
-                        </p>
-                      </div>
-                      <div className="mt-4">
-                        <PropertyActivityLog propertyId={propertyId} />
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
                   <TabsContent value="seller">
                     {property.sellerId ? (
                       <ChatWindow
@@ -1038,11 +1192,14 @@ export default function BuyerPropertyDetail() {
                     ) : (
                       <div className="p-4 text-center text-gray-500">
                         <p>The seller hasn't joined the platform yet.</p>
-                        <p className="text-sm mt-1">Once they sign up, you'll be able to chat with them here.</p>
+                        <p className="text-sm mt-1">
+                          Once they sign up, you'll be able to chat with them
+                          here.
+                        </p>
                       </div>
                     )}
                   </TabsContent>
-                  
+
                   <TabsContent value="agent">
                     {property.agentId ? (
                       <ChatWindow
@@ -1053,9 +1210,11 @@ export default function BuyerPropertyDetail() {
                       />
                     ) : (
                       <div className="p-4 text-center">
-                        <p className="text-gray-500 mb-3">No agent has been assigned yet.</p>
-                        <Button 
-                          onClick={() => setIsAgentDialogOpen(true)} 
+                        <p className="text-gray-500 mb-3">
+                          No agent has been assigned yet.
+                        </p>
+                        <Button
+                          onClick={() => setIsAgentDialogOpen(true)}
                           className="mb-2"
                           variant="outline"
                         >
@@ -1063,55 +1222,80 @@ export default function BuyerPropertyDetail() {
                           Choose an Agent
                         </Button>
                         <p className="text-xs text-gray-400 mt-2">
-                          Select an agent to help you with this property purchase
+                          Select an agent to help you with this property
+                          purchase
                         </p>
                       </div>
                     )}
                   </TabsContent>
+
+                  <TabsContent value="activity">
+                    <div className="p-4">
+                      <div className="mb-4">
+                        <h3 className="text-lg font-medium flex items-center text-gray-900">
+                          <Activity className="mr-2 h-5 w-5 text-primary" />
+                          Property Activity
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Track all interactions and updates related to this
+                          property.
+                        </p>
+                      </div>
+                      <div className="mt-4">
+                        <PropertyActivityLog propertyId={propertyId} />
+                      </div>
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </CardContent>
             </Card>
-            
+
             {/* Hidden div to maintain compatability with existing links */}
             <div id="viewing-requests-section" className="hidden"></div>
           </div>
         </div>
       </main>
 
-      {/* Viewing Request Modal */}
+      {/* Tour Request Modal */}
       <Dialog open={isViewingModalOpen} onOpenChange={setIsViewingModalOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Request Property Viewing</DialogTitle>
+            <DialogTitle>Request Property Tour</DialogTitle>
             <DialogDescription>
-              Schedule a time to view this property with your agent.
+              Schedule a time to tour this property with your agent.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="viewingDate" className="text-right text-sm font-medium col-span-1">
+              <label
+                htmlFor="viewingDate"
+                className="text-right text-sm font-medium col-span-1"
+              >
                 Date
               </label>
               <div className="col-span-3">
                 {/* Date Selection (placeholder for now) */}
-                <input 
-                  type="date" 
-                  id="viewingDate" 
+                <input
+                  type="date"
+                  id="viewingDate"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  min={new Date().toISOString().split('T')[0]}
+                  min={new Date().toISOString().split("T")[0]}
                   value={viewingDate}
                   onChange={(e) => setViewingDate(e.target.value)}
                 />
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="viewingTime" className="text-right text-sm font-medium col-span-1">
+              <label
+                htmlFor="viewingTime"
+                className="text-right text-sm font-medium col-span-1"
+              >
                 Start Time
               </label>
               <div className="col-span-3">
-                <input 
-                  type="time" 
-                  id="viewingTime" 
+                <input
+                  type="time"
+                  id="viewingTime"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={viewingTime}
                   onChange={(e) => setViewingTime(e.target.value)}
@@ -1119,13 +1303,16 @@ export default function BuyerPropertyDetail() {
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="viewingEndTime" className="text-right text-sm font-medium col-span-1">
+              <label
+                htmlFor="viewingEndTime"
+                className="text-right text-sm font-medium col-span-1"
+              >
                 End Time
               </label>
               <div className="col-span-3">
-                <input 
-                  type="time" 
-                  id="viewingEndTime" 
+                <input
+                  type="time"
+                  id="viewingEndTime"
                   className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={viewingEndTime}
                   onChange={(e) => setViewingEndTime(e.target.value)}
@@ -1133,7 +1320,10 @@ export default function BuyerPropertyDetail() {
               </div>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <label htmlFor="notes" className="text-right text-sm font-medium col-span-1">
+              <label
+                htmlFor="notes"
+                className="text-right text-sm font-medium col-span-1"
+              >
                 Notes
               </label>
               <div className="col-span-3">
@@ -1149,11 +1339,14 @@ export default function BuyerPropertyDetail() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsViewingModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsViewingModalOpen(false)}
+            >
               Cancel
             </Button>
-            <Button 
-              onClick={handleRequestViewing} 
+            <Button
+              onClick={handleRequestViewing}
               disabled={requestViewingMutation.isPending}
             >
               {requestViewingMutation.isPending ? (
@@ -1161,7 +1354,7 @@ export default function BuyerPropertyDetail() {
               ) : (
                 <CalendarIcon className="mr-2 h-4 w-4" />
               )}
-              Schedule Viewing
+              Schedule Tour
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1176,11 +1369,12 @@ export default function BuyerPropertyDetail() {
               Choose an Agent for this Property
             </DialogTitle>
             <DialogDescription>
-              Select a real estate agent to help you with the purchase of this property.
-              Agents with experience in {property.state || "your area"} are recommended.
+              Select a real estate agent to help you with the purchase of this
+              property. Agents with experience in{" "}
+              {property.state || "your area"} are recommended.
             </DialogDescription>
           </DialogHeader>
-          
+
           {!agents || agents.length === 0 ? (
             <div className="py-6 text-center text-gray-500">
               <Users className="mx-auto h-10 w-10 mb-3 text-gray-400" />
@@ -1200,12 +1394,15 @@ export default function BuyerPropertyDetail() {
               ))}
             </div>
           )}
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAgentDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsAgentDialogOpen(false)}
+            >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleChooseAgent}
               disabled={!selectedAgentId || chooseAgentMutation.isPending}
             >
@@ -1217,7 +1414,7 @@ export default function BuyerPropertyDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Agency Disclosure Form Dialog */}
       {property && property.agent && (
         <AgencyDisclosureForm
@@ -1232,7 +1429,7 @@ export default function BuyerPropertyDetail() {
           }}
         />
       )}
-      
+
       {/* Buyer Representation Agreement Dialog */}
       {selectedAgentId && (
         <BuyerRepresentationAgreement
@@ -1241,30 +1438,38 @@ export default function BuyerPropertyDetail() {
           onClose={() => {
             setIsBrbcModalOpen(false);
             // After closing the BRBC modal, refresh agreements
-            queryClient.invalidateQueries({ queryKey: ['/api/buyer/agreements'] });
-            
+            queryClient.invalidateQueries({
+              queryKey: ["/api/buyer/agreements"],
+            });
+
             // If we have a pending viewing request, retry it
             if (viewingRequestData) {
               // Check if the user has now signed a global BRBC
               apiRequest("GET", `/api/global-brbc/${selectedAgentId}`)
-                .then(res => res.json())
-                .then(data => {
-                  if (data.success && data.exists && data.agreement.status === "signed_by_buyer") {
-                    console.log("Global BRBC now signed, retrying viewing request");
+                .then((res) => res.json())
+                .then((data) => {
+                  if (
+                    data.success &&
+                    data.exists &&
+                    data.agreement.status === "signed_by_buyer"
+                  ) {
+                    console.log(
+                      "Global BRBC now signed, retrying viewing request",
+                    );
                     // The global BRBC has been signed, retry the viewing request
                     requestViewingMutation.mutate({
                       date: viewingRequestData.date,
                       time: viewingRequestData.time,
                       endTime: viewingRequestData.endTime,
                       notes: viewingRequestData.notes,
-                      override: true // Allow override since we have permission now
+                      override: true, // Allow override since we have permission now
                     });
-                    
+
                     // Clear the stored data
                     setViewingRequestData(null);
                   }
                 })
-                .catch(err => {
+                .catch((err) => {
                   console.error("Error checking for updated global BRBC:", err);
                 });
             }
@@ -1272,47 +1477,64 @@ export default function BuyerPropertyDetail() {
           isGlobal={true}
         />
       )}
-      
+
       {/* Alert Dialog for confirming override of existing viewing request */}
-      <AlertDialog open={showOverrideDialog} onOpenChange={setShowOverrideDialog}>
+      <AlertDialog
+        open={showOverrideDialog}
+        onOpenChange={setShowOverrideDialog}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center">
               <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-              Replace Existing Viewing Request?
+              Replace Existing Tour Request?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              You already have a viewing request scheduled for {existingRequestInfo?.existingRequestDate && (
-                <span className="font-medium">{new Date(existingRequestInfo.existingRequestDate).toLocaleString()}</span>
-              )}.
-              <p className="mt-2">Would you like to replace it with a new request for {pendingRequestData && (
+              You already have a viewing request scheduled for{" "}
+              {existingRequestInfo?.existingRequestDate && (
                 <span className="font-medium">
-                  {new Date(`${pendingRequestData.date}T${pendingRequestData.time}`).toLocaleString(undefined, {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
+                  {new Date(
+                    existingRequestInfo.existingRequestDate,
+                  ).toLocaleString()}
                 </span>
-              )}?</p>
+              )}
+              .
+              <p className="mt-2">
+                Would you like to replace it with a new request for{" "}
+                {pendingRequestData && (
+                  <span className="font-medium">
+                    {new Date(
+                      `${pendingRequestData.date}T${pendingRequestData.time}`,
+                    ).toLocaleString(undefined, {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                )}
+                ?
+              </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setShowOverrideDialog(false);
-              setPendingRequestData(null);
-              setExistingRequestInfo(null);
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowOverrideDialog(false);
+                setPendingRequestData(null);
+                setExistingRequestInfo(null);
+              }}
+            >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => {
                 if (pendingRequestData) {
                   // Submit the request with override flag set to true
                   requestViewingMutation.mutate({
                     ...pendingRequestData,
-                    override: true
+                    override: true,
                   });
                 }
               }}
