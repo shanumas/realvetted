@@ -4,11 +4,8 @@ import { Property, User } from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
 import { extractTextFromPdf } from "./pdf-util";
-// Import pdf-parse dynamically to avoid initialization issues with test files
-const pdfParse = (buffer: Buffer) => {
-  const pdfParseModule = require('pdf-parse');
-  return pdfParseModule(buffer);
-};
+// Import pdf-parse properly for ESM compatibility
+import pdfParse from 'pdf-parse';
 
 // Initialize the OpenAI client
 const openai = new OpenAI({
