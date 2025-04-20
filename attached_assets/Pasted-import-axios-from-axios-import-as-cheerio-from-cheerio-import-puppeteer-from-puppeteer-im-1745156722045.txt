@@ -20,7 +20,7 @@ async function getPuppeteerBrowser() {
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
       // Try without specifying path (use Puppeteer's bundled Chrome)
-      undefined
+      null
     ];
     
     // Try each path until one works
@@ -30,11 +30,11 @@ async function getPuppeteerBrowser() {
         return await puppeteer.launch({
           headless: true,
           args: ['--no-sandbox', '--disable-setuid-sandbox'],
-          executablePath: path, // Will be ignored if undefined
+          executablePath: path, // Will be ignored if null
           // Increase timeout
           timeout: 30000,
         });
-      } catch (e: any) {
+      } catch (e) {
         console.log(`Failed to launch Chrome from ${path || 'bundled Chrome'}: ${e.message}`);
         // Continue to the next path
       }
@@ -487,8 +487,7 @@ async function findAgentEmailFromWeb(
         const links: string[] = [];
         const elements = document.querySelectorAll("a");
 
-        // Convert NodeList to Array before iteration
-        Array.from(elements).forEach(el => {
+        for (const el of elements) {
           const href = el.getAttribute("href");
           if (
             href &&
@@ -499,7 +498,7 @@ async function findAgentEmailFromWeb(
             // Increased from 3 to 5
             links.push(href.substring(7, href.indexOf("&")));
           }
-        });
+        }
 
         return links;
       });
