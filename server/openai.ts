@@ -663,32 +663,26 @@ export async function extractPropertyFromUrl(
       return generateMockPropertyData("123 Main St, Springfield, IL");
     }
 
-    // In a real implementation, we would scrape the URL and extract data
+    // Import the property scraper dynamically
+    const { scrapePropertyListing } = await import('./scrapers/property-scraper');
+    
+    // Log that we're starting the scraping process
     console.log(`Extracting property data from URL: ${url}`);
 
     try {
-      // Mock implementation for testing
-      const basicPropertyData: PropertyAIData = {
-        address: "123 Main St",
-        city: "Springfield",
-        state: "IL",
-        zip: "62701",
-        propertyType: "Single Family Home",
-        bedrooms: 3,
-        bathrooms: 2,
-        squareFeet: 1800,
-        price: 250000,
-        yearBuilt: 1985,
-        description: "Charming home in a quiet neighborhood",
-        features: [
-          "Hardwood floors",
-          "Updated kitchen",
-          "Large backyard",
-          "Two-car garage",
-        ],
-      };
-
-      return basicPropertyData;
+      // Use the actual property scraper to extract data
+      const scrapedData = await scrapePropertyListing(url);
+      
+      // Log success and return the data
+      console.log("Successfully extracted property data with scraper");
+      
+      // Make sure the seller email is set - if not found, use the fallback
+      if (!scrapedData.sellerEmail) {
+        console.log("No seller email found in scraped data, using fallback email");
+        scrapedData.sellerEmail = "shanumas@gmail.com";
+      }
+      
+      return scrapedData;
     } catch (error) {
       console.error("Error extracting from URL:", error);
       throw error;
@@ -696,7 +690,10 @@ export async function extractPropertyFromUrl(
   } catch (error) {
     console.error("Error in property URL extraction:", error);
     // Return mock data as fallback
-    return generateMockPropertyData("123 Error St");
+    const mockData = generateMockPropertyData("123 Error St");
+    // Ensure the mock data has a seller email
+    mockData.sellerEmail = "shanumas@gmail.com";
+    return mockData;
   }
 }
 
@@ -723,6 +720,12 @@ function generateMockPropertyData(address: string): PropertyAIData {
       "Close to parks and schools",
       "Attached garage",
     ],
+    // Adding seller info with email
+    sellerName: "Jane Realtor",
+    sellerPhone: "555-123-4567",
+    sellerEmail: "shanumas@gmail.com",
+    sellerCompany: "Springfield Realty",
+    sellerLicenseNo: "DRE #12345678",
   };
 
   return mockData;
