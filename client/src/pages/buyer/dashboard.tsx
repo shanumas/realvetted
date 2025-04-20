@@ -469,9 +469,9 @@ export default function BuyerDashboard() {
           </div>
 
           {/* Second column - BRBC Agreement Card */}
-          <div className="relative rounded-lg">
+          <div className="relative rounded-lg flex flex-col space-y-4">
             <div
-              className={`h-1/2 ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50 border-green-100" : "bg-amber-50 border-amber-100"} rounded-lg border p-3 flex flex-col`}
+              className={`h-1/2 border-2 border-gray-300 ${buyerAgreements?.some((a) => a.type === "global_brbc") ? "bg-green-50" : "bg-amber-50"} rounded-lg p-3 flex flex-col`}
             >
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
@@ -628,7 +628,7 @@ export default function BuyerDashboard() {
 
             {/* Third column - Manual Approval Card */}
 
-            <div className="h-1/2 bg-green-50 rounded-lg border border-green-100 p-3 flex flex-col">
+            <div className="h-1/4 border-2 border-gray-300 bg-green-50 rounded-lg p-3 flex flex-col">
               <div className="flex items-center justify-between mb-1.5">
                 <div className="flex items-center">
                   <div className="bg-green-100 rounded-full w-6 h-6 flex items-center justify-center mr-2">
