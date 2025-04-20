@@ -8,6 +8,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
 });
 
+// Helper function to get puppeteer browser with correct Chrome path
+async function getPuppeteerBrowser() {
+  try {
+    return await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: process.env.CHROME_BIN || '/usr/bin/chromium-browser', // Use system Chrome/Chromium
+    });
+  } catch (error) {
+    console.error('Error launching puppeteer browser:', error);
+    throw error;
+  }
+}
+
 // Main function to scrape a property listing URL
 export async function scrapePropertyListing(
   url: string,
@@ -37,10 +51,7 @@ export async function scrapePropertyListing(
 
 // Scraper for Zillow listings
 async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await getPuppeteerBrowser();
 
   try {
     const page = await browser.newPage();
@@ -100,10 +111,7 @@ async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
 
 // Generic scraper for other real estate sites
 async function scrapeGenericListing(url: string): Promise<PropertyAIData> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await getPuppeteerBrowser();
 
   try {
     const page = await browser.newPage();
@@ -430,10 +438,7 @@ async function findAgentEmailFromWeb(
     console.log(`Searching for agent email with query: ${searchQuery}`);
 
     // Use a simple browser to search
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    const browser = await getPuppeteerBrowser();
 
     try {
       const page = await browser.newPage();
