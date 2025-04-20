@@ -15,42 +15,46 @@ async function getPuppeteerBrowser() {
       // Try environment variable first
       process.env.CHROME_BIN,
       // Common Linux paths
-      '/usr/bin/chromium-browser',
-      '/usr/bin/chromium',
-      '/usr/bin/google-chrome',
-      '/usr/bin/google-chrome-stable',
+      "/usr/bin/chromium-browser",
+      "/usr/bin/chromium",
+      "/usr/bin/google-chrome",
+      "/usr/bin/google-chrome-stable",
       // Try without specifying path (use Puppeteer's bundled Chrome)
-      undefined
+      undefined,
     ];
-    
+
     // Try each path until one works
     for (const path of chromePaths) {
       try {
-        console.log(`Trying to launch Chrome from: ${path || 'bundled Chrome'}`);
+        console.log(
+          `Trying to launch Chrome from: ${path || "bundled Chrome"}`,
+        );
         return await puppeteer.launch({
           headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox'],
+          args: ["--no-sandbox", "--disable-setuid-sandbox"],
           executablePath: path, // Will be ignored if undefined
           // Increase timeout
           timeout: 30000,
         });
       } catch (e: any) {
-        console.log(`Failed to launch Chrome from ${path || 'bundled Chrome'}: ${e.message}`);
+        console.log(
+          `Failed to launch Chrome from ${path || "bundled Chrome"}: ${e.message}`,
+        );
         // Continue to the next path
       }
     }
-    
+
     // If we get here, all paths failed
-    console.error('Could not find Chrome in any of the standard locations');
-    
+    console.error("Could not find Chrome in any of the standard locations");
+
     // Fall back to minimal configuration as last resort
-    console.log('Trying minimal launch configuration as last resort');
+    console.log("Trying minimal launch configuration as last resort");
     return await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
     });
   } catch (error) {
-    console.error('Error launching puppeteer browser:', error);
+    console.error("Error launching puppeteer browser:", error);
     throw error;
   }
 }
@@ -211,57 +215,62 @@ async function extractPropertyDataWithAI(
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
       console.log("Using mock data for property extraction (no API key)");
-      return generateMockPropertyData(url);
     }
-    
+
     // First, try to extract data using Cheerio for more reliable information
     const $ = cheerio.load(html);
     const extractedData: Partial<PropertyAIData> = {};
-    
+
     // Initialize properties with direct extraction
-    let directAddress = '';
-    let directCity = '';
-    let directState = '';
-    let directZip = '';
+    let directAddress = "";
+    let directCity = "";
+    let directState = "";
+    let directZip = "";
     let directPrice: number | undefined;
     let directBeds: number | undefined;
     let directBaths: number | undefined;
     let directSqFt: number | undefined;
-    
+
     // Attempt to find common patterns for property data in HTML
     // Look for price
     const priceText = $('*:contains("$")').text();
     const priceMatch = priceText.match(/\$([0-9,]+)/);
     if (priceMatch && priceMatch[1]) {
-      directPrice = parseInt(priceMatch[1].replace(/,/g, ''));
+      directPrice = parseInt(priceMatch[1].replace(/,/g, ""));
     }
-    
+
     // Look for beds/baths/sqft
-    const statsText = $('*:contains("bed")').text() + ' ' + $('*:contains("bath")').text() + ' ' + $('*:contains("sq")').text();
+    const statsText =
+      $('*:contains("bed")').text() +
+      " " +
+      $('*:contains("bath")').text() +
+      " " +
+      $('*:contains("sq")').text();
     const bedsMatch = statsText.match(/(\d+)\s*bed/i);
     const bathsMatch = statsText.match(/(\d+\.?\d*)\s*bath/i);
     const sqftMatch = statsText.match(/(\d+[,\d]*)\s*sq\s*\.?\s*ft/i);
-    
+
     if (bedsMatch && bedsMatch[1]) directBeds = parseInt(bedsMatch[1]);
     if (bathsMatch && bathsMatch[1]) directBaths = parseFloat(bathsMatch[1]);
-    if (sqftMatch && sqftMatch[1]) directSqFt = parseInt(sqftMatch[1].replace(/,/g, ''));
-    
+    if (sqftMatch && sqftMatch[1])
+      directSqFt = parseInt(sqftMatch[1].replace(/,/g, ""));
+
     // Look for address components in meta data
-    $('meta').each((i, el) => {
-      const property = $(el).attr('property') || '';
-      const content = $(el).attr('content') || '';
-      
-      if (property.includes('address') || property.includes('location')) {
+    $("meta").each((i, el) => {
+      const property = $(el).attr("property") || "";
+      const content = $(el).attr("content") || "";
+
+      if (property.includes("address") || property.includes("location")) {
         directAddress = content;
-      } else if (property.includes('city') || property.includes('locality')) {
+      } else if (property.includes("city") || property.includes("locality")) {
         directCity = content;
-      } else if (property.includes('state') || property.includes('region')) {
+      } else if (property.includes("state") || property.includes("region")) {
         directState = content;
-      } else if (property.includes('zip') || property.includes('postal')) {
+      } else if (property.includes("zip") || property.includes("postal")) {
         directZip = content;
       }
     });
-    
+
     console.log("Direct extraction results:", {
       address: directAddress,
       city: directCity,
@@ -270,7 +279,7 @@ async function extractPropertyDataWithAI(
       price: directPrice,
       bedrooms: directBeds,
       bathrooms: directBaths,
-      squareFeet: directSqFt
+      squareFeet: directSqFt,
     });
 
     // Extract only the relevant parts of the HTML to avoid token limit issues
@@ -289,14 +298,14 @@ async function extractPropertyDataWithAI(
       - Features/Amenities (list of key features)
       
       I've already directly extracted some data that may be correct:
-      ${directAddress ? `Address found: ${directAddress}` : 'Address not found'}
-      ${directCity ? `City found: ${directCity}` : 'City not found'}
-      ${directState ? `State found: ${directState}` : 'State not found'}
-      ${directZip ? `Zip found: ${directZip}` : 'Zip not found'}
-      ${directPrice ? `Price found: $${directPrice}` : 'Price not found'}
-      ${directBeds ? `Bedrooms found: ${directBeds}` : 'Bedrooms not found'}
-      ${directBaths ? `Bathrooms found: ${directBaths}` : 'Bathrooms not found'}
-      ${directSqFt ? `Square feet found: ${directSqFt}` : 'Square feet not found'}
+      ${directAddress ? `Address found: ${directAddress}` : "Address not found"}
+      ${directCity ? `City found: ${directCity}` : "City not found"}
+      ${directState ? `State found: ${directState}` : "State not found"}
+      ${directZip ? `Zip found: ${directZip}` : "Zip not found"}
+      ${directPrice ? `Price found: $${directPrice}` : "Price not found"}
+      ${directBeds ? `Bedrooms found: ${directBeds}` : "Bedrooms not found"}
+      ${directBaths ? `Bathrooms found: ${directBaths}` : "Bathrooms not found"}
+      ${directSqFt ? `Square feet found: ${directSqFt}` : "Square feet not found"}
       
       IMPORTANT: Only correct the directly extracted data if you find clear evidence in the HTML. If the directly extracted data is correct, use it. 
       DO NOT hallucinate or make up data. If something isn't clearly in the HTML, leave it blank or null.
@@ -337,7 +346,7 @@ async function extractPropertyDataWithAI(
     });
 
     const result = JSON.parse(response.choices[0].message.content || "{}");
-    
+
     // Prioritize directly extracted data over AI results when available
     if (directAddress) result.address = directAddress;
     if (directCity) result.city = directCity;
@@ -347,25 +356,29 @@ async function extractPropertyDataWithAI(
     if (directBeds) result.bedrooms = directBeds;
     if (directBaths) result.bathrooms = directBaths;
     if (directSqFt) result.squareFeet = directSqFt;
-    
+
     // If the URL appears to be from a specific site, we can extract some basic info from it
-    if (url.includes('zillow.com') || url.includes('realtor.com') || url.includes('redfin.com')) {
+    if (
+      url.includes("zillow.com") ||
+      url.includes("realtor.com") ||
+      url.includes("redfin.com")
+    ) {
       // Check if address components are missing, try to get from URL
       if (!result.address || !result.city || !result.state) {
-        const urlParts = url.split('/');
+        const urlParts = url.split("/");
         for (let i = 0; i < urlParts.length; i++) {
           // Look for patterns like state abbreviations
           if (urlParts[i].match(/^[A-Z]{2}$/) && !result.state) {
             result.state = urlParts[i];
           }
           // Look for patterns that might be city names
-          if (urlParts[i].includes('-') && !result.city) {
-            result.city = urlParts[i].replace(/-/g, ' ');
+          if (urlParts[i].includes("-") && !result.city) {
+            result.city = urlParts[i].replace(/-/g, " ");
           }
         }
       }
     }
-    
+
     console.log("Final extracted data:", result);
     return result;
   } catch (error) {
@@ -488,7 +501,7 @@ async function findAgentEmailFromWeb(
         const elements = document.querySelectorAll("a");
 
         // Convert NodeList to Array before iteration
-        Array.from(elements).forEach(el => {
+        Array.from(elements).forEach((el) => {
           const href = el.getAttribute("href");
           if (
             href &&
@@ -749,57 +762,4 @@ function simplifyHtml(
   // to avoid exceeding token limits
   const bodyHtml = $("body").html() || "";
   return bodyHtml.substring(0, 15000); // Limit to ~15KB of HTML
-}
-
-// Generate mock data when no API key is available
-function generateMockPropertyData(url: string): PropertyAIData {
-  const addressMatch = url.match(
-    /([0-9]+)-([A-Za-z\-]+)-([A-Za-z\-]+)-([A-Z]{2})-([0-9]+)/,
-  );
-  let address = "123 Main St";
-  let city = "San Francisco";
-  let state = "CA";
-  let zip = "94114";
-
-  if (addressMatch && addressMatch.length >= 6) {
-    address = `${addressMatch[1]} ${addressMatch[2].replace(/-/g, " ")}`;
-    city = addressMatch[3].replace(/-/g, " ");
-    state = addressMatch[4];
-    zip = addressMatch[5];
-  }
-
-  const mockData: PropertyAIData = {
-    address: address,
-    city: city,
-    state: state,
-    zip: zip,
-    propertyType: "Single Family",
-    bedrooms: 3 + Math.floor(Math.random() * 3),
-    bathrooms: 2 + Math.floor(Math.random() * 2),
-    squareFeet: 1500 + Math.floor(Math.random() * 1000),
-    price: 500000 + Math.floor(Math.random() * 1000000),
-    yearBuilt: 1980 + Math.floor(Math.random() * 40),
-    description:
-      "Beautiful home in a great neighborhood with modern amenities and convenient location.",
-    sellerName: "Jane Realtor",
-    sellerPhone: "415-555-" + Math.floor(1000 + Math.random() * 9000),
-    sellerEmail: `agent_${Math.floor(Math.random() * 1000)}@example.com`,
-    sellerCompany: "Prestige Real Estate",
-    sellerLicenseNo: `DRE #${Math.floor(Math.random() * 10000000)}`,
-    propertyUrl: url,
-    features: [
-      "Hardwood floors",
-      "Updated kitchen",
-      "Spacious backyard",
-      "Close to parks and schools",
-      "Attached garage",
-    ],
-    imageUrls: [
-      "https://example.com/property-image-1.jpg",
-      "https://example.com/property-image-2.jpg",
-      "https://example.com/property-image-3.jpg",
-    ],
-  };
-
-  return mockData;
 }

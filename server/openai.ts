@@ -38,18 +38,43 @@ export interface PrequalificationData {
   expirationDate?: string;
 }
 
+// Create a basic fallback property data when API is unavailable
+function createFallbackPropertyData(address: string): PropertyAIData {
+  return {
+    address: address || "Address unavailable",
+    city: undefined,
+    state: undefined,
+    zip: undefined,
+    propertyType: "Unknown",
+    bedrooms: undefined,
+    bathrooms: undefined,
+    squareFeet: undefined,
+    price: undefined,
+    yearBuilt: undefined,
+    description: "Property information could not be retrieved",
+    features: [],
+    sellerName: "",
+    sellerPhone: "",
+    sellerEmail: "shanumas@gmail.com", // Fallback email
+    sellerCompany: "",
+    sellerLicenseNo: "",
+    propertyUrl: "",
+    imageUrls: []
+  };
+}
+
 // Extract property data from an address
 export async function extractPropertyData(
   address: string,
 ): Promise<PropertyAIData> {
   try {
-    // If there's no API key, use mock data for development
+    // If there's no API key, use fallback data for development
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Using mock data for property extraction (no API key)");
-      return generateMockPropertyData(address);
+      console.log("Using fallback data for property extraction (no API key)");
+      return createFallbackPropertyData(address);
     }
 
     const prompt = `
@@ -87,8 +112,8 @@ export async function extractPropertyData(
     return result;
   } catch (error) {
     console.error("Error extracting property data:", error);
-    // If API call fails, return mock data
-    return generateMockPropertyData(address);
+    // If API call fails, return fallback data
+    return createFallbackPropertyData(address);
   }
 }
 
@@ -664,8 +689,10 @@ export async function extractPropertyFromUrl(
     }
 
     // Import the property scraper dynamically
-    const { scrapePropertyListing } = await import('./scrapers/property-scraper');
-    
+    const { scrapePropertyListing } = await import(
+      "./scrapers/property-scraper"
+    );
+
     // Log that we're starting the scraping process
     console.log(`Extracting property data from URL: ${url}`);
 
@@ -673,67 +700,85 @@ export async function extractPropertyFromUrl(
       try {
         // Try to use the property scraper first
         const scrapedData = await scrapePropertyListing(url);
-        
+
         // Log success and return the data
         console.log("Successfully extracted property data with scraper");
-        
+
         // Make sure the seller email is set - if not found, use the fallback
         if (!scrapedData.sellerEmail) {
-          console.log("No seller email found in scraped data, using fallback email");
+          console.log(
+            "No seller email found in scraped data, using fallback email",
+          );
           scrapedData.sellerEmail = "shanumas@gmail.com";
         }
-        
+
         return scrapedData;
       } catch (scrapeError) {
-        console.error("Scraper failed, falling back to API-based extraction:", scrapeError);
-        
+        console.error(
+          "Scraper failed, falling back to API-based extraction:",
+          scrapeError,
+        );
+
         // If Chrome/Puppeteer is failing, fallback to a direct API-based approach
         // Get listing details directly from OpenAI with the URL
         console.log("Using direct API-based property extraction");
-        
+
         // Extract domain and possible identifier from URL
         const urlObj = new URL(url);
         const domain = urlObj.hostname;
-        
+
         // Try to get property details directly from the URL structure
-        let addressFromUrl = '';
-        let cityFromUrl = '';
-        let stateFromUrl = '';
-        let zipFromUrl = '';
-        
+        let addressFromUrl = "";
+        let cityFromUrl = "";
+        let stateFromUrl = "";
+        let zipFromUrl = "";
+
         // Extract information from URL parts for common real estate sites
-        if (domain.includes('zillow.com') || domain.includes('realtor.com') || domain.includes('redfin.com')) {
-          const pathParts = urlObj.pathname.split('/');
-          
+        if (
+          domain.includes("zillow.com") ||
+          domain.includes("realtor.com") ||
+          domain.includes("redfin.com")
+        ) {
+          const pathParts = urlObj.pathname.split("/");
+
           for (const part of pathParts) {
             // Look for possible address/location information in the URL
-            if (part.includes('-')) {
-              const segments = part.split('-');
-              
+            if (part.includes("-")) {
+              const segments = part.split("-");
+
               // Check for street numbers
               if (segments.length > 1 && /^\d+$/.test(segments[0])) {
                 // This might be an address: e.g., 123-Main-St
-                addressFromUrl = segments.join(' ').replace(/-/g, ' ');
+                addressFromUrl = segments.join(" ").replace(/-/g, " ");
               }
-              
+
               // Check for state codes
-              if (segments.length > 0 && /^[A-Z]{2}$/.test(segments[segments.length-1])) {
-                stateFromUrl = segments[segments.length-1];
-                
+              if (
+                segments.length > 0 &&
+                /^[A-Z]{2}$/.test(segments[segments.length - 1])
+              ) {
+                stateFromUrl = segments[segments.length - 1];
+
                 // The part before the state is likely the city
                 if (segments.length > 1) {
-                  cityFromUrl = segments[segments.length-2].replace(/-/g, ' ');
+                  cityFromUrl = segments[segments.length - 2].replace(
+                    /-/g,
+                    " ",
+                  );
                 }
               }
-              
+
               // Check for ZIP codes
-              if (segments.length > 0 && /^\d{5}$/.test(segments[segments.length-1])) {
-                zipFromUrl = segments[segments.length-1];
+              if (
+                segments.length > 0 &&
+                /^\d{5}$/.test(segments[segments.length - 1])
+              ) {
+                zipFromUrl = segments[segments.length - 1];
               }
             }
           }
         }
-        
+
         // Construct a prompt for GPT to extract as much information as possible from the URL
         const prompt = `
           I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
@@ -741,12 +786,12 @@ export async function extractPropertyFromUrl(
           URL: ${url}
           
           Based on the URL format, I've already extracted some potential information:
-          ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ''}
-          ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ''}
-          ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ''}
-          ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ''}
+          ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
+          ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
+          ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
+          ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
           
-          Analyze the URL structure to extract or guess (with high confidence):
+          Analyze the URL structure to extract (with high confidence):
           - Property address
           - City, state, ZIP
           - Property type (if discernible)
@@ -756,34 +801,32 @@ export async function extractPropertyFromUrl(
           
           If you can't determine certain fields with reasonable confidence, leave them as null.
           
-          For listing agent, use the following info:
-          - Agent name: "Jane Smith"
-          - Agent company: "Realty Experts"
-          - Agent email: "shanumas@gmail.com"
-          - Agent phone: "555-123-4567"
-          
           Format as JSON.
         `;
-        
+
         const response = await openai.chat.completions.create({
           model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
           messages: [
             {
               role: "system",
-              content: "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values."
+              content:
+                "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
             },
-            { role: "user", content: prompt }
+            { role: "user", content: prompt },
           ],
-          response_format: { type: "json_object" }
+          response_format: { type: "json_object" },
         });
-        
+
         try {
           // Parse the API response
-          const apiResult = JSON.parse(response.choices[0].message.content || "{}");
-          
+          const apiResult = JSON.parse(
+            response.choices[0].message.content || "{}",
+          );
+
           // Ensure we have the minimum required data
           const propertyData: PropertyAIData = {
-            address: apiResult.address || addressFromUrl || "Address unavailable",
+            address:
+              apiResult.address || addressFromUrl || "Address unavailable",
             city: apiResult.city || cityFromUrl || null,
             state: apiResult.state || stateFromUrl || null,
             zip: apiResult.zip || zipFromUrl || null,
@@ -793,17 +836,20 @@ export async function extractPropertyFromUrl(
             squareFeet: apiResult.squareFeet || null,
             price: apiResult.price || null,
             yearBuilt: apiResult.yearBuilt || null,
-            description: apiResult.description || "Property information extracted from URL",
+            description:
+              apiResult.description ||
+              "Property information extracted from URL",
             features: apiResult.features || [],
-            sellerName: "Jane Smith",
-            sellerPhone: "555-123-4567",
-            sellerEmail: "shanumas@gmail.com",
-            sellerCompany: "Realty Experts",
-            sellerLicenseNo: "DRE #01234567",
+            // Add listing agent information based on extracted data or fallbacks
+            sellerName: apiResult.sellerName || apiResult.agentName || "",
+            sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
+            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "shanumas@gmail.com",
+            sellerCompany: apiResult.sellerCompany || apiResult.agentCompany || "",
+            sellerLicenseNo: apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
             propertyUrl: url,
-            imageUrls: []
+            imageUrls: [],
           };
-          
+
           return propertyData;
         } catch (parseError) {
           console.error("Error parsing API response:", parseError);
@@ -816,44 +862,30 @@ export async function extractPropertyFromUrl(
     }
   } catch (error) {
     console.error("Error in property URL extraction:", error);
-    // Return mock data as fallback
-    const mockData = generateMockPropertyData("123 Error St");
-    // Ensure the mock data has a seller email
-    mockData.sellerEmail = "shanumas@gmail.com";
-    return mockData;
+    
+    // Create a fallback property result with minimal data
+    const fallbackResult: PropertyAIData = {
+      address: "Address could not be extracted",
+      city: null,
+      state: null,
+      zip: null,
+      propertyType: "Unknown",
+      bedrooms: null,
+      bathrooms: null,
+      squareFeet: null,
+      price: null,
+      yearBuilt: null,
+      description: "Property information could not be extracted",
+      features: [],
+      sellerName: "",
+      sellerPhone: "",
+      sellerEmail: "shanumas@gmail.com", // Always include the fallback email
+      sellerCompany: "",
+      sellerLicenseNo: "",
+      propertyUrl: url,
+      imageUrls: []
+    };
+    
+    return fallbackResult;
   }
-}
-
-// Generate mock property data for testing
-function generateMockPropertyData(address: string): PropertyAIData {
-  // Generate realistic mock data based on the address
-  const mockData: PropertyAIData = {
-    address: address,
-    city: "Springfield",
-    state: "IL",
-    zip: "62701",
-    propertyType: "Single Family Home",
-    bedrooms: 3,
-    bathrooms: 2,
-    squareFeet: 2000,
-    price: 350000,
-    yearBuilt: 1995,
-    description:
-      "Beautiful single-family home in a great neighborhood with modern amenities and convenient location.",
-    features: [
-      "Hardwood floors",
-      "Updated kitchen",
-      "Spacious backyard",
-      "Close to parks and schools",
-      "Attached garage",
-    ],
-    // Adding seller info with email
-    sellerName: "Jane Realtor",
-    sellerPhone: "555-123-4567",
-    sellerEmail: "shanumas@gmail.com",
-    sellerCompany: "Springfield Realty",
-    sellerLicenseNo: "DRE #12345678",
-  };
-
-  return mockData;
 }
