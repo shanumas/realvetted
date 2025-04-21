@@ -511,6 +511,18 @@ export default function AgentPropertyDetail() {
                         </p>
                       </div>
                       
+                      {property.sellerEmail && (
+                        <div className="mt-4 mb-6 p-4 bg-white rounded-md border border-gray-200">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Current Contact Email:</h4>
+                          <CopyableContact
+                            label="Email"
+                            value={property.sellerEmail}
+                            type="email"
+                            className="text-primary"
+                          />
+                        </div>
+                      )}
+                      
                       <div className="mt-4">
                         <AgentEmailEditor 
                           propertyId={propertyId} 
