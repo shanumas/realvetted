@@ -677,7 +677,7 @@ async function rankAgentsByExpertise(
 // Extract property data from URL
 export async function extractPropertyFromUrl(
   url: string,
-): Promise<PropertyAIData> {
+): Promise<PropertyAIData | null> {
   try {
     // If there's no API key, use mock data for development
     if (
@@ -685,7 +685,7 @@ export async function extractPropertyFromUrl(
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
       console.log("Using mock data for URL extraction (no API key)");
-      return generateMockPropertyData("123 Main St, Springfield, IL");
+      return null;
     }
 
     // Import the property scraper dynamically
@@ -699,6 +699,7 @@ export async function extractPropertyFromUrl(
 
     try {
       try {
+        console.log("--------Inside scraper");
         // Try to use the property scraper first
         const scrapedData = await scrapePropertyListing(url);
 
@@ -707,9 +708,7 @@ export async function extractPropertyFromUrl(
 
         // If seller email wasn't found, we'll keep it as empty
         if (!scrapedData.sellerEmail) {
-          console.log(
-            "No seller email found in scraped data"
-          );
+          console.log("No seller email found in scraped data");
           // Don't use a hardcoded fallback, keep it empty/undefined
         }
 
@@ -844,10 +843,7 @@ export async function extractPropertyFromUrl(
             // Add listing agent information based on extracted data or fallbacks
             sellerName: apiResult.sellerName || apiResult.agentName || "",
             sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-            sellerEmail:
-              apiResult.sellerEmail ||
-              apiResult.agentEmail ||
-              "", // Don't use hardcoded fallback
+            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "", // Don't use hardcoded fallback
             sellerCompany:
               apiResult.sellerCompany || apiResult.agentCompany || "",
             sellerLicenseNo:
@@ -872,15 +868,15 @@ export async function extractPropertyFromUrl(
     // Create a fallback property result with minimal data
     const fallbackResult: PropertyAIData = {
       address: "Address could not be extracted",
-      city: null,
-      state: null,
-      zip: null,
+      city: "",
+      state: "",
+      zip: "",
       propertyType: "Unknown",
-      bedrooms: null,
-      bathrooms: null,
-      squareFeet: null,
-      price: null,
-      yearBuilt: null,
+      bedrooms: 0,
+      bathrooms: 0,
+      squareFeet: 0,
+      price: "",
+      yearBuilt: 0,
       description: "Property information could not be extracted",
       features: [],
       sellerName: "",
