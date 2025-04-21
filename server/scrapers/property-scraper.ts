@@ -105,10 +105,11 @@ export async function scrapePropertyListing(
 
     // Single API call to OpenAI to extract all property data
     const prompt = `
-      I have a real estate listing URL. Please extract as much information as possible based on the URL
+      ${headingText}
       
       URL: ${url}
-
+      
+      ${htmlContent ? `HTML Content (first 15000 chars): ${htmlContent.substring(0, 15000)}...` : ""}
       
       Based on the URL format, I've already extracted some potential information:
       ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
@@ -235,26 +236,31 @@ async function findAgentEmailFromWeb(
       return "shanumas@gmail.com";
     }
 
-    // Create a search query for this agent
-    const searchQuery = `${agentName} real estate agent ${agentCompany || ""} contact email`;
-    console.log(`Searching for agent email with query: "${searchQuery}"`);
-
-    // Use direct API call to OpenAI instead of web scraping
+    // Build a more comprehensive search query for finding the agent's email
+    const cleanAgentName = agentName.replace(/[^\w\s]/gi, ''); // Remove special characters
+    const searchQuery = `${cleanAgentName} real estate agent ${agentCompany || ""} email contact`;
+    console.log(`Searching for ${cleanAgentName}'s email with query: "${searchQuery}"`);
+    
+    // Attempt to search for agent info using simulated web search via OpenAI
+    console.log("Attempting to search for agent contact information...");
+    
+    // Enhanced prompt with web search simulation
     const prompt = `
-      I need to find the email address for a real estate agent.
+      You are tasked with finding the email address for a real estate agent by simulating a web search.
       
-      Agent Name: ${agentName}
+      Agent Name: ${cleanAgentName}
       Company/Brokerage: ${agentCompany || "Unknown"}
+      Search Query: "${searchQuery}"
       
-      Based on this information, please provide a best guess for what this agent's 
-      professional email address might be. Consider common email formats like:
-      - first.last@company.com
-      - firstinitial.last@company.com
-      - first@company.com
+      Based on your knowledge of real estate websites and common email formats:
+      1. What's the most likely professional email address for this agent?
+      2. Consider different formats like:
+         - first.last@company.com
+         - firstinitial.last@company.com
+         - first@company.com
+         - first.last@realestatebrokerage.com
       
-      If you can't make a confident guess, just respond with the fallback email: shanumas@gmail.com
-      
-      Return only the email address, nothing else.
+      Return ONLY the email address, nothing else. If unsure, return: shanumas@gmail.com
     `;
 
     // Call OpenAI
