@@ -9,13 +9,14 @@ import { PropertyActivityLog } from "@/components/property-activity-log";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
 import { AgentEmailEditor } from "@/components/agent-email-editor";
+import { CopyableContact } from "@/components/ui/copyable-contact";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, FileSignature, CalendarDays
+  Activity, FileSignature, CalendarDays, Copy, Check
 } from "lucide-react";
 
 export default function AgentPropertyDetail() {
