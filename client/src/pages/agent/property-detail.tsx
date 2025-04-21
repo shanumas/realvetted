@@ -9,14 +9,13 @@ import { PropertyActivityLog } from "@/components/property-activity-log";
 import { BuyerRepresentationAgreement } from "@/components/buyer-representation-agreement";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
 import { AgentEmailEditor } from "@/components/agent-email-editor";
-import { CopyableContact } from "@/components/ui/copyable-contact";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Loader2, Home, Bed, Bath, Square, Tag, Calendar, Building, Phone, Mail, 
   Briefcase, Award, Link, FileText, ListTodo, ImageIcon, ChevronLeft, ChevronRight,
-  Activity, FileSignature, CalendarDays, Copy, Check
+  Activity, FileSignature, CalendarDays
 } from "lucide-react";
 
 export default function AgentPropertyDetail() {
@@ -510,18 +509,6 @@ export default function AgentPropertyDetail() {
                           Set or update the contact email for this property listing
                         </p>
                       </div>
-                      
-                      {property.sellerEmail && (
-                        <div className="mt-4 mb-6 p-4 bg-white rounded-md border border-gray-200">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Current Contact Email:</h4>
-                          <CopyableContact
-                            label="Email"
-                            value={property.sellerEmail}
-                            type="email"
-                            className="text-primary"
-                          />
-                        </div>
-                      )}
                       
                       <div className="mt-4">
                         <AgentEmailEditor 

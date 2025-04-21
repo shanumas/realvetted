@@ -54,14 +54,10 @@ import {
   Eye,
   Calendar as CalendarIcon,
   AlertTriangle,
-  Mail,
-  Copy,
-  Check,
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
-import { CopyableContact } from "@/components/ui/copyable-contact";
 import {
   Dialog,
   DialogContent,
@@ -942,71 +938,43 @@ export default function BuyerPropertyDetail() {
                               <Building className="mr-2 h-4 w-4" /> Agent name
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <CopyableContact
-                                label=""
-                                value={property.sellerName}
-                                type="text"
-                              />
+                              {property.sellerName}
                             </dd>
                           </div>
                         )}
 
                         {property.sellerPhone && (
-                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Phone className="mr-2 h-4 w-4" /> Phone
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <CopyableContact
-                                label=""
-                                value={property.sellerPhone}
-                                type="phone"
-                              />
+                              <a
+                                href={`tel:${property.sellerPhone}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {property.sellerPhone}
+                              </a>
                             </dd>
                           </div>
                         )}
-                        
-                        {property.sellerEmail && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Mail className="mr-2 h-4 w-4" /> Email
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <CopyableContact
-                                label=""
-                                value={property.sellerEmail}
-                                type="email"
-                              />
-                            </dd>
-                          </div>
-                        )}
-                        
                         {property.sellerCompany && (
                           <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" /> Company
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <CopyableContact
-                                label=""
-                                value={property.sellerCompany}
-                                type="text"
-                              />
+                              {property.sellerCompany}
                             </dd>
                           </div>
                         )}
-                        
                         {property.sellerLicenseNo && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Award className="mr-2 h-4 w-4" /> License #
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <CopyableContact
-                                label=""
-                                value={property.sellerLicenseNo}
-                                type="text"
-                              />
+                              {property.sellerLicenseNo}
                             </dd>
                           </div>
                         )}
