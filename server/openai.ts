@@ -689,8 +689,9 @@ export async function extractPropertyFromUrl(
     }
 
     // Import the property scraper dynamically
+    // Use the new SerpAPI-based scraper for better results
     const { scrapePropertyListing } = await import(
-      "./scrapers/property-scraper"
+      "./scrapers/property-scraper-with-serp"
     );
 
     // Log that we're starting the scraping process

@@ -3,6 +3,18 @@ import axios from "axios";
 import { getJson } from "serpapi";
 import { PropertyAIData } from "@shared/types";
 
+interface SerpApiResult {
+  title?: string;
+  link?: string;
+  snippet?: string;
+  [key: string]: any;
+}
+
+interface SerpApiResponse {
+  organic_results?: SerpApiResult[];
+  [key: string]: any;
+}
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
 });
@@ -110,7 +122,7 @@ export async function scrapePropertyListing(
           
           // Create a prompt with the search results
           const organicContent = organicResults
-            .map((result, index) => 
+            .map((result: SerpApiResult, index: number) => 
               `Result ${index+1}:\nTitle: ${result.title || ""}\nLink: ${result.link || ""}\nSnippet: ${result.snippet || ""}`
             )
             .join("\n\n");
@@ -193,7 +205,7 @@ export async function scrapePropertyListing(
               
               // Create a prompt with the agent search results
               const agentContent = agentResults
-                .map((result, index) => 
+                .map((result: SerpApiResult, index: number) => 
                   `Result ${index+1}:\nTitle: ${result.title || ""}\nLink: ${result.link || ""}\nSnippet: ${result.snippet || ""}`
                 )
                 .join("\n\n");
@@ -450,7 +462,7 @@ async function findAgentEmailFromWeb(
         if (results.length > 0) {
           // Create a prompt with search results
           const resultsContent = results
-            .map((result, index) => 
+            .map((result: SerpApiResult, index: number) => 
               `Result ${index+1}:\nTitle: ${result.title || ""}\nLink: ${result.link || ""}\nSnippet: ${result.snippet || ""}`
             )
             .join("\n\n");
