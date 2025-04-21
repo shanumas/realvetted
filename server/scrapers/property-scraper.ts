@@ -8,6 +8,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
 });
 
+// Helper function to get puppeteer browser with correct Chrome path
+async function getPuppeteerBrowser() {
+  try {
+    return await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: process.env.CHROME_BIN || '/usr/bin/chromium-browser', // Use system Chrome/Chromium
+    });
+  } catch (error) {
+    console.error('Error launching puppeteer browser:', error);
+    throw error;
+  }
+}
+
 // Main function to scrape a property listing URL
 export async function scrapePropertyListing(
   url: string,
@@ -37,10 +51,7 @@ export async function scrapePropertyListing(
 
 // Scraper for Zillow listings
 async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await getPuppeteerBrowser();
 
   try {
     const page = await browser.newPage();
@@ -100,10 +111,7 @@ async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
 
 // Generic scraper for other real estate sites
 async function scrapeGenericListing(url: string): Promise<PropertyAIData> {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const browser = await getPuppeteerBrowser();
 
   try {
     const page = await browser.newPage();
@@ -172,6 +180,65 @@ async function extractPropertyDataWithAI(
       console.log("Using mock data for property extraction (no API key)");
       return generateMockPropertyData(url);
     }
+    
+    // First, try to extract data using Cheerio for more reliable information
+    const $ = cheerio.load(html);
+    const extractedData: Partial<PropertyAIData> = {};
+    
+    // Initialize properties with direct extraction
+    let directAddress = '';
+    let directCity = '';
+    let directState = '';
+    let directZip = '';
+    let directPrice: number | undefined;
+    let directBeds: number | undefined;
+    let directBaths: number | undefined;
+    let directSqFt: number | undefined;
+    
+    // Attempt to find common patterns for property data in HTML
+    // Look for price
+    const priceText = $('*:contains("$")').text();
+    const priceMatch = priceText.match(/\$([0-9,]+)/);
+    if (priceMatch && priceMatch[1]) {
+      directPrice = parseInt(priceMatch[1].replace(/,/g, ''));
+    }
+    
+    // Look for beds/baths/sqft
+    const statsText = $('*:contains("bed")').text() + ' ' + $('*:contains("bath")').text() + ' ' + $('*:contains("sq")').text();
+    const bedsMatch = statsText.match(/(\d+)\s*bed/i);
+    const bathsMatch = statsText.match(/(\d+\.?\d*)\s*bath/i);
+    const sqftMatch = statsText.match(/(\d+[,\d]*)\s*sq\s*\.?\s*ft/i);
+    
+    if (bedsMatch && bedsMatch[1]) directBeds = parseInt(bedsMatch[1]);
+    if (bathsMatch && bathsMatch[1]) directBaths = parseFloat(bathsMatch[1]);
+    if (sqftMatch && sqftMatch[1]) directSqFt = parseInt(sqftMatch[1].replace(/,/g, ''));
+    
+    // Look for address components in meta data
+    $('meta').each((i, el) => {
+      const property = $(el).attr('property') || '';
+      const content = $(el).attr('content') || '';
+      
+      if (property.includes('address') || property.includes('location')) {
+        directAddress = content;
+      } else if (property.includes('city') || property.includes('locality')) {
+        directCity = content;
+      } else if (property.includes('state') || property.includes('region')) {
+        directState = content;
+      } else if (property.includes('zip') || property.includes('postal')) {
+        directZip = content;
+      }
+    });
+    
+    console.log("Direct extraction results:", {
+      address: directAddress,
+      city: directCity,
+      state: directState,
+      zip: directZip,
+      price: directPrice,
+      bedrooms: directBeds,
+      bathrooms: directBaths,
+      squareFeet: directSqFt
+    });
 
     // Extract only the relevant parts of the HTML to avoid token limit issues
     const simplifiedHtml = simplifyHtml(html);
@@ -187,26 +254,39 @@ async function extractPropertyDataWithAI(
       - Year Built
       - Property Description (brief)
       - Features/Amenities (list of key features)
-
+      
+      I've already directly extracted some data that may be correct:
+      ${directAddress ? `Address found: ${directAddress}` : 'Address not found'}
+      ${directCity ? `City found: ${directCity}` : 'City not found'}
+      ${directState ? `State found: ${directState}` : 'State not found'}
+      ${directZip ? `Zip found: ${directZip}` : 'Zip not found'}
+      ${directPrice ? `Price found: $${directPrice}` : 'Price not found'}
+      ${directBeds ? `Bedrooms found: ${directBeds}` : 'Bedrooms not found'}
+      ${directBaths ? `Bathrooms found: ${directBaths}` : 'Bathrooms not found'}
+      ${directSqFt ? `Square feet found: ${directSqFt}` : 'Square feet not found'}
+      
+      IMPORTANT: Only correct the directly extracted data if you find clear evidence in the HTML. If the directly extracted data is correct, use it. 
+      DO NOT hallucinate or make up data. If something isn't clearly in the HTML, leave it blank or null.
+      
       Here's the HTML content:
       ${simplifiedHtml}
-
+      
       Please format your response as a valid JSON object with these fields: 
       {
-        "address": "full street address",
-        "city": "city name",
-        "state": "state code",
-        "zip": "zip code",
-        "propertyType": "type of property",
-        "bedrooms": number of bedrooms,
-        "bathrooms": number of bathrooms,
-        "squareFeet": square footage as a number,
-        "price": price as a number without currency symbols,
-        "yearBuilt": year built as a number,
-        "description": "brief description",
-        "features": ["feature1", "feature2", ...]
+        "address": "full street address or null if uncertain",
+        "city": "city name or null if uncertain",
+        "state": "state code or null if uncertain",
+        "zip": "zip code or null if uncertain",
+        "propertyType": "type of property or null if uncertain",
+        "bedrooms": number of bedrooms or null if uncertain,
+        "bathrooms": number of bathrooms or null if uncertain,
+        "squareFeet": square footage as a number or null if uncertain,
+        "price": price as a number without currency symbols or null if uncertain,
+        "yearBuilt": year built as a number or null if uncertain,
+        "description": "brief description or null if uncertain",
+        "features": ["feature1", "feature2", ...] or [] if uncertain
       }
-
+      
       Return only the JSON with no additional text or explanation.
     `;
 
@@ -216,7 +296,7 @@ async function extractPropertyDataWithAI(
         {
           role: "system",
           content:
-            "You are a real estate data extraction expert. Extract structured property data from HTML.",
+            "You are a real estate data extraction expert. Extract ONLY data that is clearly present in the HTML. Do not guess or hallucinate data that isn't clearly there. It's better to return null than incorrect information.",
         },
         { role: "user", content: prompt },
       ],
@@ -224,6 +304,36 @@ async function extractPropertyDataWithAI(
     });
 
     const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Prioritize directly extracted data over AI results when available
+    if (directAddress) result.address = directAddress;
+    if (directCity) result.city = directCity;
+    if (directState) result.state = directState;
+    if (directZip) result.zip = directZip;
+    if (directPrice) result.price = directPrice;
+    if (directBeds) result.bedrooms = directBeds;
+    if (directBaths) result.bathrooms = directBaths;
+    if (directSqFt) result.squareFeet = directSqFt;
+    
+    // If the URL appears to be from a specific site, we can extract some basic info from it
+    if (url.includes('zillow.com') || url.includes('realtor.com') || url.includes('redfin.com')) {
+      // Check if address components are missing, try to get from URL
+      if (!result.address || !result.city || !result.state) {
+        const urlParts = url.split('/');
+        for (let i = 0; i < urlParts.length; i++) {
+          // Look for patterns like state abbreviations
+          if (urlParts[i].match(/^[A-Z]{2}$/) && !result.state) {
+            result.state = urlParts[i];
+          }
+          // Look for patterns that might be city names
+          if (urlParts[i].includes('-') && !result.city) {
+            result.city = urlParts[i].replace(/-/g, ' ');
+          }
+        }
+      }
+    }
+    
+    console.log("Final extracted data:", result);
     return result;
   } catch (error) {
     console.error("Error extracting property data with AI:", error);
@@ -257,21 +367,21 @@ async function extractAgentInfoWithAI(
 
     const prompt = `
       From this real estate listing HTML, extract information about the listing agent:
-
+      
       IMPORTANT: Focus specifically on finding the "Listed by" or "Listing Agent" information.
       This is the real estate agent who has listed the property for sale (not the property owner).
       Look for sections labeled as "Listed by", "Listing Agent", "Contact Agent", "Agent", etc.
-
+      
       Extract the following information about the listing agent:
       1. Agent Name
       2. Phone Number
       3. Email Address (if available)
       4. Real Estate Company/Brokerage
       5. License Number (usually in format like "DRE #12345678")
-
+      
       Here's the HTML content:
       ${simplifiedHtml}
-
+      
       Please format your response as a valid JSON object with these fields:
       {
         "sellerName": "listing agent's full name",
@@ -280,7 +390,7 @@ async function extractAgentInfoWithAI(
         "sellerCompany": "listing agent's company name",
         "sellerLicenseNo": "listing agent's license number"
       }
-
+      
       Return only the JSON with no additional text or explanation.
     `;
 
@@ -309,7 +419,7 @@ async function extractAgentInfoWithAI(
 async function findAgentEmailFromWeb(
   agentName: string,
   agentCompany?: string,
-): Promise<string | undefined> {
+): Promise<string> {
   try {
     // If no API key available, return placeholder data
     if (
@@ -325,12 +435,10 @@ async function findAgentEmailFromWeb(
       agentName,
       agentCompany,
     );
+    console.log(`Searching for agent email with query: ${searchQuery}`);
 
     // Use a simple browser to search
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    const browser = await getPuppeteerBrowser();
 
     try {
       const page = await browser.newPage();
@@ -341,7 +449,7 @@ async function findAgentEmailFromWeb(
         { waitUntil: "networkidle2", timeout: 30000 },
       );
 
-      // Extract the first few search result URLs
+      // Extract the first 5 search result URLs
       const searchResults = await page.evaluate(() => {
         const links: string[] = [];
         const elements = document.querySelectorAll("a");
@@ -352,8 +460,9 @@ async function findAgentEmailFromWeb(
             href &&
             href.startsWith("/url?q=") &&
             !href.includes("google.com") &&
-            links.length < 3
+            links.length < 5
           ) {
+            // Increased from 3 to 5
             links.push(href.substring(7, href.indexOf("&")));
           }
         }
@@ -361,9 +470,14 @@ async function findAgentEmailFromWeb(
         return links;
       });
 
+      console.log(
+        `Found ${searchResults.length} potential websites to check for agent email`,
+      );
+
       // Visit each link and look for an email
       for (const url of searchResults) {
         try {
+          console.log(`Checking URL for agent email: ${url}`);
           await page.goto(url, {
             waitUntil: "domcontentloaded",
             timeout: 20000,
@@ -376,6 +490,7 @@ async function findAgentEmailFromWeb(
           const email = await extractEmailWithAI(content, agentName);
 
           if (email) {
+            console.log(`Found email for agent ${agentName}: ${email}`);
             return email;
           }
         } catch (err) {
@@ -384,13 +499,18 @@ async function findAgentEmailFromWeb(
         }
       }
 
-      return undefined;
+      // If no email found, use the fallback email
+      console.log(
+        `No email found for agent ${agentName}, using fallback email: shanumas@gmail.com`,
+      );
+      return "shanumas@gmail.com";
     } finally {
       await browser.close();
     }
   } catch (error) {
     console.error("Error finding agent email:", error);
-    return undefined;
+    // Return fallback email in case of any errors
+    return "shanumas@gmail.com";
   }
 }
 
@@ -410,10 +530,10 @@ async function constructAgentSearchQuery(
     const prompt = `
       I need to find the professional website or profile page for a real estate agent. 
       Please create the most effective search query to find their contact information.
-
+      
       Agent Name: ${agentName}
       Company/Brokerage: ${agentCompany || "Unknown"}
-
+      
       Return only the search query, nothing else.
     `;
 
@@ -453,14 +573,51 @@ async function extractEmailWithAI(
       return `${agentName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
     }
 
+    // First, try to find email directly using regex
+    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
+    const emailMatches = html.match(emailRegex);
+
+    if (emailMatches && emailMatches.length > 0) {
+      // If we have multiple email matches, try to find one that seems related to the agent
+      const agentNameWords = agentName.toLowerCase().split(/\s+/);
+
+      for (const email of emailMatches) {
+        const emailLower = email.toLowerCase();
+        // Check if any part of the agent's name appears in the email
+        if (
+          agentNameWords.some(
+            (word) => word.length > 2 && emailLower.includes(word),
+          )
+        ) {
+          console.log(`Found email matching agent name pattern: ${email}`);
+          return email;
+        }
+      }
+
+      // If no specific match found, return the first email
+      console.log(`Found generic email: ${emailMatches[0]}`);
+      return emailMatches[0];
+    }
+
+    // If regex doesn't find anything, try with AI
+    console.log(
+      `No emails found using regex, trying AI extraction for ${agentName}`,
+    );
+
     // Extract only the relevant parts of the HTML to avoid token limit issues
     const simplifiedHtml = simplifyHtml(html, "email");
 
     const prompt = `
-      Find the email address for real estate agent "${agentName}" from this webpage HTML:
-
+      Find the email address for real estate agent "${agentName}" from this webpage HTML.
+      Look for:
+      1. mailto: links
+      2. Contact information sections
+      3. Email address patterns (something@domain.com)
+      4. "Email" or "Contact" sections
+      5. Footer contact information
+      
       ${simplifiedHtml}
-
+      
       Return the email address without any additional text. If you can't find an email address, respond with "No email found".
     `;
 
@@ -470,7 +627,7 @@ async function extractEmailWithAI(
         {
           role: "system",
           content:
-            "You are an expert at finding email addresses in webpages. Return only the email address, no additional text.",
+            "You are an expert at finding email addresses in webpages. You search thoroughly through HTML for email addresses. Return only the email address, no additional text.",
         },
         { role: "user", content: prompt },
       ],
@@ -479,9 +636,11 @@ async function extractEmailWithAI(
     const result = response.choices[0].message.content?.trim();
 
     if (result && result !== "No email found" && result.includes("@")) {
+      console.log(`AI found email: ${result}`);
       return result;
     }
 
+    console.log(`No email found for ${agentName} using AI either`);
     return undefined;
   } catch (error) {
     console.error("Error extracting email with AI:", error);
