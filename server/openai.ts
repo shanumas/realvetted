@@ -705,12 +705,12 @@ export async function extractPropertyFromUrl(
         // Log success and return the data
         console.log("Successfully extracted property data with scraper");
 
-        // Make sure the seller email is set - if not found, use the fallback
+        // If seller email wasn't found, we'll keep it as empty
         if (!scrapedData.sellerEmail) {
           console.log(
-            "No seller email found in scraped data, using fallback email",
+            "No seller email found in scraped data"
           );
-          scrapedData.sellerEmail = "shanumas@gmail.com";
+          // Don't use a hardcoded fallback, keep it empty/undefined
         }
 
         return scrapedData;
@@ -847,7 +847,7 @@ export async function extractPropertyFromUrl(
             sellerEmail:
               apiResult.sellerEmail ||
               apiResult.agentEmail ||
-              "shanumas@gmail.com",
+              "", // Don't use hardcoded fallback
             sellerCompany:
               apiResult.sellerCompany || apiResult.agentCompany || "",
             sellerLicenseNo:
@@ -885,7 +885,7 @@ export async function extractPropertyFromUrl(
       features: [],
       sellerName: "",
       sellerPhone: "",
-      sellerEmail: "shanumas@gmail.com", // Always include the fallback email
+      sellerEmail: "", // Don't use hardcoded fallback email
       sellerCompany: "",
       sellerLicenseNo: "",
       propertyUrl: url,

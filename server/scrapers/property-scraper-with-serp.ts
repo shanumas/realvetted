@@ -423,7 +423,7 @@ export async function scrapePropertyListing(
 
 /**
  * Find an agent's email by searching for them on the web
- * Returns a fallback email (shanumas@gmail.com) if unable to find the real one
+ * Returns an empty string if unable to find their email
  */
 async function findAgentEmailFromWeb(
   agentName: string,
@@ -483,7 +483,7 @@ async function findAgentEmailFromWeb(
             - firstinitial.last@company.com
             - first@company.com
             
-            Return ONLY the email address, nothing else. If unsure, return: shanumas@gmail.com
+            Return ONLY the email address, nothing else. If you cannot find an email with high confidence, respond with "no_email_found"
           `;
           
           // Call OpenAI to extract email
@@ -526,7 +526,7 @@ async function findAgentEmailFromWeb(
       - firstinitial.last@company.com
       - first@company.com
       
-      Return ONLY the email address, nothing else. If unsure, return: shanumas@gmail.com
+      Return ONLY the email address, nothing else. If you cannot find an email with high confidence, respond with "no_email_found"
     `;
     
     // Call OpenAI
@@ -550,12 +550,12 @@ async function findAgentEmailFromWeb(
       return suggestedEmail;
     }
 
-    // If we couldn't get a good email, use the fallback
-    console.log(`No valid email found for agent ${agentName}, using fallback`);
-    return "shanumas@gmail.com";
+    // If we couldn't get a good email, return empty string
+    console.log(`No valid email found for agent ${agentName}`);
+    return "";
   } catch (error) {
     console.error("Error finding agent email:", error);
-    // Return fallback email in case of any errors
-    return "shanumas@gmail.com";
+    // Return empty string in case of any errors
+    return "";
   }
 }
