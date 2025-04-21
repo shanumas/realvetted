@@ -941,23 +941,12 @@ export default function BuyerPropertyDetail() {
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Building className="mr-2 h-4 w-4" /> Agent name
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
-                              <span>{property.sellerName}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6" 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(property.sellerName);
-                                  toast({
-                                    title: "Copied",
-                                    description: "Agent name copied to clipboard",
-                                    variant: "default",
-                                  });
-                                }}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <CopyableContact
+                                label=""
+                                value={property.sellerName}
+                                type="text"
+                              />
                             </dd>
                           </div>
                         )}
@@ -997,23 +986,12 @@ export default function BuyerPropertyDetail() {
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" /> Company
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
-                              <span>{property.sellerCompany}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6" 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(property.sellerCompany);
-                                  toast({
-                                    title: "Copied",
-                                    description: "Company name copied to clipboard",
-                                    variant: "default",
-                                  });
-                                }}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <CopyableContact
+                                label=""
+                                value={property.sellerCompany}
+                                type="text"
+                              />
                             </dd>
                           </div>
                         )}
@@ -1023,23 +1001,12 @@ export default function BuyerPropertyDetail() {
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Award className="mr-2 h-4 w-4" /> License #
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
-                              <span>{property.sellerLicenseNo}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6" 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(property.sellerLicenseNo);
-                                  toast({
-                                    title: "Copied",
-                                    description: "License number copied to clipboard",
-                                    variant: "default",
-                                  });
-                                }}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                              </Button>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <CopyableContact
+                                label=""
+                                value={property.sellerLicenseNo}
+                                type="text"
+                              />
                             </dd>
                           </div>
                         )}
