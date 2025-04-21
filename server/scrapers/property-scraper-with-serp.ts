@@ -459,6 +459,12 @@ async function findAgentEmailFromWeb(
         const cleanCompany = agentCompany ? agentCompany.replace(/[^\w\s]/gi, '') : '';
         
         // Try multiple search queries with different patterns to increase chances of finding email
+        // Generate variations of the agent's name to cover different formats
+        const nameParts = cleanAgentName.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+        const firstInitial = firstName.charAt(0) || '';
+        
         const searchQueries = [
           // Most specific query with everything we know
           `${cleanAgentName} ${cleanCompany} real estate agent email contact ${location || ""}`,
@@ -470,7 +476,16 @@ async function findAgentEmailFromWeb(
           `${cleanAgentName} realtor contact information email`,
           
           // Try finding the agent's personal website
-          `${cleanAgentName} real estate personal website ${cleanCompany}`
+          `${cleanAgentName} real estate personal website ${cleanCompany}`,
+          
+          // Try explicit email searches with common email patterns
+          `${firstName}.${lastName}@${cleanCompany.toLowerCase()} ${cleanAgentName} real estate agent`,
+          
+          // Try with "contact me" which often appears on pages with email addresses
+          `${cleanAgentName} real estate agent "contact me" email`,
+          
+          // Try with "email me" which often appears with email addresses
+          `${cleanAgentName} real estate agent "email me"`
         ];
         
         // Take the first query as our primary search
@@ -574,6 +589,24 @@ async function findAgentEmailFromWeb(
                       if (response.data) {
                         const html = response.data.toString();
                         
+                        // Before searching for emails, check if this contains 
+                        // what looks like a real estate agent profile or a contact page
+                        const isLikelyAgentPage = (
+                          html.toLowerCase().includes(firstName.toLowerCase()) &&
+                          html.toLowerCase().includes(lastName.toLowerCase()) &&
+                          (
+                            html.toLowerCase().includes('real estate') ||
+                            html.toLowerCase().includes('realtor') ||
+                            html.toLowerCase().includes('agent') ||
+                            html.toLowerCase().includes('broker') ||
+                            html.toLowerCase().includes('contact') ||
+                            html.toLowerCase().includes('about me')
+                          )
+                        );
+                        
+                        // Give a higher priority to pages that look like agent profiles
+                        console.log(`Page appears to be an agent profile? ${isLikelyAgentPage}`);
+                        
                         // Method 1: Simple regex extraction - finds basic email patterns
                         const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
                         let emails = html.match(emailRegex) || [];
@@ -588,9 +621,44 @@ async function findAgentEmailFromWeb(
                             if (href) {
                               const mailtoEmail = href.replace('mailto:', '').split('?')[0].trim();
                               if (mailtoEmail && !emails.includes(mailtoEmail)) {
-                                emails.push(mailtoEmail);
+                                // Give higher priority to emails found in mailto links on agent profile pages
+                                if (isLikelyAgentPage) {
+                                  // Add the email at the beginning of the array to prioritize it
+                                  emails.unshift(mailtoEmail);
+                                } else {
+                                  emails.push(mailtoEmail);
+                                }
                               }
                             }
+                          });
+                          
+                          // Look for contact sections that often have emails
+                          const contactSectionSelectors = [
+                            '.contact', 
+                            '#contact',
+                            '[id*="contact"]',
+                            '[class*="contact"]',
+                            '.agent-contact',
+                            '.agent-info',
+                            '.agent-details',
+                            '.agent-content',
+                            '.realtor-contact',
+                            '.contact-info'
+                          ];
+                          
+                          // Check each possible contact section
+                          contactSectionSelectors.forEach(selector => {
+                            $(selector).each((i, el) => {
+                              const sectionText = $(el).text();
+                              const sectionEmailMatch = sectionText.match(emailRegex);
+                              if (sectionEmailMatch) {
+                                sectionEmailMatch.forEach(email => {
+                                  if (!emails.includes(email)) {
+                                    emails.push(email);
+                                  }
+                                });
+                              }
+                            });
                           });
                           
                           // Look for elements with data-email attribute (common pattern)
