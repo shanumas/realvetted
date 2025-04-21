@@ -1,15 +1,14 @@
-import OpenAI from "openai";
 import axios from "axios";
+import * as cheerio from "cheerio";
+import puppeteer from "puppeteer";
+import OpenAI from "openai";
 import { PropertyAIData, PropertyScraperResult } from "@shared/types";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
 });
 
-/**
- * Simplified approach to extract property listing data directly using OpenAI
- * Passes the URL to OpenAI to get details about the property
- */
+// Main function to scrape a property listing URL
 export async function scrapePropertyListing(
   url: string,
 ): Promise<PropertyAIData> {
@@ -21,130 +20,180 @@ export async function scrapePropertyListing(
       );
     }
 
-    console.log(`Extracting property data from URL: ${url}`);
+    // Check if it's a Zillow URL
+    if (url.includes("zillow.com")) {
+      return await scrapeZillowListing(url);
+    }
 
-    // Extract domain and possible identifier from URL
-    const urlObj = new URL(url);
-    const domain = urlObj.hostname;
+    // For other sites, use a generic scraper
+    return await scrapeGenericListing(url);
+  } catch (error) {
+    console.error("Property scraping error:", error);
+    throw new Error(
+      `Failed to scrape property details: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
+  }
+}
 
-    // Try to get property details directly from the URL structure
-    let addressFromUrl = "";
-    let cityFromUrl = "";
-    let stateFromUrl = "";
-    let zipFromUrl = "";
+// Scraper for Zillow listings
+async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
 
-    // Extract information from URL parts for common real estate sites
+  try {
+    const page = await browser.newPage();
+
+    // Set user agent to avoid detection
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    );
+
+    // Navigate to the URL
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+    // Wait for the content to load
+    await page.waitForSelector("body", { timeout: 5000 });
+
+    // Extract the HTML content
+    const htmlContent = await page.content();
+
+    // Parse the HTML with cheerio
+    const $ = cheerio.load(htmlContent);
+
+    // Use AI to extract structured data from the HTML
+    const extractedData = await extractPropertyDataWithAI(htmlContent, url);
+
+    // Find the agent/seller information section
+    const agentInfo = await extractAgentInfoWithAI(htmlContent, url);
+
+    // If agent email isn't found in the listing, try to find it from their website
+    if (agentInfo.sellerName && !agentInfo.sellerEmail) {
+      agentInfo.sellerEmail = await findAgentEmailFromWeb(
+        agentInfo.sellerName,
+        agentInfo.sellerCompany,
+      );
+    }
+
+    // Create a scraper result with possibly undefined address
+    const scrapedResult: PropertyScraperResult = {
+      ...extractedData,
+      ...agentInfo,
+      propertyUrl: url,
+    };
+
+    // Make sure we have the required address field
+    if (!scrapedResult.address) {
+      scrapedResult.address = "Address information unavailable";
+    }
+
+    // Return with required address field populated
+    return scrapedResult as PropertyAIData;
+  } catch (error) {
+    console.error("Zillow scraping error:", error);
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
+
+// Generic scraper for other real estate sites
+async function scrapeGenericListing(url: string): Promise<PropertyAIData> {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    // Set user agent to avoid detection
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    );
+
+    // Navigate to the URL
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
+    // Wait for the content to load
+    await page.waitForSelector("body", { timeout: 5000 });
+
+    // Extract the HTML content
+    const htmlContent = await page.content();
+
+    // Use AI to extract structured data from the HTML
+    const extractedData = await extractPropertyDataWithAI(htmlContent, url);
+
+    // Find the agent/seller information
+    const agentInfo = await extractAgentInfoWithAI(htmlContent, url);
+
+    // If agent email isn't found in the listing, try to find it from their website
+    if (agentInfo.sellerName && !agentInfo.sellerEmail) {
+      agentInfo.sellerEmail = await findAgentEmailFromWeb(
+        agentInfo.sellerName,
+        agentInfo.sellerCompany,
+      );
+    }
+
+    // Create a scraper result with possibly undefined address
+    const scrapedResult: PropertyScraperResult = {
+      ...extractedData,
+      ...agentInfo,
+      propertyUrl: url,
+    };
+
+    // Make sure we have the required address field
+    if (!scrapedResult.address) {
+      scrapedResult.address = "Address information unavailable";
+    }
+
+    // Return with required address field populated
+    return scrapedResult as PropertyAIData;
+  } catch (error) {
+    console.error("Generic scraping error:", error);
+    throw error;
+  } finally {
+    await browser.close();
+  }
+}
+
+// Use OpenAI to extract structured property data from HTML
+async function extractPropertyDataWithAI(
+  html: string,
+  url: string,
+): Promise<Partial<PropertyAIData>> {
+  try {
+    // If no API key available, return placeholder data
     if (
-      domain.includes("zillow.com") ||
-      domain.includes("realtor.com") ||
-      domain.includes("redfin.com")
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      const pathParts = urlObj.pathname.split("/");
-
-      // Simple URL parsing logic
-      for (const part of pathParts) {
-        if (part.includes("-")) {
-          const segments = part.split("-");
-
-          // Check for street numbers
-          if (segments.length > 1 && /^\d+$/.test(segments[0])) {
-            addressFromUrl = segments.join(" ").replace(/-/g, " ");
-          }
-
-          // Check for state codes
-          if (
-            segments.length > 0 &&
-            /^[A-Z]{2}$/.test(segments[segments.length - 1])
-          ) {
-            stateFromUrl = segments[segments.length - 1];
-
-            // The part before the state is likely the city
-            if (segments.length > 1) {
-              cityFromUrl = segments[segments.length - 2].replace(/-/g, " ");
-            }
-          }
-
-          // Check for ZIP codes
-          if (
-            segments.length > 0 &&
-            /^\d{5}$/.test(segments[segments.length - 1])
-          ) {
-            zipFromUrl = segments[segments.length - 1];
-          }
-        }
-      }
+      console.log("Using mock data for property extraction (no API key)");
+      return generateMockPropertyData(url);
     }
 
-    // First, fetch the HTML content from the URL
-    console.log(`Fetching HTML content from: ${url}`);
-    let htmlContent = "";
-    try {
-      const response = await axios.get(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml",
-        },
-        timeout: 10000,
-      });
-      htmlContent = response.data;
-      console.log(
-        `Successfully fetched HTML content (${htmlContent.length} bytes)`,
-      );
-    } catch (error) {
-      console.error(
-        `Error fetching URL content: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-      console.log("Proceeding with URL-only analysis as fallback");
-    }
+    // Extract only the relevant parts of the HTML to avoid token limit issues
+    const simplifiedHtml = simplifyHtml(html);
 
-    // Create appropriate heading based on whether we have HTML content
-    const headingText = htmlContent
-      ? "I have a real estate listing HTML content to analyze."
-      : "I have a real estate listing URL. Please extract as much information as possible based on the URL pattern.";
-
-    // Single API call to OpenAI to extract all property data
     const prompt = `
-      ${headingText}
-      
-      URL: ${url}
-      
-      ${htmlContent ? `HTML Content (first 15000 chars): ${htmlContent.substring(0, 15000)}...` : ""}
-      
-      Based on the URL format, I've already extracted some potential information:
-      ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
-      ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
-      ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
-      ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
-      
-      I need the following information:
-      1. Property Details:
-         - Full Address (street, city, state, zip)
-         - Property Type (Single Family, Condo, etc.)
-         - Number of Bedrooms
-         - Number of Bathrooms
-         - Square Footage
-         - Price
-         - Year Built
-         - Property Description (brief)
-         - Features/Amenities (list of key features)
-      
-      2. Listing Agent Information:
-         - Agent Name
-         - Phone Number
-         - Email Address
-         - Real Estate Company/Brokerage
-         - License Number
-      
-      IMPORTANT: 
-      - If you can't determine certain fields with reasonable confidence, leave them as null.
-      - For the agent's email, if you can't find it, that's okay. We'll use a fallback.
-      - This information is being used for a real estate application, so accuracy is important.
-      - ANALYZE THE HTML CONTENT to extract the real data, don't just use the URL pattern.
-      
-      Format as JSON with these fields:
+      I have a real estate listing HTML content. Please extract the following property details from it:
+      - Full Address (street, city, state, zip)
+      - Property Type (Single Family, Condo, etc.)
+      - Number of Bedrooms
+      - Number of Bathrooms
+      - Square Footage
+      - Price
+      - Year Built
+      - Property Description (brief)
+      - Features/Amenities (list of key features)
+
+      Here's the HTML content:
+      ${simplifiedHtml}
+
+      Please format your response as a valid JSON object with these fields: 
       {
-        "address": "street address",
+        "address": "full street address",
         "city": "city name",
         "state": "state code",
         "zip": "zip code",
@@ -155,154 +204,409 @@ export async function scrapePropertyListing(
         "price": price as a number without currency symbols,
         "yearBuilt": year built as a number,
         "description": "brief description",
-        "features": ["feature1", "feature2", ...],
-        "sellerName": "listing agent's name",
-        "sellerPhone": "listing agent's phone",
-        "sellerEmail": "listing agent's email",
-        "sellerCompany": "listing agent's company",
-        "sellerLicenseNo": "license number"
+        "features": ["feature1", "feature2", ...]
       }
+
+      Return only the JSON with no additional text or explanation.
     `;
 
-    // Call OpenAI with our prompt
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
           role: "system",
           content:
-            "You are a real estate data extraction expert. Extract as much information as possible from the given URL. For information you can't confidently determine, use null values.",
+            "You are a real estate data extraction expert. Extract structured property data from HTML.",
         },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
     });
 
-    // Print the complete response for debugging
-    console.log(
-      "OPENAI PROPERTY RESPONSE: ",
-      JSON.stringify(response, null, 2),
-    );
-
-    // Parse the API response
     const result = JSON.parse(response.choices[0].message.content || "{}");
-
-    // Always ensure we have an address
-    if (!result.address) {
-      result.address = addressFromUrl || "Address information unavailable";
-    }
-
-    // If we don't have agent email, find it or use fallback
-    if (!result.sellerEmail && result.sellerName) {
-      console.log("No seller email found, searching web for agent email...");
-      result.sellerEmail = await findAgentEmailFromWeb(
-        result.sellerName,
-        result.sellerCompany,
-      );
-    } else if (!result.sellerEmail) {
-      console.log("Using fallback email (no agent name available)");
-      result.sellerEmail = "shanumas@gmail.com";
-    }
-
-    // Add the property URL to the result
-    result.propertyUrl = url;
-    result.imageUrls = result.imageUrls || [];
-
-    console.log("Successfully extracted property data from URL");
-    return result as PropertyAIData;
+    return result;
   } catch (error) {
-    console.error("Property scraping error:", error);
-    throw new Error(
-      `Failed to scrape property details: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    console.error("Error extracting property data with AI:", error);
+    throw new Error("Failed to extract property data. Please try again later.");
   }
 }
 
-/**
- * Simplified function to find an agent's email by searching for them on the web
- * Returns a fallback email (shanumas@gmail.com) if unable to find the real one
- */
-async function findAgentEmailFromWeb(
-  agentName: string,
-  agentCompany?: string,
-): Promise<string> {
+// Use OpenAI to extract agent/seller info from HTML
+async function extractAgentInfoWithAI(
+  html: string,
+  url: string,
+): Promise<Partial<PropertyAIData>> {
   try {
-    // If no API key, return fallback immediately
+    // If no API key available, return placeholder data
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Cannot search for agent email (no API key), using fallback");
-      return "shanumas@gmail.com";
+      console.log("Using mock data for agent extraction (no API key)");
+      return {
+        sellerName: "John Smith",
+        sellerPhone: "555-123-4567",
+        sellerEmail: `agent_${Math.floor(Math.random() * 1000)}@example.com`,
+        sellerCompany: "Real Estate Company",
+        sellerLicenseNo: `DRE #${Math.floor(Math.random() * 10000000)}`,
+      };
     }
 
-    // Build a more comprehensive search query for finding the agent's email
-    const cleanAgentName = agentName.replace(/[^\w\s]/gi, ''); // Remove special characters
-    const searchQuery = `${cleanAgentName} real estate agent ${agentCompany || ""} email contact`;
-    console.log(`Searching for ${cleanAgentName}'s email with query: "${searchQuery}"`);
-    
-    // Attempt to search for agent info using simulated web search via OpenAI
-    console.log("Attempting to search for agent contact information...");
-    
-    // Enhanced prompt with web search simulation
+    // Extract only the relevant parts of the HTML to avoid token limit issues
+    const simplifiedHtml = simplifyHtml(html, "agent");
+
     const prompt = `
-      You are tasked with finding the email address for a real estate agent by simulating a web search.
-      
-      Agent Name: ${cleanAgentName}
-      Company/Brokerage: ${agentCompany || "Unknown"}
-      Search Query: "${searchQuery}"
-      
-      Based on your knowledge of real estate websites and common email formats:
-      1. What's the most likely professional email address for this agent?
-      2. Consider different formats like:
-         - first.last@company.com
-         - firstinitial.last@company.com
-         - first@company.com
-         - first.last@realestatebrokerage.com
-      
-      Return ONLY the email address, nothing else. If unsure, return: shanumas@gmail.com
+      From this real estate listing HTML, extract information about the listing agent:
+
+      IMPORTANT: Focus specifically on finding the "Listed by" or "Listing Agent" information.
+      This is the real estate agent who has listed the property for sale (not the property owner).
+      Look for sections labeled as "Listed by", "Listing Agent", "Contact Agent", "Agent", etc.
+
+      Extract the following information about the listing agent:
+      1. Agent Name
+      2. Phone Number
+      3. Email Address (if available)
+      4. Real Estate Company/Brokerage
+      5. License Number (usually in format like "DRE #12345678")
+
+      Here's the HTML content:
+      ${simplifiedHtml}
+
+      Please format your response as a valid JSON object with these fields:
+      {
+        "sellerName": "listing agent's full name",
+        "sellerPhone": "listing agent's phone number",
+        "sellerEmail": "listing agent's email address or null if not found",
+        "sellerCompany": "listing agent's company name",
+        "sellerLicenseNo": "listing agent's license number"
+      }
+
+      Return only the JSON with no additional text or explanation.
     `;
 
-    // Call OpenAI
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
           content:
-            "You are an assistant that helps find email addresses for real estate professionals.",
+            "You are a data extraction expert specialized in real estate listings. Extract the listing agent information (the agent who listed the property for sale) from real estate listings. Focus specifically on sections labeled 'Listed by', 'Listing Agent', 'Contact Agent', etc.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    return result;
+  } catch (error) {
+    console.error("Error extracting agent info with AI:", error);
+    return {};
+  }
+}
+
+// Try to find the agent's email by searching for their website and extracting contact information
+async function findAgentEmailFromWeb(
+  agentName: string,
+  agentCompany?: string,
+): Promise<string | undefined> {
+  try {
+    // If no API key available, return placeholder data
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
+      console.log("Using mock data for agent email (no API key)");
+      return `${agentName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
+    }
+
+    // First, use AI to help construct a good search query
+    const searchQuery = await constructAgentSearchQuery(
+      agentName,
+      agentCompany,
+    );
+
+    // Use a simple browser to search
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    try {
+      const page = await browser.newPage();
+
+      // Search for the agent
+      await page.goto(
+        `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
+        { waitUntil: "networkidle2", timeout: 30000 },
+      );
+
+      // Extract the first few search result URLs
+      const searchResults = await page.evaluate(() => {
+        const links: string[] = [];
+        const elements = document.querySelectorAll("a");
+
+        for (const el of elements) {
+          const href = el.getAttribute("href");
+          if (
+            href &&
+            href.startsWith("/url?q=") &&
+            !href.includes("google.com") &&
+            links.length < 3
+          ) {
+            links.push(href.substring(7, href.indexOf("&")));
+          }
+        }
+
+        return links;
+      });
+
+      // Visit each link and look for an email
+      for (const url of searchResults) {
+        try {
+          await page.goto(url, {
+            waitUntil: "domcontentloaded",
+            timeout: 20000,
+          });
+
+          // Get the page content
+          const content = await page.content();
+
+          // Use AI to extract email from the page content
+          const email = await extractEmailWithAI(content, agentName);
+
+          if (email) {
+            return email;
+          }
+        } catch (err) {
+          console.log(`Error visiting ${url}: ${err}`);
+          continue;
+        }
+      }
+
+      return undefined;
+    } finally {
+      await browser.close();
+    }
+  } catch (error) {
+    console.error("Error finding agent email:", error);
+    return undefined;
+  }
+}
+
+// Use AI to construct an optimal search query for finding an agent's website
+async function constructAgentSearchQuery(
+  agentName: string,
+  agentCompany?: string,
+): Promise<string> {
+  try {
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
+      return `${agentName} real estate agent ${agentCompany || ""} contact information`;
+    }
+
+    const prompt = `
+      I need to find the professional website or profile page for a real estate agent. 
+      Please create the most effective search query to find their contact information.
+
+      Agent Name: ${agentName}
+      Company/Brokerage: ${agentCompany || "Unknown"}
+
+      Return only the search query, nothing else.
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an expert in creating effective search queries. Return only the search query, no additional text.",
         },
         { role: "user", content: prompt },
       ],
     });
 
-    // Print the complete agent email response for debugging
-    console.log(
-      "OPENAI AGENT EMAIL RESPONSE: ",
-      JSON.stringify(response, null, 2),
-    );
+    const query =
+      response.choices[0].message.content?.trim() ||
+      `${agentName} real estate agent ${agentCompany || ""} contact email`;
 
-    // Extract the email from the response
-    const suggestedEmail = response.choices[0].message.content?.trim();
+    return query;
+  } catch (error) {
+    console.error("Error constructing agent search query:", error);
+    return `${agentName} real estate agent ${agentCompany || ""} contact information`;
+  }
+}
 
-    // Validate if it's a plausible email
+// Use AI to extract an email from a webpage
+async function extractEmailWithAI(
+  html: string,
+  agentName: string,
+): Promise<string | undefined> {
+  try {
     if (
-      suggestedEmail &&
-      suggestedEmail.includes("@") &&
-      !suggestedEmail.includes(" ")
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log(
-        `Found potential email for agent ${agentName}: ${suggestedEmail}`,
-      );
-      return suggestedEmail;
+      return `${agentName.toLowerCase().replace(/\s+/g, ".")}@example.com`;
     }
 
-    // If we couldn't get a good email, use the fallback
-    console.log(`No valid email found for agent ${agentName}, using fallback`);
-    return "shanumas@gmail.com";
+    // Extract only the relevant parts of the HTML to avoid token limit issues
+    const simplifiedHtml = simplifyHtml(html, "email");
+
+    const prompt = `
+      Find the email address for real estate agent "${agentName}" from this webpage HTML:
+
+      ${simplifiedHtml}
+
+      Return the email address without any additional text. If you can't find an email address, respond with "No email found".
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an expert at finding email addresses in webpages. Return only the email address, no additional text.",
+        },
+        { role: "user", content: prompt },
+      ],
+    });
+
+    const result = response.choices[0].message.content?.trim();
+
+    if (result && result !== "No email found" && result.includes("@")) {
+      return result;
+    }
+
+    return undefined;
   } catch (error) {
-    console.error("Error finding agent email:", error);
-    // Return fallback email in case of any errors
-    return "shanumas@gmail.com";
+    console.error("Error extracting email with AI:", error);
+    return undefined;
   }
+}
+
+// Helper function to simplify HTML to focus on relevant parts and reduce token usage
+function simplifyHtml(
+  html: string,
+  focus: "property" | "agent" | "email" = "property",
+): string {
+  const $ = cheerio.load(html);
+
+  // Remove scripts, styles, and other unnecessary elements
+  $("script, style, iframe, noscript, svg, path, link, meta").remove();
+
+  // Based on the focus, try to extract only relevant sections
+  if (focus === "agent") {
+    // Look for common agent/contact sections
+    let agentSection = "";
+
+    // Try to find agent info by common classes/IDs/text
+    const potentialSections = [
+      $('[class*="agent"],[class*="Agent"],[id*="agent"],[id*="Agent"]'),
+      $(
+        '[class*="contact"],[class*="Contact"],[id*="contact"],[id*="Contact"]',
+      ),
+      $('[class*="broker"],[class*="Broker"],[id*="broker"],[id*="Broker"]'),
+      $('*:contains("Listed by")').parents("div, section").first(),
+      $('*:contains("Listing Agent")').parents("div, section").first(),
+      $('*:contains("Contact")').parents("div, section").first(),
+    ];
+
+    for (const section of potentialSections) {
+      if (section.length > 0) {
+        agentSection += section.html() || "";
+      }
+    }
+
+    // If we found agent sections, return just those
+    if (agentSection.length > 0) {
+      return agentSection;
+    }
+  } else if (focus === "email") {
+    // Look for sections likely to contain emails
+    let contactSection = "";
+
+    // Try different common ways emails might be found
+    const potentialEmailSections = [
+      $(
+        '[class*="contact"],[class*="Contact"],[id*="contact"],[id*="Contact"]',
+      ),
+      $('[class*="email"],[class*="Email"],[id*="email"],[id*="Email"]'),
+      $('a[href^="mailto:"]').parents("div, section").first(),
+      $('*:contains("@")').parents("div, section").first(),
+    ];
+
+    for (const section of potentialEmailSections) {
+      if (section.length > 0) {
+        contactSection += section.html() || "";
+      }
+    }
+
+    // If we found contact sections, return just those
+    if (contactSection.length > 0) {
+      return contactSection;
+    }
+  }
+
+  // If we can't find relevant sections, take the full body HTML but truncate it
+  // to avoid exceeding token limits
+  const bodyHtml = $("body").html() || "";
+  return bodyHtml.substring(0, 15000); // Limit to ~15KB of HTML
+}
+
+// Generate mock data when no API key is available
+function generateMockPropertyData(url: string): PropertyAIData {
+  const addressMatch = url.match(
+    /([0-9]+)-([A-Za-z\-]+)-([A-Za-z\-]+)-([A-Z]{2})-([0-9]+)/,
+  );
+  let address = "123 Main St";
+  let city = "San Francisco";
+  let state = "CA";
+  let zip = "94114";
+
+  if (addressMatch && addressMatch.length >= 6) {
+    address = `${addressMatch[1]} ${addressMatch[2].replace(/-/g, " ")}`;
+    city = addressMatch[3].replace(/-/g, " ");
+    state = addressMatch[4];
+    zip = addressMatch[5];
+  }
+
+  const mockData: PropertyAIData = {
+    address: address,
+    city: city,
+    state: state,
+    zip: zip,
+    propertyType: "Single Family",
+    bedrooms: 3 + Math.floor(Math.random() * 3),
+    bathrooms: 2 + Math.floor(Math.random() * 2),
+    squareFeet: 1500 + Math.floor(Math.random() * 1000),
+    price: 500000 + Math.floor(Math.random() * 1000000),
+    yearBuilt: 1980 + Math.floor(Math.random() * 40),
+    description:
+      "Beautiful home in a great neighborhood with modern amenities and convenient location.",
+    sellerName: "Jane Realtor",
+    sellerPhone: "415-555-" + Math.floor(1000 + Math.random() * 9000),
+    sellerEmail: `agent_${Math.floor(Math.random() * 1000)}@example.com`,
+    sellerCompany: "Prestige Real Estate",
+    sellerLicenseNo: `DRE #${Math.floor(Math.random() * 10000000)}`,
+    propertyUrl: url,
+    features: [
+      "Hardwood floors",
+      "Updated kitchen",
+      "Spacious backyard",
+      "Close to parks and schools",
+      "Attached garage",
+    ],
+    imageUrls: [
+      "https://example.com/property-image-1.jpg",
+      "https://example.com/property-image-2.jpg",
+      "https://example.com/property-image-3.jpg",
+    ],
+  };
+
+  return mockData;
 }

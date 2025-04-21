@@ -59,7 +59,7 @@ function createFallbackPropertyData(address: string): PropertyAIData {
     sellerCompany: "",
     sellerLicenseNo: "",
     propertyUrl: "",
-    imageUrls: []
+    imageUrls: [],
   };
 }
 
@@ -843,9 +843,14 @@ export async function extractPropertyFromUrl(
             // Add listing agent information based on extracted data or fallbacks
             sellerName: apiResult.sellerName || apiResult.agentName || "",
             sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "shanumas@gmail.com",
-            sellerCompany: apiResult.sellerCompany || apiResult.agentCompany || "",
-            sellerLicenseNo: apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
+            sellerEmail:
+              apiResult.sellerEmail ||
+              apiResult.agentEmail ||
+              "shanumas@gmail.com",
+            sellerCompany:
+              apiResult.sellerCompany || apiResult.agentCompany || "",
+            sellerLicenseNo:
+              apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
             propertyUrl: url,
             imageUrls: [],
           };
@@ -862,7 +867,7 @@ export async function extractPropertyFromUrl(
     }
   } catch (error) {
     console.error("Error in property URL extraction:", error);
-    
+
     // Create a fallback property result with minimal data
     const fallbackResult: PropertyAIData = {
       address: "Address could not be extracted",
@@ -883,9 +888,9 @@ export async function extractPropertyFromUrl(
       sellerCompany: "",
       sellerLicenseNo: "",
       propertyUrl: url,
-      imageUrls: []
+      imageUrls: [],
     };
-    
+
     return fallbackResult;
   }
 }
