@@ -230,11 +230,11 @@ export async function scrapePropertyListing(
                 
                 Format as JSON with these fields:
                 {
-                  "listingAgentName": "agent's full name",
-                  "listingAgentPhone": "agent's phone number",
-                  "listingAgentEmail": "agent's email address",
-                  "listingAgentCompany": "agent's brokerage/company",
-                  "listingAgentLicenseNo": "agent's license number"
+                  "sellerName": "agent's name",
+                  "sellerPhone": "agent's phone",
+                  "sellerEmail": "agent's email",
+                  "sellerCompany": "agent's company",
+                  "sellerLicenseNo": "license number"
                 }
                 
                 If a field can't be determined, use null.
@@ -325,11 +325,11 @@ export async function scrapePropertyListing(
             "yearBuilt": year built as number,
             "description": "brief description",
             "features": ["feature1", "feature2", ...],
-            "listingAgentName": "agent's full name",
-            "listingAgentPhone": "agent's phone number",
-            "listingAgentEmail": "agent's email address",
-            "listingAgentCompany": "agent's brokerage/company",
-            "listingAgentLicenseNo": "agent's license number"
+            "sellerName": "agent's name",
+            "sellerPhone": "agent's phone",
+            "sellerEmail": "agent's email",
+            "sellerCompany": "agent's company",
+            "sellerLicenseNo": "license number"
           }
           
           If a field can't be determined, use null.
@@ -353,11 +353,11 @@ export async function scrapePropertyListing(
         
         // Merge with previous data, prioritizing HTML extraction results
         propertyData = { ...propertyData, ...htmlData };
-        if (htmlData.listingAgentName) agentData.listingAgentName = htmlData.listingAgentName;
-        if (htmlData.listingAgentPhone) agentData.listingAgentPhone = htmlData.listingAgentPhone;
-        if (htmlData.listingAgentEmail) agentData.listingAgentEmail = htmlData.listingAgentEmail;
-        if (htmlData.listingAgentCompany) agentData.listingAgentCompany = htmlData.listingAgentCompany;
-        if (htmlData.listingAgentLicenseNo) agentData.listingAgentLicenseNo = htmlData.listingAgentLicenseNo;
+        if (htmlData.sellerName) agentData.sellerName = htmlData.sellerName;
+        if (htmlData.sellerPhone) agentData.sellerPhone = htmlData.sellerPhone;
+        if (htmlData.sellerEmail) agentData.sellerEmail = htmlData.sellerEmail;
+        if (htmlData.sellerCompany) agentData.sellerCompany = htmlData.sellerCompany;
+        if (htmlData.sellerLicenseNo) agentData.sellerLicenseNo = htmlData.sellerLicenseNo;
         
       } catch (error) {
         console.error("Error fetching URL content:", error);
@@ -370,25 +370,25 @@ export async function scrapePropertyListing(
       console.log("Analyzing URL pattern as final fallback...");
       // Use URL structure for basic info
       propertyData.address = addressFromUrl || "Address information unavailable";
-      propertyData.city = cityFromUrl ?? undefined;
-      propertyData.state = stateFromUrl ?? undefined;
-      propertyData.zip = zipFromUrl ?? undefined;
+      propertyData.city = cityFromUrl || null;
+      propertyData.state = stateFromUrl || null;
+      propertyData.zip = zipFromUrl || null;
     }
 
     // ===== STEP 5: Find agent email if not available =====
-    if (!agentData.listingAgentEmail && agentData.listingAgentName) {
-      console.log("No listing agent email found, searching web for agent email...");
+    if (!agentData.sellerEmail && agentData.sellerName) {
+      console.log("No seller email found, searching web for agent email...");
       // Use property location in the search (from city and state if available)
       const location = propertyData.city && propertyData.state ? 
                       `${propertyData.city} ${propertyData.state}` : 
                       (cityFromUrl && stateFromUrl ? `${cityFromUrl} ${stateFromUrl}` : "");
       
-      agentData.listingAgentEmail = await findAgentEmailFromWeb(
-        agentData.listingAgentName, 
-        agentData.listingAgentCompany,
+      agentData.sellerEmail = await findAgentEmailFromWeb(
+        agentData.sellerName, 
+        agentData.sellerCompany,
         location
       );
-    } else if (!agentData.listingAgentEmail) {
+    } else if (!agentData.sellerEmail) {
       console.log("No agent information available, unable to determine email");
       // Leave as undefined/null rather than using hardcoded fallback
     }
@@ -397,32 +397,24 @@ export async function scrapePropertyListing(
     const result: PropertyAIData = {
       // Property data
       address: propertyData.address || addressFromUrl || "Address information unavailable",
-      city: propertyData.city ?? cityFromUrl ?? undefined,
-      state: propertyData.state ?? stateFromUrl ?? undefined,
-      zip: propertyData.zip ?? zipFromUrl ?? undefined,
-      propertyType: propertyData.propertyType || undefined,
-      bedrooms: propertyData.bedrooms || undefined,
-      bathrooms: propertyData.bathrooms || undefined,
-      squareFeet: propertyData.squareFeet || undefined,
-      price: propertyData.price || undefined,
-      yearBuilt: propertyData.yearBuilt || undefined,
-      description: propertyData.description || undefined,
+      city: propertyData.city || cityFromUrl || null,
+      state: propertyData.state || stateFromUrl || null,
+      zip: propertyData.zip || zipFromUrl || null,
+      propertyType: propertyData.propertyType || null,
+      bedrooms: propertyData.bedrooms || null,
+      bathrooms: propertyData.bathrooms || null,
+      squareFeet: propertyData.squareFeet || null,
+      price: propertyData.price || null,
+      yearBuilt: propertyData.yearBuilt || null,
+      description: propertyData.description || null,
       features: propertyData.features || [],
       
-      // Listing Agent data - fill both old and new field formats for compatibility
-      // New format (preferred)
-      listingAgentName: agentData.listingAgentName || undefined,
-      listingAgentPhone: agentData.listingAgentPhone || undefined,
-      listingAgentEmail: agentData.listingAgentEmail || "", // Don't use hardcoded fallback email
-      listingAgentCompany: agentData.listingAgentCompany || undefined,
-      listingAgentLicenseNo: agentData.listingAgentLicenseNo || undefined,
-      
-      // Legacy format (maintained for compatibility)
-      sellerName: agentData.listingAgentName || undefined,
-      sellerPhone: agentData.listingAgentPhone || undefined,
-      sellerEmail: agentData.listingAgentEmail || "", // Don't use hardcoded fallback email 
-      sellerCompany: agentData.listingAgentCompany || undefined,
-      sellerLicenseNo: agentData.listingAgentLicenseNo || undefined,
+      // Agent data
+      sellerName: agentData.sellerName || null,
+      sellerPhone: agentData.sellerPhone || null,
+      sellerEmail: agentData.sellerEmail || "", // Don't use hardcoded fallback email
+      sellerCompany: agentData.sellerCompany || null,
+      sellerLicenseNo: agentData.sellerLicenseNo || null,
       
       // URL info
       propertyUrl: url,

@@ -924,11 +924,11 @@ export default function BuyerPropertyDetail() {
                   </dl>
 
                   {/* Listing Agent Information */}
-                  {(property.listingAgentName || property.sellerName ||
-                    property.listingAgentEmail || property.sellerEmail ||
-                    property.listingAgentPhone || property.sellerPhone ||
-                    property.listingAgentCompany || property.sellerCompany ||
-                    property.listingAgentLicenseNo || property.sellerLicenseNo) && (
+                  {(property.sellerName ||
+                    property.sellerEmail ||
+                    property.sellerPhone ||
+                    property.sellerCompany ||
+                    property.sellerLicenseNo) && (
                     <>
                       <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
                         <h3 className="text-lg leading-6 font-medium text-gray-900">
@@ -936,7 +936,7 @@ export default function BuyerPropertyDetail() {
                         </h3>
                       </div>
                       <dl>
-                        {(property.listingAgentName || property.sellerName) && (
+                        {property.sellerName && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Building className="mr-2 h-4 w-4" /> Agent name
@@ -944,14 +944,14 @@ export default function BuyerPropertyDetail() {
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <CopyableContact
                                 label=""
-                                value={property.listingAgentName || property.sellerName}
+                                value={property.sellerName}
                                 type="text"
                               />
                             </dd>
                           </div>
                         )}
 
-                        {(property.listingAgentPhone || property.sellerPhone) && (
+                        {property.sellerPhone && (
                           <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Phone className="mr-2 h-4 w-4" /> Phone
@@ -959,14 +959,14 @@ export default function BuyerPropertyDetail() {
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <CopyableContact
                                 label=""
-                                value={property.listingAgentPhone || property.sellerPhone}
+                                value={property.sellerPhone}
                                 type="phone"
                               />
                             </dd>
                           </div>
                         )}
                         
-                        {(property.listingAgentEmail || property.sellerEmail) && (
+                        {property.sellerEmail && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Mail className="mr-2 h-4 w-4" /> Email
@@ -974,14 +974,14 @@ export default function BuyerPropertyDetail() {
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <CopyableContact
                                 label=""
-                                value={property.listingAgentEmail || property.sellerEmail}
+                                value={property.sellerEmail}
                                 type="email"
                               />
                             </dd>
                           </div>
                         )}
                         
-                        {(property.listingAgentCompany || property.sellerCompany) && (
+                        {property.sellerCompany && (
                           <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" /> Company
@@ -989,14 +989,14 @@ export default function BuyerPropertyDetail() {
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <CopyableContact
                                 label=""
-                                value={property.listingAgentCompany || property.sellerCompany}
+                                value={property.sellerCompany}
                                 type="text"
                               />
                             </dd>
                           </div>
                         )}
                         
-                        {(property.listingAgentLicenseNo || property.sellerLicenseNo) && (
+                        {property.sellerLicenseNo && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Award className="mr-2 h-4 w-4" /> License #
@@ -1004,7 +1004,7 @@ export default function BuyerPropertyDetail() {
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <CopyableContact
                                 label=""
-                                value={property.listingAgentLicenseNo || property.sellerLicenseNo}
+                                value={property.sellerLicenseNo}
                                 type="text"
                               />
                             </dd>
