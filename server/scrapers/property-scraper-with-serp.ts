@@ -379,8 +379,8 @@ export async function scrapePropertyListing(
       console.log("No seller email found, searching web for agent email...");
       agentData.sellerEmail = await findAgentEmailFromWeb(agentData.sellerName, agentData.sellerCompany);
     } else if (!agentData.sellerEmail) {
-      console.log("Using fallback email (no agent name available)");
-      agentData.sellerEmail = "shanumas@gmail.com";
+      console.log("No agent information available, unable to determine email");
+      // Leave as undefined/null rather than using hardcoded fallback
     }
 
     // ===== STEP 6: Combine all data and return final result =====
@@ -402,7 +402,7 @@ export async function scrapePropertyListing(
       // Agent data
       sellerName: agentData.sellerName || null,
       sellerPhone: agentData.sellerPhone || null,
-      sellerEmail: agentData.sellerEmail || "shanumas@gmail.com", // Ensure fallback email
+      sellerEmail: agentData.sellerEmail || "", // Don't use hardcoded fallback email
       sellerCompany: agentData.sellerCompany || null,
       sellerLicenseNo: agentData.sellerLicenseNo || null,
       
@@ -435,8 +435,8 @@ async function findAgentEmailFromWeb(
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Cannot search for agent email (no API key), using fallback");
-      return "shanumas@gmail.com";
+      console.log("Cannot search for agent email (no API key)");
+      return "";
     }
 
     // Only try SerpAPI if we have a key
