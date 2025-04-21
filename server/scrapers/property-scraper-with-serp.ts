@@ -370,9 +370,9 @@ export async function scrapePropertyListing(
       console.log("Analyzing URL pattern as final fallback...");
       // Use URL structure for basic info
       propertyData.address = addressFromUrl || "Address information unavailable";
-      propertyData.city = cityFromUrl || null;
-      propertyData.state = stateFromUrl || null;
-      propertyData.zip = zipFromUrl || null;
+      propertyData.city = cityFromUrl ?? undefined;
+      propertyData.state = stateFromUrl ?? undefined;
+      propertyData.zip = zipFromUrl ?? undefined;
     }
 
     // ===== STEP 5: Find agent email if not available =====
@@ -397,24 +397,32 @@ export async function scrapePropertyListing(
     const result: PropertyAIData = {
       // Property data
       address: propertyData.address || addressFromUrl || "Address information unavailable",
-      city: propertyData.city || cityFromUrl || null,
-      state: propertyData.state || stateFromUrl || null,
-      zip: propertyData.zip || zipFromUrl || null,
-      propertyType: propertyData.propertyType || null,
-      bedrooms: propertyData.bedrooms || null,
-      bathrooms: propertyData.bathrooms || null,
-      squareFeet: propertyData.squareFeet || null,
-      price: propertyData.price || null,
-      yearBuilt: propertyData.yearBuilt || null,
-      description: propertyData.description || null,
+      city: propertyData.city ?? cityFromUrl ?? undefined,
+      state: propertyData.state ?? stateFromUrl ?? undefined,
+      zip: propertyData.zip ?? zipFromUrl ?? undefined,
+      propertyType: propertyData.propertyType || undefined,
+      bedrooms: propertyData.bedrooms || undefined,
+      bathrooms: propertyData.bathrooms || undefined,
+      squareFeet: propertyData.squareFeet || undefined,
+      price: propertyData.price || undefined,
+      yearBuilt: propertyData.yearBuilt || undefined,
+      description: propertyData.description || undefined,
       features: propertyData.features || [],
       
-      // Agent data
-      sellerName: agentData.sellerName || null,
-      sellerPhone: agentData.sellerPhone || null,
-      sellerEmail: agentData.sellerEmail || "", // Don't use hardcoded fallback email
-      sellerCompany: agentData.sellerCompany || null,
-      sellerLicenseNo: agentData.sellerLicenseNo || null,
+      // Listing Agent data - fill both old and new field formats for compatibility
+      // New format (preferred)
+      listingAgentName: agentData.listingAgentName || undefined,
+      listingAgentPhone: agentData.listingAgentPhone || undefined,
+      listingAgentEmail: agentData.listingAgentEmail || "", // Don't use hardcoded fallback email
+      listingAgentCompany: agentData.listingAgentCompany || undefined,
+      listingAgentLicenseNo: agentData.listingAgentLicenseNo || undefined,
+      
+      // Legacy format (maintained for compatibility)
+      sellerName: agentData.listingAgentName || undefined,
+      sellerPhone: agentData.listingAgentPhone || undefined,
+      sellerEmail: agentData.listingAgentEmail || "", // Don't use hardcoded fallback email 
+      sellerCompany: agentData.listingAgentCompany || undefined,
+      sellerLicenseNo: agentData.listingAgentLicenseNo || undefined,
       
       // URL info
       propertyUrl: url,
