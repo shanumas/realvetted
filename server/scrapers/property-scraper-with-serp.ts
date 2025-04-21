@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import axios from "axios";
 import { getJson } from "serpapi";
 import { PropertyAIData } from "@shared/types";
+import * as cheerio from "cheerio";
 
 interface SerpApiResult {
   title?: string;
@@ -377,7 +378,16 @@ export async function scrapePropertyListing(
     // ===== STEP 5: Find agent email if not available =====
     if (!agentData.sellerEmail && agentData.sellerName) {
       console.log("No seller email found, searching web for agent email...");
-      agentData.sellerEmail = await findAgentEmailFromWeb(agentData.sellerName, agentData.sellerCompany);
+      // Use property location in the search (from city and state if available)
+      const location = propertyData.city && propertyData.state ? 
+                      `${propertyData.city} ${propertyData.state}` : 
+                      (cityFromUrl && stateFromUrl ? `${cityFromUrl} ${stateFromUrl}` : "");
+      
+      agentData.sellerEmail = await findAgentEmailFromWeb(
+        agentData.sellerName, 
+        agentData.sellerCompany,
+        location
+      );
     } else if (!agentData.sellerEmail) {
       console.log("No agent information available, unable to determine email");
       // Leave as undefined/null rather than using hardcoded fallback
@@ -423,11 +433,13 @@ export async function scrapePropertyListing(
 
 /**
  * Find an agent's email by searching for them on the web
+ * Performs specific searches for real estate agent email addresses
  * Returns an empty string if unable to find their email
  */
 async function findAgentEmailFromWeb(
   agentName: string,
   agentCompany?: string,
+  location?: string
 ): Promise<string> {
   try {
     // If no API key, return fallback immediately
@@ -444,20 +456,36 @@ async function findAgentEmailFromWeb(
       try {
         // Clean agent name for searching
         const cleanAgentName = agentName.replace(/[^\w\s]/gi, '');
+        const cleanCompany = agentCompany ? agentCompany.replace(/[^\w\s]/gi, '') : '';
         
-        // Create search query for the agent's contact info
-        const agentQuery = `${cleanAgentName} real estate agent ${agentCompany || ""} contact email`;
-        console.log(`Searching for agent email with query: "${agentQuery}"`);
+        // Try multiple search queries with different patterns to increase chances of finding email
+        const searchQueries = [
+          // Most specific query with everything we know
+          `${cleanAgentName} ${cleanCompany} real estate agent email contact ${location || ""}`,
+          
+          // Try finding profile pages that often have emails
+          `${cleanAgentName} ${cleanCompany} real estate agent profile`,
+          
+          // Try finding "Contact" pages that often list agent emails
+          `${cleanAgentName} realtor contact information email`,
+          
+          // Try finding the agent's personal website
+          `${cleanAgentName} real estate personal website ${cleanCompany}`
+        ];
+        
+        // Take the first query as our primary search
+        const primaryQuery = searchQueries[0];
+        console.log(`Searching for agent email with primary query: "${primaryQuery}"`);
         
         // Search using SerpAPI
         const agentSearchResults = await getJson({
           engine: "google",
-          q: agentQuery,
+          q: primaryQuery,
           api_key: serpApiKey,
-          num: 5
+          num: 10  // Increase to 10 results for better chances
         });
         
-        const results = agentSearchResults?.organic_results || [];
+        let results = agentSearchResults?.organic_results || [];
         
         if (results.length > 0) {
           // Create a prompt with search results
@@ -505,6 +533,181 @@ async function findAgentEmailFromWeb(
           if (suggestedEmail && suggestedEmail.includes("@") && !suggestedEmail.includes(" ")) {
             console.log(`Found potential email for agent ${agentName}: ${suggestedEmail}`);
             return suggestedEmail;
+          }
+        }
+        
+        // If primary search didn't yield an email, try alternative queries
+        if (searchQueries.length > 1) {
+          for (let i = 1; i < searchQueries.length; i++) {
+            try {
+              const query = searchQueries[i];
+              console.log(`Trying fallback search query ${i}: "${query}"`);
+              
+              // Search using SerpAPI
+              const fallbackResults = await getJson({
+                engine: "google",
+                q: query,
+                api_key: serpApiKey,
+                num: 8
+              });
+              
+              const fallbackOrganic = fallbackResults?.organic_results || [];
+              
+              if (fallbackOrganic.length > 0) {
+                // Try to visit top result URLs to find emails directly (common tactic)
+                for (let j = 0; j < Math.min(3, fallbackOrganic.length); j++) {
+                  const result = fallbackOrganic[j];
+                  if (result.link) {
+                    try {
+                      console.log(`Trying to visit URL for direct email extraction: ${result.link}`);
+                      
+                      // Try to fetch the page content
+                      const response = await axios.get(result.link, {
+                        headers: {
+                          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+                          "Accept": "text/html,application/xhtml+xml,application/xml"
+                        },
+                        timeout: 10000
+                      });
+                      
+                      // If we got content, look for emails using both regex and cheerio parsing
+                      if (response.data) {
+                        const html = response.data.toString();
+                        
+                        // Method 1: Simple regex extraction - finds basic email patterns
+                        const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
+                        let emails = html.match(emailRegex) || [];
+                        
+                        // Method 2: Improved parsing using cheerio
+                        try {
+                          const $ = cheerio.load(html);
+                          
+                          // Look for email in mailto links (common in real estate sites)
+                          $('a[href^="mailto:"]').each((i, el) => {
+                            const href = $(el).attr('href');
+                            if (href) {
+                              const mailtoEmail = href.replace('mailto:', '').split('?')[0].trim();
+                              if (mailtoEmail && !emails.includes(mailtoEmail)) {
+                                emails.push(mailtoEmail);
+                              }
+                            }
+                          });
+                          
+                          // Look for elements with data-email attribute (common pattern)
+                          $('[data-email]').each((i, el) => {
+                            const dataEmail = $(el).attr('data-email');
+                            if (dataEmail && dataEmail.includes('@') && !emails.includes(dataEmail)) {
+                              emails.push(dataEmail);
+                            }
+                          });
+                          
+                          // Look for contact form hidden fields
+                          $('input[name*="email"], input[id*="email"], input[type="email"]').each((i, el) => {
+                            const value = $(el).attr('value');
+                            if (value && value.includes('@') && !emails.includes(value)) {
+                              emails.push(value);
+                            }
+                          });
+                        } catch (cheerioError) {
+                          console.error("Error using cheerio to parse HTML:", cheerioError);
+                        }
+                        
+                        console.log(`Found ${emails.length} potential emails on page`);
+                        
+                        if (emails.length > 0) {
+                          // If we have multiple emails, let OpenAI pick the most likely agent email
+                          if (emails.length > 1) {
+                            const emailSelectionPrompt = `
+                              I found multiple email addresses on a real estate agent's page.
+                              
+                              Agent Name: ${cleanAgentName}
+                              Company/Brokerage: ${agentCompany || "Unknown"}
+                              
+                              Emails found:
+                              ${emails.join('\n')}
+                              
+                              Which of these is most likely to be the agent's professional email address?
+                              
+                              Return ONLY the email address, nothing else.
+                            `;
+                            
+                            const emailSelectionResponse = await openai.chat.completions.create({
+                              model: "gpt-4o",
+                              messages: [
+                                {
+                                  role: "system",
+                                  content: "You are an assistant that helps identify the most relevant email for a real estate professional."
+                                },
+                                { role: "user", content: emailSelectionPrompt }
+                              ]
+                            });
+                            
+                            const selectedEmail = emailSelectionResponse.choices[0].message.content?.trim();
+                            
+                            if (selectedEmail && selectedEmail.includes("@") && !selectedEmail.includes(" ")) {
+                              console.log(`Selected most likely agent email: ${selectedEmail}`);
+                              return selectedEmail;
+                            }
+                          }
+                          
+                          // If only one email or OpenAI couldn't select one, just use the first match
+                          console.log(`Using first email found: ${emails[0]}`);
+                          return emails[0];
+                        }
+                      }
+                    } catch (error) {
+                      const urlError = error as Error;
+                      console.error(`Error visiting URL ${result.link}:`, urlError.message);
+                    }
+                  }
+                }
+                
+                // Create a prompt with fallback search results
+                const fallbackContent = fallbackOrganic
+                  .map((result: SerpApiResult, index: number) => 
+                    `Result ${index+1}:\nTitle: ${result.title || ""}\nLink: ${result.link || ""}\nSnippet: ${result.snippet || ""}`
+                  )
+                  .join("\n\n");
+                
+                const fallbackPrompt = `
+                  I'm trying to find the professional email address for this real estate agent:
+                  
+                  Agent Name: ${cleanAgentName}
+                  Company/Brokerage: ${agentCompany || "Unknown"}
+                  Location: ${location || ""}
+                  
+                  Based on these search results, extract the most likely email address:
+                  
+                  ${fallbackContent}
+                  
+                  If you can find an email address in the results, provide it.
+                  If no email is found, make a best guess based on common patterns.
+                  Return ONLY the email address, nothing else.
+                `;
+                
+                // Call OpenAI to extract email from fallback results
+                const fallbackResponse = await openai.chat.completions.create({
+                  model: "gpt-4o",
+                  messages: [
+                    {
+                      role: "system", 
+                      content: "You are an assistant that helps find email addresses for real estate professionals. Focus on finding actual email addresses in the search results. Be thorough."
+                    },
+                    { role: "user", content: fallbackPrompt }
+                  ]
+                });
+                
+                const fallbackEmail = fallbackResponse.choices[0].message.content?.trim();
+                
+                if (fallbackEmail && fallbackEmail.includes("@") && !fallbackEmail.includes(" ")) {
+                  console.log(`Found potential email from fallback search ${i}: ${fallbackEmail}`);
+                  return fallbackEmail;
+                }
+              }
+            } catch (error) {
+              const fallbackError = error as Error;
+              console.error(`Error with fallback search ${i}:`, fallbackError.message);
+            }
           }
         }
       } catch (error) {
