@@ -54,10 +54,14 @@ import {
   Eye,
   Calendar as CalendarIcon,
   AlertTriangle,
+  Mail,
+  Copy,
+  Check,
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
 import { PropertyViewingRequestsList } from "@/components/property-viewing-requests-list";
+import { CopyableContact } from "@/components/ui/copyable-contact";
 import {
   Dialog,
   DialogContent,
@@ -937,44 +941,105 @@ export default function BuyerPropertyDetail() {
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Building className="mr-2 h-4 w-4" /> Agent name
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerName}
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
+                              <span>{property.sellerName}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6" 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(property.sellerName);
+                                  toast({
+                                    title: "Copied",
+                                    description: "Agent name copied to clipboard",
+                                    variant: "default",
+                                  });
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
                             </dd>
                           </div>
                         )}
 
                         {property.sellerPhone && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Phone className="mr-2 h-4 w-4" /> Phone
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a
-                                href={`tel:${property.sellerPhone}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {property.sellerPhone}
-                              </a>
+                              <CopyableContact
+                                label=""
+                                value={property.sellerPhone}
+                                type="phone"
+                              />
                             </dd>
                           </div>
                         )}
+                        
+                        {property.sellerEmail && (
+                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Mail className="mr-2 h-4 w-4" /> Email
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <CopyableContact
+                                label=""
+                                value={property.sellerEmail}
+                                type="email"
+                              />
+                            </dd>
+                          </div>
+                        )}
+                        
                         {property.sellerCompany && (
                           <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" /> Company
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerCompany}
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
+                              <span>{property.sellerCompany}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6" 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(property.sellerCompany);
+                                  toast({
+                                    title: "Copied",
+                                    description: "Company name copied to clipboard",
+                                    variant: "default",
+                                  });
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
                             </dd>
                           </div>
                         )}
+                        
                         {property.sellerLicenseNo && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Award className="mr-2 h-4 w-4" /> License #
                             </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerLicenseNo}
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2 flex justify-between items-center">
+                              <span>{property.sellerLicenseNo}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6" 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(property.sellerLicenseNo);
+                                  toast({
+                                    title: "Copied",
+                                    description: "License number copied to clipboard",
+                                    variant: "default",
+                                  });
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
                             </dd>
                           </div>
                         )}
