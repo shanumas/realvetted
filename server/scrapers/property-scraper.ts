@@ -137,6 +137,9 @@ export async function scrapePropertyListing(
       response_format: { type: "json_object" },
     });
     
+    // Print the complete response for debugging
+    console.log("OPENAI PROPERTY RESPONSE: ", JSON.stringify(response, null, 2));
+    
     // Parse the API response
     const result = JSON.parse(response.choices[0].message.content || "{}");
     
@@ -219,6 +222,9 @@ async function findAgentEmailFromWeb(
         { role: "user", content: prompt },
       ],
     });
+    
+    // Print the complete agent email response for debugging
+    console.log("OPENAI AGENT EMAIL RESPONSE: ", JSON.stringify(response, null, 2));
     
     // Extract the email from the response
     const suggestedEmail = response.choices[0].message.content?.trim();
