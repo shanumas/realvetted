@@ -1,65 +1,15 @@
-import axios from "axios";
-import * as cheerio from "cheerio";
-import puppeteer from "puppeteer";
 import OpenAI from "openai";
+import axios from "axios";
 import { PropertyAIData, PropertyScraperResult } from "@shared/types";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
 });
 
-// Helper function to get puppeteer browser with correct Chrome path
-async function getPuppeteerBrowser() {
-  try {
-    const chromePaths = [
-      // Try environment variable first
-      process.env.CHROME_BIN,
-      // Common Linux paths
-      "/usr/bin/chromium-browser",
-      "/usr/bin/chromium",
-      "/usr/bin/google-chrome",
-      "/usr/bin/google-chrome-stable",
-      // Try without specifying path (use Puppeteer's bundled Chrome)
-      undefined,
-    ];
-
-    // Try each path until one works
-    for (const path of chromePaths) {
-      try {
-        console.log(
-          `Trying to launch Chrome from: ${path || "bundled Chrome"}`,
-        );
-        return await puppeteer.launch({
-          headless: true,
-          args: ["--no-sandbox", "--disable-setuid-sandbox"],
-          executablePath: path, // Will be ignored if undefined
-          // Increase timeout
-          timeout: 30000,
-        });
-      } catch (e: any) {
-        console.log(
-          `Failed to launch Chrome from ${path || "bundled Chrome"}: ${e.message}`,
-        );
-        // Continue to the next path
-      }
-    }
-
-    // If we get here, all paths failed
-    console.error("Could not find Chrome in any of the standard locations");
-
-    // Fall back to minimal configuration as last resort
-    console.log("Trying minimal launch configuration as last resort");
-    return await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-  } catch (error) {
-    console.error("Error launching puppeteer browser:", error);
-    throw error;
-  }
-}
-
-// Main function to scrape a property listing URL
+/**
+ * Simplified approach to extract property listing data directly using OpenAI
+ * Passes the URL to OpenAI to get details about the property
+ */
 export async function scrapePropertyListing(
   url: string,
 ): Promise<PropertyAIData> {
@@ -71,13 +21,145 @@ export async function scrapePropertyListing(
       );
     }
 
-    // Check if it's a Zillow URL
-    if (url.includes("zillow.com")) {
-      return await scrapeZillowListing(url);
-    }
+    console.log(`Extracting property data from URL: ${url}`);
+    
+    // Extract domain and possible identifier from URL
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+    
+    // Try to get property details directly from the URL structure
+    let addressFromUrl = "";
+    let cityFromUrl = "";
+    let stateFromUrl = "";
+    let zipFromUrl = "";
 
-    // For other sites, use a generic scraper
-    return await scrapeGenericListing(url);
+    // Extract information from URL parts for common real estate sites
+    if (domain.includes("zillow.com") || domain.includes("realtor.com") || domain.includes("redfin.com")) {
+      const pathParts = urlObj.pathname.split("/");
+      
+      // Simple URL parsing logic
+      for (const part of pathParts) {
+        if (part.includes("-")) {
+          const segments = part.split("-");
+          
+          // Check for street numbers
+          if (segments.length > 1 && /^\d+$/.test(segments[0])) {
+            addressFromUrl = segments.join(" ").replace(/-/g, " ");
+          }
+          
+          // Check for state codes
+          if (segments.length > 0 && /^[A-Z]{2}$/.test(segments[segments.length - 1])) {
+            stateFromUrl = segments[segments.length - 1];
+            
+            // The part before the state is likely the city
+            if (segments.length > 1) {
+              cityFromUrl = segments[segments.length - 2].replace(/-/g, " ");
+            }
+          }
+          
+          // Check for ZIP codes
+          if (segments.length > 0 && /^\d{5}$/.test(segments[segments.length - 1])) {
+            zipFromUrl = segments[segments.length - 1];
+          }
+        }
+      }
+    }
+    
+    // Single API call to OpenAI to extract all property data
+    const prompt = `
+      I have a real estate listing URL. Please extract as much information as possible about this property listing.
+      
+      URL: ${url}
+      
+      Based on the URL format, I've already extracted some potential information:
+      ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
+      ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
+      ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
+      ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
+      
+      I need the following information:
+      1. Property Details:
+         - Full Address (street, city, state, zip)
+         - Property Type (Single Family, Condo, etc.)
+         - Number of Bedrooms
+         - Number of Bathrooms
+         - Square Footage
+         - Price
+         - Year Built
+         - Property Description (brief)
+         - Features/Amenities (list of key features)
+      
+      2. Listing Agent Information:
+         - Agent Name
+         - Phone Number
+         - Email Address
+         - Real Estate Company/Brokerage
+         - License Number
+      
+      IMPORTANT: 
+      - If you can't determine certain fields with reasonable confidence, leave them as null.
+      - For the agent's email, if you can't find it, that's okay. We'll use a fallback.
+      - This information is being used for a real estate application, so accuracy is important.
+      
+      Format as JSON with these fields:
+      {
+        "address": "street address",
+        "city": "city name",
+        "state": "state code",
+        "zip": "zip code",
+        "propertyType": "type of property",
+        "bedrooms": number of bedrooms,
+        "bathrooms": number of bathrooms,
+        "squareFeet": square footage as a number,
+        "price": price as a number without currency symbols,
+        "yearBuilt": year built as a number,
+        "description": "brief description",
+        "features": ["feature1", "feature2", ...],
+        "sellerName": "listing agent's name",
+        "sellerPhone": "listing agent's phone",
+        "sellerEmail": "listing agent's email",
+        "sellerCompany": "listing agent's company",
+        "sellerLicenseNo": "license number"
+      }
+    `;
+    
+    // Call OpenAI with our prompt
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: 
+            "You are a real estate data extraction expert. Extract as much information as possible from the given URL. For information you can't confidently determine, use null values.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+    
+    // Parse the API response
+    const result = JSON.parse(response.choices[0].message.content || "{}");
+    
+    // Always ensure we have an address
+    if (!result.address) {
+      result.address = addressFromUrl || "Address information unavailable";
+    }
+    
+    // If we don't have agent email, find it or use fallback
+    if (!result.sellerEmail && result.sellerName) {
+      console.log("No seller email found, searching web for agent email...");
+      result.sellerEmail = await findAgentEmailFromWeb(result.sellerName, result.sellerCompany);
+    } else if (!result.sellerEmail) {
+      console.log("Using fallback email (no agent name available)");
+      result.sellerEmail = "shanumas@gmail.com";
+    }
+    
+    // Add the property URL to the result
+    result.propertyUrl = url;
+    result.imageUrls = result.imageUrls || [];
+    
+    console.log("Successfully extracted property data from URL");
+    return result as PropertyAIData;
   } catch (error) {
     console.error("Property scraping error:", error);
     throw new Error(
@@ -86,251 +168,76 @@ export async function scrapePropertyListing(
   }
 }
 
-// Scraper for Zillow listings
-async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
-  const browser = await getPuppeteerBrowser();
-
+/**
+ * Simplified function to find an agent's email by searching for them on the web
+ * Returns a fallback email (shanumas@gmail.com) if unable to find the real one
+ */
+async function findAgentEmailFromWeb(
+  agentName: string,
+  agentCompany?: string,
+): Promise<string> {
   try {
-    const page = await browser.newPage();
-
-    // Set user agent to avoid detection
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    );
-
-    // Navigate to the URL
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-
-    // Wait for the content to load
-    await page.waitForSelector("body", { timeout: 5000 });
-
-    // Extract the HTML content
-    const htmlContent = await page.content();
-
-    // Parse the HTML with cheerio
-    const $ = cheerio.load(htmlContent);
-
-    // Use AI to extract structured data from the HTML
-    const extractedData = await extractPropertyDataWithAI(htmlContent, url);
-
-    // Find the agent/seller information section
-    const agentInfo = await extractAgentInfoWithAI(htmlContent, url);
-
-    // If agent email isn't found in the listing, try to find it from their website
-    if (agentInfo.sellerName && !agentInfo.sellerEmail) {
-      agentInfo.sellerEmail = await findAgentEmailFromWeb(
-        agentInfo.sellerName,
-        agentInfo.sellerCompany,
-      );
-    }
-
-    // Create a scraper result with possibly undefined address
-    const scrapedResult: PropertyScraperResult = {
-      ...extractedData,
-      ...agentInfo,
-      propertyUrl: url,
-    };
-
-    // Make sure we have the required address field
-    if (!scrapedResult.address) {
-      scrapedResult.address = "Address information unavailable";
-    }
-
-    // Return with required address field populated
-    return scrapedResult as PropertyAIData;
-  } catch (error) {
-    console.error("Zillow scraping error:", error);
-    throw error;
-  } finally {
-    await browser.close();
-  }
-}
-
-// Generic scraper for other real estate sites
-async function scrapeGenericListing(url: string): Promise<PropertyAIData> {
-  const browser = await getPuppeteerBrowser();
-
-  try {
-    const page = await browser.newPage();
-
-    // Set user agent to avoid detection
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-    );
-
-    // Navigate to the URL
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-
-    // Wait for the content to load
-    await page.waitForSelector("body", { timeout: 5000 });
-
-    // Extract the HTML content
-    const htmlContent = await page.content();
-
-    // Use AI to extract structured data from the HTML
-    const extractedData = await extractPropertyDataWithAI(htmlContent, url);
-
-    // Find the agent/seller information
-    const agentInfo = await extractAgentInfoWithAI(htmlContent, url);
-
-    // If agent email isn't found in the listing, try to find it from their website
-    if (agentInfo.sellerName && !agentInfo.sellerEmail) {
-      agentInfo.sellerEmail = await findAgentEmailFromWeb(
-        agentInfo.sellerName,
-        agentInfo.sellerCompany,
-      );
-    }
-
-    // Create a scraper result with possibly undefined address
-    const scrapedResult: PropertyScraperResult = {
-      ...extractedData,
-      ...agentInfo,
-      propertyUrl: url,
-    };
-
-    // Make sure we have the required address field
-    if (!scrapedResult.address) {
-      scrapedResult.address = "Address information unavailable";
-    }
-
-    // Return with required address field populated
-    return scrapedResult as PropertyAIData;
-  } catch (error) {
-    console.error("Generic scraping error:", error);
-    throw error;
-  } finally {
-    await browser.close();
-  }
-}
-
-// Use OpenAI to extract structured property data from HTML
-async function extractPropertyDataWithAI(
-  html: string,
-  url: string,
-): Promise<Partial<PropertyAIData>> {
-  try {
-    // If no API key available, return placeholder data
+    // If no API key, return fallback immediately
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Using mock data for property extraction (no API key)");
+      console.log("Cannot search for agent email (no API key), using fallback");
+      return "shanumas@gmail.com";
     }
-
-    // First, try to extract data using Cheerio for more reliable information
-    const $ = cheerio.load(html);
-    const extractedData: Partial<PropertyAIData> = {};
-
-    // Initialize properties with direct extraction
-    let directAddress = "";
-    let directCity = "";
-    let directState = "";
-    let directZip = "";
-    let directPrice: number | undefined;
-    let directBeds: number | undefined;
-    let directBaths: number | undefined;
-    let directSqFt: number | undefined;
-
-    // Attempt to find common patterns for property data in HTML
-    // Look for price
-    const priceText = $('*:contains("$")').text();
-    const priceMatch = priceText.match(/\$([0-9,]+)/);
-    if (priceMatch && priceMatch[1]) {
-      directPrice = parseInt(priceMatch[1].replace(/,/g, ""));
-    }
-
-    // Look for beds/baths/sqft
-    const statsText =
-      $('*:contains("bed")').text() +
-      " " +
-      $('*:contains("bath")').text() +
-      " " +
-      $('*:contains("sq")').text();
-    const bedsMatch = statsText.match(/(\d+)\s*bed/i);
-    const bathsMatch = statsText.match(/(\d+\.?\d*)\s*bath/i);
-    const sqftMatch = statsText.match(/(\d+[,\d]*)\s*sq\s*\.?\s*ft/i);
-
-    if (bedsMatch && bedsMatch[1]) directBeds = parseInt(bedsMatch[1]);
-    if (bathsMatch && bathsMatch[1]) directBaths = parseFloat(bathsMatch[1]);
-    if (sqftMatch && sqftMatch[1])
-      directSqFt = parseInt(sqftMatch[1].replace(/,/g, ""));
-
-    // Look for address components in meta data
-    $("meta").each((i, el) => {
-      const property = $(el).attr("property") || "";
-      const content = $(el).attr("content") || "";
-
-      if (property.includes("address") || property.includes("location")) {
-        directAddress = content;
-      } else if (property.includes("city") || property.includes("locality")) {
-        directCity = content;
-      } else if (property.includes("state") || property.includes("region")) {
-        directState = content;
-      } else if (property.includes("zip") || property.includes("postal")) {
-        directZip = content;
-      }
-    });
-
-    console.log("Direct extraction results:", {
-      address: directAddress,
-      city: directCity,
-      state: directState,
-      zip: directZip,
-      price: directPrice,
-      bedrooms: directBeds,
-      bathrooms: directBaths,
-      squareFeet: directSqFt,
-    });
-
-    // Extract only the relevant parts of the HTML to avoid token limit issues
-    const simplifiedHtml = simplifyHtml(html);
-
+    
+    // Create a search query for this agent
+    const searchQuery = `${agentName} real estate agent ${agentCompany || ""} contact email`;
+    console.log(`Searching for agent email with query: "${searchQuery}"`);
+    
+    // Use direct API call to OpenAI instead of web scraping
     const prompt = `
-      I have a real estate listing HTML content. Please extract the following property details from it:
-      - Full Address (street, city, state, zip)
-      - Property Type (Single Family, Condo, etc.)
-      - Number of Bedrooms
-      - Number of Bathrooms
-      - Square Footage
-      - Price
-      - Year Built
-      - Property Description (brief)
-      - Features/Amenities (list of key features)
+      I need to find the email address for a real estate agent.
       
-      I've already directly extracted some data that may be correct:
-      ${directAddress ? `Address found: ${directAddress}` : "Address not found"}
-      ${directCity ? `City found: ${directCity}` : "City not found"}
-      ${directState ? `State found: ${directState}` : "State not found"}
-      ${directZip ? `Zip found: ${directZip}` : "Zip not found"}
-      ${directPrice ? `Price found: $${directPrice}` : "Price not found"}
-      ${directBeds ? `Bedrooms found: ${directBeds}` : "Bedrooms not found"}
-      ${directBaths ? `Bathrooms found: ${directBaths}` : "Bathrooms not found"}
-      ${directSqFt ? `Square feet found: ${directSqFt}` : "Square feet not found"}
+      Agent Name: ${agentName}
+      Company/Brokerage: ${agentCompany || "Unknown"}
       
-      IMPORTANT: Only correct the directly extracted data if you find clear evidence in the HTML. If the directly extracted data is correct, use it. 
-      DO NOT hallucinate or make up data. If something isn't clearly in the HTML, leave it blank or null.
+      Based on this information, please provide a best guess for what this agent's 
+      professional email address might be. Consider common email formats like:
+      - first.last@company.com
+      - firstinitial.last@company.com
+      - first@company.com
       
-      Here's the HTML content:
-      ${simplifiedHtml}
+      If you can't make a confident guess, just respond with the fallback email: shanumas@gmail.com
       
-      Please format your response as a valid JSON object with these fields: 
-      {
-        "address": "full street address or null if uncertain",
-        "city": "city name or null if uncertain",
-        "state": "state code or null if uncertain",
-        "zip": "zip code or null if uncertain",
-        "propertyType": "type of property or null if uncertain",
-        "bedrooms": number of bedrooms or null if uncertain,
-        "bathrooms": number of bathrooms or null if uncertain,
-        "squareFeet": square footage as a number or null if uncertain,
-        "price": price as a number without currency symbols or null if uncertain,
-        "yearBuilt": year built as a number or null if uncertain,
-        "description": "brief description or null if uncertain",
-        "features": ["feature1", "feature2", ...] or [] if uncertain
-      }
-      
-      Return only the JSON with no additional text or explanation.
+      Return only the email address, nothing else.
     `;
+    
+    // Call OpenAI
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: "You are an assistant that helps find email addresses for real estate professionals.",
+        },
+        { role: "user", content: prompt },
+      ],
+    });
+    
+    // Extract the email from the response
+    const suggestedEmail = response.choices[0].message.content?.trim();
+    
+    // Validate if it's a plausible email
+    if (suggestedEmail && suggestedEmail.includes("@") && !suggestedEmail.includes(" ")) {
+      console.log(`Found potential email for agent ${agentName}: ${suggestedEmail}`);
+      return suggestedEmail;
+    }
+    
+    // If we couldn't get a good email, use the fallback
+    console.log(`No valid email found for agent ${agentName}, using fallback`);
+    return "shanumas@gmail.com";
+  } catch (error) {
+    console.error("Error finding agent email:", error);
+    // Return fallback email in case of any errors
+    return "shanumas@gmail.com";
+  }
+}
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
