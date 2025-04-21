@@ -22,7 +22,7 @@ export async function scrapePropertyListing(
       num: 5,
     },
   });
-  const realtorUrl = serpRes.data.organic_results.find((r) =>
+  const realtorUrl = serpRes.data.organic_results.find((r: { link: string }) =>
     r.link.includes("/realestateandhomes-detail"),
   ).link;
 
