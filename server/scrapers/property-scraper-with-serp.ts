@@ -230,11 +230,11 @@ export async function scrapePropertyListing(
                 
                 Format as JSON with these fields:
                 {
-                  "sellerName": "agent's name",
-                  "sellerPhone": "agent's phone",
-                  "sellerEmail": "agent's email",
-                  "sellerCompany": "agent's company",
-                  "sellerLicenseNo": "license number"
+                  "listingAgentName": "agent's full name",
+                  "listingAgentPhone": "agent's phone number",
+                  "listingAgentEmail": "agent's email address",
+                  "listingAgentCompany": "agent's brokerage/company",
+                  "listingAgentLicenseNo": "agent's license number"
                 }
                 
                 If a field can't be determined, use null.
@@ -325,11 +325,11 @@ export async function scrapePropertyListing(
             "yearBuilt": year built as number,
             "description": "brief description",
             "features": ["feature1", "feature2", ...],
-            "sellerName": "agent's name",
-            "sellerPhone": "agent's phone",
-            "sellerEmail": "agent's email",
-            "sellerCompany": "agent's company",
-            "sellerLicenseNo": "license number"
+            "listingAgentName": "agent's full name",
+            "listingAgentPhone": "agent's phone number",
+            "listingAgentEmail": "agent's email address",
+            "listingAgentCompany": "agent's brokerage/company",
+            "listingAgentLicenseNo": "agent's license number"
           }
           
           If a field can't be determined, use null.
@@ -353,11 +353,11 @@ export async function scrapePropertyListing(
         
         // Merge with previous data, prioritizing HTML extraction results
         propertyData = { ...propertyData, ...htmlData };
-        if (htmlData.sellerName) agentData.sellerName = htmlData.sellerName;
-        if (htmlData.sellerPhone) agentData.sellerPhone = htmlData.sellerPhone;
-        if (htmlData.sellerEmail) agentData.sellerEmail = htmlData.sellerEmail;
-        if (htmlData.sellerCompany) agentData.sellerCompany = htmlData.sellerCompany;
-        if (htmlData.sellerLicenseNo) agentData.sellerLicenseNo = htmlData.sellerLicenseNo;
+        if (htmlData.listingAgentName) agentData.listingAgentName = htmlData.listingAgentName;
+        if (htmlData.listingAgentPhone) agentData.listingAgentPhone = htmlData.listingAgentPhone;
+        if (htmlData.listingAgentEmail) agentData.listingAgentEmail = htmlData.listingAgentEmail;
+        if (htmlData.listingAgentCompany) agentData.listingAgentCompany = htmlData.listingAgentCompany;
+        if (htmlData.listingAgentLicenseNo) agentData.listingAgentLicenseNo = htmlData.listingAgentLicenseNo;
         
       } catch (error) {
         console.error("Error fetching URL content:", error);
@@ -376,19 +376,19 @@ export async function scrapePropertyListing(
     }
 
     // ===== STEP 5: Find agent email if not available =====
-    if (!agentData.sellerEmail && agentData.sellerName) {
-      console.log("No seller email found, searching web for agent email...");
+    if (!agentData.listingAgentEmail && agentData.listingAgentName) {
+      console.log("No listing agent email found, searching web for agent email...");
       // Use property location in the search (from city and state if available)
       const location = propertyData.city && propertyData.state ? 
                       `${propertyData.city} ${propertyData.state}` : 
                       (cityFromUrl && stateFromUrl ? `${cityFromUrl} ${stateFromUrl}` : "");
       
-      agentData.sellerEmail = await findAgentEmailFromWeb(
-        agentData.sellerName, 
-        agentData.sellerCompany,
+      agentData.listingAgentEmail = await findAgentEmailFromWeb(
+        agentData.listingAgentName, 
+        agentData.listingAgentCompany,
         location
       );
-    } else if (!agentData.sellerEmail) {
+    } else if (!agentData.listingAgentEmail) {
       console.log("No agent information available, unable to determine email");
       // Leave as undefined/null rather than using hardcoded fallback
     }
