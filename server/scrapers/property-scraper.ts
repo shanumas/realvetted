@@ -65,11 +65,36 @@ export async function scrapePropertyListing(
       }
     }
     
+    // First, fetch the HTML content from the URL
+    console.log(`Fetching HTML content from: ${url}`);
+    let htmlContent = "";
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml'
+        },
+        timeout: 10000
+      });
+      htmlContent = response.data;
+      console.log(`Successfully fetched HTML content (${htmlContent.length} bytes)`);
+    } catch (error) {
+      console.error(`Error fetching URL content: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.log("Proceeding with URL-only analysis as fallback");
+    }
+    
+    // Create appropriate heading based on whether we have HTML content
+    const headingText = htmlContent 
+      ? "I have a real estate listing HTML content to analyze." 
+      : "I have a real estate listing URL. Please extract as much information as possible based on the URL pattern.";
+    
     // Single API call to OpenAI to extract all property data
     const prompt = `
-      I have a real estate listing URL. Please extract as much information as possible about this property listing.
+      ${headingText}
       
       URL: ${url}
+      
+      ${htmlContent ? `HTML Content (first 15000 chars): ${htmlContent.substring(0, 15000)}...` : ""}
       
       Based on the URL format, I've already extracted some potential information:
       ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
@@ -100,6 +125,7 @@ export async function scrapePropertyListing(
       - If you can't determine certain fields with reasonable confidence, leave them as null.
       - For the agent's email, if you can't find it, that's okay. We'll use a fallback.
       - This information is being used for a real estate application, so accuracy is important.
+      - ANALYZE THE HTML CONTENT to extract the real data, don't just use the URL pattern.
       
       Format as JSON with these fields:
       {
