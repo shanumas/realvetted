@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
-import { extractPropertyWithDirectScraping } from "./scrapers/direct-html-scraper";
+import { extractPropertyWithPuppeteer } from "./scrapers/puppeteer-direct-scraper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
@@ -10,7 +10,8 @@ const openai = new OpenAI({
 /**
  * Extract property data from a URL
  * 
- * This function uses direct scraping with Puppeteer to extract property data from any real estate listing URL
+ * This function uses direct scraping with an enhanced Puppeteer setup to extract property data 
+ * from any real estate listing URL, with specific handling for popular sites like Realtor.com, Zillow, etc.
  * 
  * @param url The URL of the property listing
  * @returns The extracted property data
@@ -28,18 +29,12 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
-    // Check for required API key
-    if (!process.env.OPENAI_API_KEY) {
-      console.log("OpenAI API key is missing. Cannot extract property data.");
-      throw new Error("OpenAI API key is required for property data extraction");
-    }
-
-    // Use direct scraping with Puppeteer to extract data from any real estate listing
-    console.log(`Using direct scraping with Puppeteer for URL: ${url}`);
+    // Use enhanced Puppeteer scraping with anti-detection measures
+    console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
     try {
-      return await extractPropertyWithDirectScraping(url);
+      return await extractPropertyWithPuppeteer(url);
     } catch (error) {
-      console.error("Direct scraping failed:", error);
+      console.error("Enhanced Puppeteer scraping failed:", error);
       
       // Fallback method: URL analysis with OpenAI if scraping fails
       console.log("Falling back to URL analysis");

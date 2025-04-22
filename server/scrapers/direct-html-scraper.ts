@@ -25,7 +25,7 @@ export async function extractPropertyWithDirectScraping(
     // Launch a headless browser using system-installed Chromium
     browser = await puppeteer.launch({
       headless: "new",
-      executablePath: '/nix/store/9jwnd3s4gxvkhnj7prxmxzryhcg8hr5r-chromium-118.0.5993.70/bin/chromium',
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
