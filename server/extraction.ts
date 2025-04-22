@@ -51,14 +51,14 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
         // For monetary or measurement values, keep decimal points but remove currency symbols, commas, etc.
         cleanedValue = value.replace(/[^0-9.]/g, "");
       } else if (field === "bathrooms") {
-        // Special handling for bathrooms which might be in format like "2 1/2"
+        // Special handling for bathrooms which might be in various fractional formats
         if (value.includes("/")) {
-          // Handle fractions like "2 1/2" baths
-          const match = value.match(/(\d+)\s*(\d+)\/(\d+)/);
-          if (match) {
-            const whole = parseInt(match[1]);
-            const numerator = parseInt(match[2]);
-            const denominator = parseInt(match[3]);
+          // Handle fractions with space or dash format: "2 1/2" or "2-1/2"
+          const fractionMatch = value.match(/(\d+)[\s\-]*(\d+)\/(\d+)/);
+          if (fractionMatch) {
+            const whole = parseInt(fractionMatch[1]);
+            const numerator = parseInt(fractionMatch[2]);
+            const denominator = parseInt(fractionMatch[3]);
             if (denominator > 0) {
               const result = whole + (numerator / denominator);
               _.set(normalizedData, field, result);
@@ -66,7 +66,18 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
             }
           }
         }
-        // Standard decimal handling if no fraction was found
+        // Handle text format like "2bath1half"
+        else if (value.includes("bath") && value.includes("half")) {
+          const textMatch = value.match(/(\d+)bath(\d+)half/i);
+          if (textMatch) {
+            const whole = parseInt(textMatch[1]);
+            const half = parseInt(textMatch[2]);
+            const result = whole + (half * 0.5);
+            _.set(normalizedData, field, result);
+            return;
+          }
+        }
+        // Standard decimal handling if no special format was found
         cleanedValue = value.replace(/[^0-9.]/g, "");
       } else {
         // For integer values like bedrooms, etc.

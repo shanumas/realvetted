@@ -12,6 +12,7 @@ import puppeteer, { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
 import _ from "lodash";
+import randomUseragent from "random-useragent";
 
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
@@ -27,12 +28,14 @@ export async function extractPropertyWithPuppeteer(
     // Prepare the page with anti-bot measures
     await prepPage(listingPage);
 
-    const UA = _.sample([
+    const UAs = [
       "Mozilla/5.0 … Chrome/125.0.0.0 Safari/537.36",
       "Mozilla/5.0 … Edg/125.0.0.0",
       "Mozilla/5.0 … Firefox/125.0",
-    ]);
-    await listingPage.setUserAgent(UA);
+    ];
+    const UA = UAs[Math.floor(Math.random() * UAs.length)];
+
+    await listingPage.setUserAgent(randomUseragent.getRandom()); // each run → fresh, realistic desktop UA
 
     // Navigate to the URL
     await listingPage.goto(url, {
