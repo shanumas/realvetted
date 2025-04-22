@@ -750,6 +750,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to strip license prefixes
+  function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
+    if (!licenseNo) return licenseNo;
+    
+    // Remove any prefix like "DRE", "DRE #", "CalDRE", etc. and keep only the numbers
+    return licenseNo.replace(/^(DRE\s*#?|CalDRE\s*#?|Lic\.|License|BRE\s*#?)\s*/i, "").trim();
+  }
+
   // Property routes
   app.post(
     "/api/properties",
@@ -757,6 +765,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     hasRole(["buyer"]),
     async (req, res) => {
       try {
+        // Clean up license numbers before validation
+        if (req.body.sellerLicenseNo) {
+          req.body.sellerLicenseNo = cleanLicenseNumber(req.body.sellerLicenseNo);
+        }
+        if (req.body.listingAgentLicenseNo) {
+          req.body.listingAgentLicenseNo = cleanLicenseNumber(req.body.listingAgentLicenseNo);
+        }
+        
+        // Convert numeric fields to numbers if they're strings
+        ['price', 'bedrooms', 'bathrooms', 'squareFeet', 'yearBuilt'].forEach(field => {
+          if (typeof req.body[field] === 'string' && req.body[field]) {
+            req.body[field] = Number(req.body[field]);
+          }
+        });
+        
         const propertyData = propertySchema.parse({
           ...req.body,
           createdBy: req.user.id,
