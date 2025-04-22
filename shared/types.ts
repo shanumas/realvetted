@@ -23,6 +23,7 @@ export interface PropertyAIData {
   sellerCompany?: string; // Real estate company of the seller/listing agent
   sellerLicenseNo?: string; // License number of the seller/listing agent
   // Enhanced listing agent information
+  listedby?: string;
   listingAgentName?: string; // Name of the listing agent
   listingAgentEmail?: string; // Email of the listing agent
   listingAgentPhone?: string; // Phone number of the listing agent

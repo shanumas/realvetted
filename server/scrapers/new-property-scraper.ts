@@ -30,16 +30,30 @@ export async function extractPropertyWithSerpApi(
 
     // Step 3: Search for agent email if we have agent name
     // We'll search even if we don't have the company name to increase chances of finding email
-    if (extractedData.listingAgentName) {
-      console.log("Found agent name, searching for email:", extractedData.listingAgentName);
+    // Use either specific agent name or listedby field for email search
+    let agentInfo = extractedData.listingAgentName;
+    
+    // If no specific agent name but we have some form of listing info, use that
+    if ((!agentInfo || agentInfo.trim() === '') && extractedData.listedby && extractedData.listedby.trim() !== '') {
+      agentInfo = extractedData.listedby;
       
-      const agentEmail = await findAgentEmail(
-        extractedData.listingAgentName,
-        extractedData.listingAgentCompany || "",
-        extractedData.listingAgentPhone,
-        extractedData.listingAgentLicenseNo,
-      );
-
+      // If agent name not already populated, try to extract it from listedby
+      if (!extractedData.listingAgentName || extractedData.listingAgentName.trim() === '') {
+        // Basic extraction - try to get a name from the listedby field
+        const words = extractedData.listedby.split(' ');
+        if (words.length >= 2) {
+          extractedData.listingAgentName = `${words[0]} ${words[1]}`;
+        } else {
+          extractedData.listingAgentName = extractedData.listedby;
+        }
+      }
+    }
+    
+    // Proceed with email search if we have any agent information
+    if (agentInfo && agentInfo.trim() !== '') {
+      console.log("Found agent information, searching for email:", agentInfo);
+      const agentEmail = await findAgentEmail(agentInfo);
+      
       if (agentEmail) {
         console.log("Found agent email:", agentEmail);
         extractedData.listingAgentEmail = agentEmail;
@@ -47,7 +61,7 @@ export async function extractPropertyWithSerpApi(
         console.log("No agent email found");
       }
     } else {
-      console.log("No agent name found, skipping email search");
+      console.log("No agent information found, skipping email search");
     }
 
     return extractedData;
@@ -137,31 +151,66 @@ ${snippets}
 Be as detailed as possible, but do not make up information that is not present in the data.
 If a data point is not available, use null or empty string.
 
-Carefully look for listing agent information, which often appears as "Listed by: [Agent Name]" or similar patterns.
-When extracting agent details, be sure to separate the agent's name from their license number (often formatted as "DRE #XXXXXXXX") and phone number.
+IMPORTANT - AGENT INFORMATION EXTRACTION:
+1. Look very carefully for any real estate agent information in the data using multiple pattern recognition approaches.
+2. Agent information might appear in various formats:
+   - "Listed by: [Agent Name]"
+   - "Listing Agent: [Agent Name]"
+   - "Contact: [Agent Name]"
+   - "[Agent Name] with [Company]"
+   - Any section that mentions an agent's name followed by a phone number, license number, or company name
 
-Extract the following fields:
-- address: Full property address
-- city: City name
-- state: State or province
-- zip: ZIP/Postal code
-- propertyType: Type of property (e.g., Single Family, Condo, etc.)
-- bedrooms: Number of bedrooms (as a string, e.g. "3" or "4.5")
-- bathrooms: Number of bathrooms (as a string, e.g. "2" or "2.5")
-- squareFeet: Square footage (as a string, e.g. "1500")
-- price: Price as a string with $ (e.g. "$750,000")
-- yearBuilt: Year the property was built (as a string, e.g. "1998")
-- description: Property description
-- features: Array of property features
-- listingAgentName: Name of listing agent (e.g., "Gary J. Snow" from "Listed by: Gary J. Snow DRE #01452902")
-- listingAgentPhone: Phone number of listing agent (e.g., "415-601-5223")
-- listingAgentCompany: Real estate company (e.g., "Vantage Realty")
-- listingAgentLicenseNo: License number if available (e.g., "DRE #01452902" or just "01452902")
+3. Scan the entire content for patterns that might indicate an agent:
+   - A person's name followed by a phone number
+   - A person's name followed by "DRE" or any license number format
+   - A person's name associated with real estate companies like "Realty", "Properties", "Homes", etc.
+   - A person's name followed by "REALTOR" or "agent" or "broker"
 
-Example agent information that might appear:
+4. Even if you only find partial agent information (e.g., just a name), extract it rather than returning an empty field.
+
+Return valid JSON with these fields:
+
+address: Full property address
+
+city: City
+
+state: State or province
+
+zip: ZIP/postal code
+
+propertyType: e.g., "Single Family", "Condo"
+
+bedrooms: e.g., "3"
+
+bathrooms: e.g., "2.5"
+
+squareFeet: e.g., "1500"
+
+price: e.g., "$750,000"
+
+yearBuilt: e.g., "1998"
+
+description: Full property description
+
+features: Array of features
+
+listedby: Full details of the listing agent (include everything you find about the agent)
+
+listingAgentName: Just the agent's name without titles or other details
+
+listingAgentPhone: Agent's phone number
+
+listingAgentCompany: Real estate company name
+
+listingAgentLicenseNo: Agent's license number (e.g. "01452902" without "DRE #")
+
+Example agent information formats that might appear:
 "Listed by: Gary J. Snow DRE #01452902 415-601-5223, Vantage Realty 415-846-4685"
+"Contact John Smith at 555-123-4567 for more information"
+"Jane Doe | XYZ Realty | License# 12345"
+"Property represented by Bob Johnson (415-555-1234)"
 
-Return only valid JSON.`,
+Return only the JSON.`,
         },
         {
           role: "user",
@@ -190,6 +239,7 @@ Return only valid JSON.`,
       yearBuilt: extractedData.yearBuilt || "",
       description: extractedData.description || "No description available",
       features: extractedData.features || [],
+      listedby: extractedData.listedby || "",
       listingAgentName: extractedData.listingAgentName || "",
       listingAgentPhone: extractedData.listingAgentPhone || "",
       listingAgentCompany: extractedData.listingAgentCompany || "",
@@ -208,7 +258,7 @@ Return only valid JSON.`,
 
 /**
  * Use OpenAI to select the best email from multiple options
- * 
+ *
  * @param emails Array of email addresses found
  * @param agentName Name of the agent
  * @param agentCompany Company of the agent
@@ -218,36 +268,41 @@ Return only valid JSON.`,
  */
 async function selectBestEmail(
   emails: string[],
-  agentName: string,
-  agentCompany: string,
-  agentPhone?: string,
-  agentLicense?: string
+  listedby: string,
 ): Promise<string> {
   try {
-    console.log(`Selecting best email from ${emails.length} options for ${agentName} at ${agentCompany}`);
-    
+    console.log(
+      `Selecting best email from ${emails.length} options for ${listedby}`,
+    );
+
     // Prepare the email options with analysis
-    const emailOptions = emails.map(email => {
+    const emailOptions = emails.map((email) => {
       // Do some basic analysis on each email
-      const nameParts = agentName.toLowerCase().split(' ');
-      const firstInitial = nameParts[0]?.[0] || '';
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts[nameParts.length - 1] || '';
-      
-      const hasFirstName = email.toLowerCase().includes(firstName.toLowerCase());
+      const nameParts = listedby.toLowerCase().split(" ");
+      const firstInitial = nameParts[0]?.[0] || "";
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts[nameParts.length - 1] || "";
+
+      const hasFirstName = email
+        .toLowerCase()
+        .includes(firstName.toLowerCase());
       const hasLastName = email.toLowerCase().includes(lastName.toLowerCase());
-      const hasInitial = email.toLowerCase().includes(firstInitial.toLowerCase());
-      const hasCompanyDomain = email.toLowerCase().includes(agentCompany.toLowerCase().replace(/\s+/g, ''));
-      
+      const hasInitial = email
+        .toLowerCase()
+        .includes(firstInitial.toLowerCase());
+      const hasCompanyDomain = email
+        .toLowerCase()
+        .includes(listedby.toLowerCase().replace(/\s+/g, ""));
+
       return {
         email,
         hasFirstName,
         hasLastName,
         hasInitial,
-        hasCompanyDomain
+        hasCompanyDomain,
       };
     });
-    
+
     // Use OpenAI to analyze and choose the best email
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -256,31 +311,33 @@ async function selectBestEmail(
           role: "system",
           content: `You are an AI assistant that specializes in analyzing and selecting the correct email address for real estate agents.
 Given a set of email addresses found from web searches, select the most likely correct email for the specific real estate agent.
-Return only the email address (no explanation).`
+Return only the email address (no explanation).`,
         },
         {
           role: "user",
           content: `I need to find the correct email address for a real estate agent with these details:
-- Name: ${agentName}
-- Company: ${agentCompany}
-${agentPhone ? `- Phone: ${agentPhone}` : ''}
-${agentLicense ? `- License: ${agentLicense}` : ''}
+- ${listedby}
 
 These email addresses were found in search results:
-${emailOptions.map(option => 
-  `- ${option.email} (Contains first name: ${option.hasFirstName}, Contains last name: ${option.hasLastName}, Contains initial: ${option.hasInitial}, Contains company domain: ${option.hasCompanyDomain})`
-).join('\n')}
+${emailOptions
+  .map(
+    (option) =>
+      `- ${option.email} (Contains first name: ${option.hasFirstName}, Contains last name: ${option.hasLastName}, Contains initial: ${option.hasInitial}, Contains company domain: ${option.hasCompanyDomain})`,
+  )
+  .join("\n")}
 
-Which email is most likely the correct one for this agent? Select exactly one email address from the list.`
-        }
-      ]
+Which email is most likely the correct one for this agent? Select exactly one email address from the list.`,
+        },
+      ],
     });
 
-    const selectedEmail = response.choices[0].message.content?.trim() || emails[0];
-    
+    const selectedEmail =
+      response.choices[0].message.content?.trim() || emails[0];
+
     // Make sure we return an actual email from our list
-    const validatedEmail = emails.find(email => selectedEmail.includes(email)) || emails[0];
-    
+    const validatedEmail =
+      emails.find((email) => selectedEmail.includes(email)) || emails[0];
+
     console.log(`OpenAI selected email: ${validatedEmail}`);
     return validatedEmail;
   } catch (error) {
@@ -298,22 +355,11 @@ Which email is most likely the correct one for this agent? Select exactly one em
  * @param listingAgentLicenseNo License number of the agent (optional)
  * @returns The agent's email address if found, otherwise empty string
  */
-async function findAgentEmail(
-  agentName: string,
-  agentCompany: string,
-  listingAgentPhone: string | undefined,
-  listingAgentLicenseNo: string | undefined,
-): Promise<string> {
+async function findAgentEmail(listedby: string | ""): Promise<string> {
   try {
-    console.log(
-      "Finding agent email using SerpAPI for:",
-      agentName,
-      agentCompany,
-      listingAgentPhone,
-      listingAgentLicenseNo,
-    );
+    console.log("Finding agent email using SerpAPI for:", listedby);
     // Craft a specific search query to find the agent's email
-    const searchQuery = `${agentName} ${agentCompany} "real estate agent" "email" contact ${listingAgentPhone || ''} ${listingAgentLicenseNo || ''}`;
+    const searchQuery = `${listedby} "real estate agent" "email" contact"}`;
 
     // Make the SerpAPI request
     const response = await axios.get("https://serpapi.com/search.json", {
@@ -327,17 +373,21 @@ async function findAgentEmail(
 
     // Extract the relevant information from the search results
     const organicResults = response.data.organic_results || [];
-    console.log(`Found ${organicResults.length} organic results for agent email search`);
-    
+    console.log(
+      `Found ${organicResults.length} organic results for agent email search`,
+    );
+
     // Combine titles and snippets for more thorough email extraction
     const potentialEmailSources = organicResults
-      .map((r: any) => `${r.title || ''} ${r.snippet || ''}`)
+      .map((r: any) => `${r.title || ""} ${r.snippet || ""}`)
       .join(" ");
-    
+
     // Log a portion of the search results for debugging
-    console.log("Potential email sources (truncated):", 
-      potentialEmailSources.substring(0, 200) + 
-      (potentialEmailSources.length > 200 ? "..." : ""));
+    console.log(
+      "Potential email sources (truncated):",
+      potentialEmailSources.substring(0, 200) +
+        (potentialEmailSources.length > 200 ? "..." : ""),
+    );
 
     // Use a regex pattern to find email addresses in the text
     const emailPattern = /[\w.+-]+@[\w.-]+\.\w+/g;
@@ -347,16 +397,12 @@ async function findAgentEmail(
 
     // If multiple emails are found, use OpenAI to pick the best one
     if (emailMatches.length > 1) {
-      console.log("Multiple emails found, using OpenAI to select the most appropriate one");
-      return await selectBestEmail(
-        emailMatches,
-        agentName,
-        agentCompany,
-        listingAgentPhone,
-        listingAgentLicenseNo
+      console.log(
+        "Multiple emails found, using OpenAI to select the most appropriate one",
       );
+      return await selectBestEmail(emailMatches, listedby);
     }
-    
+
     // Return the first found email, or empty string if none found
     return emailMatches.length > 0 ? emailMatches[0] : "";
   } catch (error) {
