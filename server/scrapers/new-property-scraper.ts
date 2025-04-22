@@ -207,10 +207,95 @@ Return only valid JSON.`,
 }
 
 /**
+ * Use OpenAI to select the best email from multiple options
+ * 
+ * @param emails Array of email addresses found
+ * @param agentName Name of the agent
+ * @param agentCompany Company of the agent
+ * @param agentPhone Phone number of the agent (optional)
+ * @param agentLicense License number of the agent (optional)
+ * @returns The most likely correct email for the agent
+ */
+async function selectBestEmail(
+  emails: string[],
+  agentName: string,
+  agentCompany: string,
+  agentPhone?: string,
+  agentLicense?: string
+): Promise<string> {
+  try {
+    console.log(`Selecting best email from ${emails.length} options for ${agentName} at ${agentCompany}`);
+    
+    // Prepare the email options with analysis
+    const emailOptions = emails.map(email => {
+      // Do some basic analysis on each email
+      const nameParts = agentName.toLowerCase().split(' ');
+      const firstInitial = nameParts[0]?.[0] || '';
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts[nameParts.length - 1] || '';
+      
+      const hasFirstName = email.toLowerCase().includes(firstName.toLowerCase());
+      const hasLastName = email.toLowerCase().includes(lastName.toLowerCase());
+      const hasInitial = email.toLowerCase().includes(firstInitial.toLowerCase());
+      const hasCompanyDomain = email.toLowerCase().includes(agentCompany.toLowerCase().replace(/\s+/g, ''));
+      
+      return {
+        email,
+        hasFirstName,
+        hasLastName,
+        hasInitial,
+        hasCompanyDomain
+      };
+    });
+    
+    // Use OpenAI to analyze and choose the best email
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: `You are an AI assistant that specializes in analyzing and selecting the correct email address for real estate agents.
+Given a set of email addresses found from web searches, select the most likely correct email for the specific real estate agent.
+Return only the email address (no explanation).`
+        },
+        {
+          role: "user",
+          content: `I need to find the correct email address for a real estate agent with these details:
+- Name: ${agentName}
+- Company: ${agentCompany}
+${agentPhone ? `- Phone: ${agentPhone}` : ''}
+${agentLicense ? `- License: ${agentLicense}` : ''}
+
+These email addresses were found in search results:
+${emailOptions.map(option => 
+  `- ${option.email} (Contains first name: ${option.hasFirstName}, Contains last name: ${option.hasLastName}, Contains initial: ${option.hasInitial}, Contains company domain: ${option.hasCompanyDomain})`
+).join('\n')}
+
+Which email is most likely the correct one for this agent? Select exactly one email address from the list.`
+        }
+      ]
+    });
+
+    const selectedEmail = response.choices[0].message.content?.trim() || emails[0];
+    
+    // Make sure we return an actual email from our list
+    const validatedEmail = emails.find(email => selectedEmail.includes(email)) || emails[0];
+    
+    console.log(`OpenAI selected email: ${validatedEmail}`);
+    return validatedEmail;
+  } catch (error) {
+    console.error("Error selecting best email:", error);
+    return emails[0]; // Fallback to first email if OpenAI selection fails
+  }
+}
+
+/**
  * Find an agent's email using SerpAPI
  *
  * @param agentName The name of the real estate agent
  * @param agentCompany The name of the real estate company
+ * @param listingAgentPhone Phone number of the agent (optional)
+ * @param listingAgentLicenseNo License number of the agent (optional)
  * @returns The agent's email address if found, otherwise empty string
  */
 async function findAgentEmail(
@@ -260,6 +345,18 @@ async function findAgentEmail(
 
     console.log(emailMatches);
 
+    // If multiple emails are found, use OpenAI to pick the best one
+    if (emailMatches.length > 1) {
+      console.log("Multiple emails found, using OpenAI to select the most appropriate one");
+      return await selectBestEmail(
+        emailMatches,
+        agentName,
+        agentCompany,
+        listingAgentPhone,
+        listingAgentLicenseNo
+      );
+    }
+    
     // Return the first found email, or empty string if none found
     return emailMatches.length > 0 ? emailMatches[0] : "";
   } catch (error) {
