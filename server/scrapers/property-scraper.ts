@@ -39,7 +39,13 @@ export async function scrapePropertyListing(
 async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: [
+      "--no-sandbox", 
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--disable-gpu"
+    ]
   });
 
   try {
@@ -102,7 +108,13 @@ async function scrapeZillowListing(url: string): Promise<PropertyAIData> {
 async function scrapeGenericListing(url: string): Promise<PropertyAIData> {
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: [
+      "--no-sandbox", 
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--disable-gpu"
+    ]
   });
 
   try {
@@ -329,7 +341,13 @@ async function findAgentEmailFromWeb(
     // Use a simple browser to search
     const browser = await puppeteer.launch({
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox", 
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu"
+      ]
     });
 
     try {
