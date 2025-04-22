@@ -8,8 +8,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Flag to control whether to use SerpAPI as a preliminary step
-const USE_SERPAPI_PRELIMINARY_STEP = true;
+// Configuration for extraction methods
+const EXTRACTION_CONFIG = {
+  USE_SERPAPI_PRELIMINARY_STEP: true, // Use SerpAPI to get Realtor.com URLs
+  SERPAPI_TIMEOUT_MS: 15000,          // Timeout for SerpAPI requests (15 seconds)
+  MAX_EXTRACTION_ATTEMPTS: 2,         // Maximum number of extraction attempts with different methods
+  EXTRACTION_TIMEOUT_MS: 30000        // Overall extraction timeout (30 seconds)
+};
 
 /**
  * Extract property data from a URL
@@ -35,11 +40,23 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
+    // Track extraction method for metadata
+    let extractionMethod = "direct";
+    let startTime = Date.now();
+    
     // Step 1: For Zillow and other heavily protected sites, try to get a Realtor.com URL first
-    if (USE_SERPAPI_PRELIMINARY_STEP && shouldUseSerpApi(url)) {
+    if (EXTRACTION_CONFIG.USE_SERPAPI_PRELIMINARY_STEP && shouldUseSerpApi(url)) {
       console.log(`Using SerpAPI to find a Realtor.com URL for: ${url}`);
+      
       try {
-        const realtorUrl = await getRealtorUrlFromAnyRealEstateUrl(url);
+        // Set a timeout for the SerpAPI request
+        const serpApiPromise = getRealtorUrlFromAnyRealEstateUrl(url);
+        const timeoutPromise = new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error("SerpAPI request timed out")), 
+          EXTRACTION_CONFIG.SERPAPI_TIMEOUT_MS));
+        
+        // Race the SerpAPI request against the timeout
+        const realtorUrl = await Promise.race([serpApiPromise, timeoutPromise]);
         
         if (realtorUrl) {
           console.log(`✅ Found Realtor.com equivalent URL: ${realtorUrl}`);
@@ -49,11 +66,17 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
             // Try to extract from Realtor.com URL
             const propertyData = await extractPropertyWithPuppeteer(realtorUrl);
             
-            // Add original URL as the source
+            // Set extraction metadata
+            extractionMethod = "serpapi+direct";
+            
+            // Add original URL as the source and include metadata
             return {
               ...propertyData,
-              propertyUrl: url, // Keep the original URL as the source
-              _realtorUrl: realtorUrl, // For debugging/tracking
+              propertyUrl: url, // Keep the original URL as the property source
+              _realtorUrl: realtorUrl, // Store the Realtor.com URL used
+              _extractionMethod: extractionMethod,
+              _extractionTimestamp: new Date().toISOString(),
+              _extractionSource: url
             };
           } catch (realtorExtractionError) {
             console.error("Extraction from Realtor.com URL failed:", realtorExtractionError);
@@ -71,13 +94,29 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     // Step 2: Try direct extraction with Puppeteer (either on original URL or if SerpAPI failed)
     console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
     try {
-      return await extractPropertyWithPuppeteer(url);
+      const propertyData = await extractPropertyWithPuppeteer(url);
+      
+      // Add metadata to the result
+      return {
+        ...propertyData,
+        _extractionMethod: "direct",
+        _extractionTimestamp: new Date().toISOString(),
+        _extractionSource: url
+      };
     } catch (puppeteerError) {
       console.error("Enhanced Puppeteer scraping failed:", puppeteerError);
       
       // Step 3: Fallback to URL analysis with OpenAI if scraping fails
       console.log("Falling back to URL analysis");
-      return await extractFromUrlStructure(url);
+      const urlAnalysisData = await extractFromUrlStructure(url);
+      
+      // Add metadata to the result
+      return {
+        ...urlAnalysisData,
+        _extractionMethod: "url-analysis",
+        _extractionTimestamp: new Date().toISOString(),
+        _extractionSource: url
+      };
     }
   } catch (error) {
     console.error("Error in property URL extraction:", error);
@@ -108,7 +147,11 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       sellerCompany: "",
       sellerLicenseNo: "",
       sellerEmail: "",
-      listedby: ""
+      listedby: "",
+      // Add extraction metadata
+      _extractionMethod: "error",
+      _extractionTimestamp: new Date().toISOString(),
+      _extractionSource: url
     };
     
     return fallbackResult;

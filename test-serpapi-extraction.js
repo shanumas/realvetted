@@ -7,8 +7,8 @@
  * 3. The complete extraction flow works with the SerpAPI step
  */
 
-import { getRealtorUrlFromAnyRealEstateUrl } from './server/scrapers/serpapi-extractor.js';
-import { extractPropertyFromUrl } from './server/extraction.js';
+import { getRealtorUrlFromAnyRealEstateUrl } from './server/scrapers/serpapi-extractor.ts';
+import { extractPropertyFromUrl } from './server/extraction.ts';
 
 // Test URLs from different real estate sites
 const testUrls = [
