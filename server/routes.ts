@@ -9,9 +9,9 @@ import {
   verifyKYCDocuments,
   findAgentsForProperty,
   extractIDData,
-  extractPropertyFromUrl,
   validatePrequalificationDocument,
 } from "./openai";
+import { extractPropertyFromUrl } from "./extraction";
 import { sendTourRequestEmail, sendPrequalificationApprovalEmail } from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
