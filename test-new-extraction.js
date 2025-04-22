@@ -8,7 +8,7 @@ async function login() {
   try {
     // Login as a buyer to get authentication cookie
     const loginResponse = await axios.post('http://localhost:5000/api/auth/login', {
-      email: 'test@example.com',
+      email: '76@0.com',
       password: 'password'
     }, {
       withCredentials: true
