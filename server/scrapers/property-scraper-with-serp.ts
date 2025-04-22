@@ -67,35 +67,66 @@ export async function scrapePropertyListing(
   } catch (httpError) {
     console.error("Error during direct HTTP request:", httpError);
     
-    // Fallback to Puppeteer if direct HTTP request fails
-    console.log("Falling back to Puppeteer for fetching property page...");
+    // Try with a different user agent as fallback
+    console.log("Trying with alternate user agent...");
     try {
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-          "--no-sandbox", 
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--disable-gpu"
-        ]
-      });
-
-      const page = await browser.newPage();
-      await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-      await page.goto(realtorUrl, {
-        waitUntil: "domcontentloaded",
+      const response = await axios.get(realtorUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.google.com/',
+          'Cache-Control': 'max-age=0',
+          'Connection': 'keep-alive'
+        },
         timeout: 30000,
+        maxRedirects: 10
       });
-
-      // Get the page content
-      pageContent = await page.content();
-      await browser.close();
       
-      console.log("Successfully fetched property page using Puppeteer fallback");
-    } catch (puppeteerError) {
-      console.error("Error during Puppeteer fallback request:", puppeteerError);
-      throw new Error("Failed to fetch the property page using both direct HTTP and Puppeteer fallback.");
+      pageContent = response.data;
+      console.log("Successfully fetched property page with alternate user agent");
+    } catch (alternateError) {
+      console.error("Error with alternate user agent:", alternateError);
+      
+      // If both HTTP approaches fail, try Puppeteer as final fallback
+      console.log("Falling back to Puppeteer for fetching property page...");
+      try {
+        // Using older Puppeteer version configuration options
+        const browser = await puppeteer.launch({
+          headless: true,
+          args: [
+            "--no-sandbox", 
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--single-process",
+            "--no-zygote"
+          ]
+        });
+
+        const page = await browser.newPage();
+        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+        
+        // Add extra options to evade detection
+        await page.setExtraHTTPHeaders({
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.google.com/',
+        });
+        
+        // Navigate to the URL with increased timeout
+        await page.goto(realtorUrl, {
+          waitUntil: "domcontentloaded",
+          timeout: 60000,
+        });
+
+        // Get the page content
+        pageContent = await page.content();
+        await browser.close();
+        
+        console.log("Successfully fetched property page using Puppeteer final fallback");
+      } catch (puppeteerError) {
+        console.error("Error during Puppeteer fallback request:", puppeteerError);
+        throw new Error("Failed to fetch the property page using all available methods.");
+      }
     }
   }
 
