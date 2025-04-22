@@ -200,12 +200,7 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     // Common format: "Listed by: Jane Doe, Broker, (123) 456-7890, License #: ABC12345"
     if (listingAgentText) {
       // Extract agent name - typically follows "Listed by:" or is at the start
-      const nameMatch = listingAgentText.match(/Listed by:?\s*([^,]+)/i) || 
-                         listingAgentText.match(/^([^,]+)/i);
-      
-      if (nameMatch && nameMatch[1]) {
-        listingAgentName = nameMatch[1].trim();
-      }
+      listingAgentName = extractAgentName(listingAgentText);
       
       // Extract phone number
       const phoneMatch = listingAgentText.match(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
@@ -259,13 +254,40 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     // Zillow URLs often have the format: /homedetails/1234-Street-City-STATE-ZIP/
     const urlParts = zillowUrl.split('/');
     for (const part of urlParts) {
-      if (part.includes('-CA-') || part.includes('-NY-')) {  // Example for CA and NY
+      // Zillow URLs have the format: 122-N-Clark-Dr-Los-Angeles-CA-90048
+      // We need to extract the city name which could have multiple parts
+      if (part.includes('-CA-') || part.includes('-NY-') || part.includes('-FL-') || 
+          part.includes('-TX-') || part.includes('-IL-')) {
+        
         const addressParts = part.split('-');
         if (addressParts.length >= 3) {
-          // Last 3 parts are typically City-STATE-ZIP
-          city = cleanCityName(addressParts[addressParts.length - 3]);
-          state = addressParts[addressParts.length - 2];
-          zip = addressParts[addressParts.length - 1].split('/')[0]; // Remove trailing slash if present
+          // Get the state and zip which are typically last and second to last parts
+          const stateIndex = addressParts.findIndex(p => p.length === 2 && p.toUpperCase() === p);
+          
+          if (stateIndex > -1 && stateIndex < addressParts.length - 1) {
+            state = addressParts[stateIndex];
+            zip = addressParts[stateIndex + 1].split('/')[0];
+            
+            // City is everything between the street number and state
+            // Assume city starts after any parts with numbers or directionals
+            let cityStartIndex = 0;
+            
+            // Skip over the street number and directionals (like N, S, E, W)
+            for (let i = 0; i < stateIndex; i++) {
+              const part = addressParts[i];
+              if (
+                /\d/.test(part) || // Has a number
+                /^[NSEW]$/.test(part) || // Is a directional
+                /^(Dr|St|Ave|Blvd|Lane|Road|Rd|Way|Ct|Circle|Cir|Place|Pl)$/i.test(part) // Is a street type
+              ) {
+                cityStartIndex = i + 1;
+              }
+            }
+            
+            // City components will be between the street and state
+            const cityComponents = addressParts.slice(cityStartIndex, stateIndex);
+            city = cityComponents.map(c => cleanCityName(c)).join(' ');
+          }
         }
       }
     }
@@ -495,6 +517,42 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     console.error('Error finding Zillow URL:', error.message || String(error));
     return null;
   }
+}
+
+/**
+ * Extract agent name from a listing agent text that might contain other information
+ * @param agentText The text that contains agent information
+ * @returns Cleaned agent name or empty string if not found
+ */
+function extractAgentName(agentText: string): string {
+  if (!agentText) return '';
+  
+  // Pattern 1: Explicit "Listed by: Agent Name" format
+  const listedByMatch = agentText.match(/Listed by:?\s*([^,]+)/i);
+  if (listedByMatch && listedByMatch[1]) {
+    return listedByMatch[1].trim();
+  }
+  
+  // Pattern 2: Name at start up to first comma or separator
+  const startMatch = agentText.match(/^([^,|:]+)/i);
+  if (startMatch && startMatch[1]) {
+    return startMatch[1].trim();
+  }
+  
+  // Pattern 3: Look for common name patterns (first name followed by last name)
+  // This is a more aggressive approach and might have false positives
+  const nameMatch = agentText.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/);
+  if (nameMatch && nameMatch[1]) {
+    return nameMatch[1].trim();
+  }
+  
+  // If we can't extract a clean name, return the first 30 characters 
+  // (better than nothing but will need manual cleanup)
+  if (agentText.length > 30) {
+    return agentText.substring(0, 30).trim() + '...';
+  }
+  
+  return agentText.trim();
 }
 
 /**
