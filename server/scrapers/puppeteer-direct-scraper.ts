@@ -11,6 +11,7 @@
 import puppeteer, { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
+import _ from "lodash";
 
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
@@ -22,95 +23,49 @@ export async function extractPropertyWithPuppeteer(
      *  1)  scrape listing page with anti-detection measures
      * -------------------------------------------------- */
     const listingPage = await browser.newPage();
-    
+
     // Prepare the page with anti-bot measures
     await prepPage(listingPage);
-    
-    // Rotate user agents
-    const userAgents = [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
-    ];
-    
-    await listingPage.setUserAgent(userAgents[Math.floor(Math.random() * userAgents.length)]);
-    
-    // Add a random delay before navigation to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-    
-    // Navigate with more options for real browser behavior
-    await listingPage.goto(url, {
-      waitUntil: "networkidle2", // More comprehensive page load waiting
-      timeout: 40_000, // Longer timeout for slower connections
-    });
-    
-    // Check for CAPTCHA/security challenges
-    const isCaptchaPresent = await listingPage.evaluate(() => {
-      const html = document.body.innerHTML.toLowerCase();
-      return (
-        html.includes('captcha') || 
-        html.includes('security check') || 
-        html.includes('verify you are a human') ||
-        html.includes('px-captcha') ||
-        html.includes('robot check') ||
-        document.querySelector('iframe[src*="captcha"]') !== null
-      );
-    });
-    
-    if (isCaptchaPresent) {
-      console.log("CAPTCHA detected - attempting to work around it...");
-      
-      // Try to bypass by performing more human-like interactions
-      // Random mouse movements
-      for (let i = 0; i < 5; i++) {
-        await listingPage.mouse.move(
-          100 + Math.random() * 700,
-          100 + Math.random() * 500
-        );
-        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
-      }
-      
-      // Try waiting longer to see if challenge resolves automatically
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      
-      // Refresh the page after some delay
-      await listingPage.reload({ waitUntil: "networkidle2" });
-      
-      // Check if still on CAPTCHA after attempts
-      const stillCaptcha = await listingPage.evaluate(() => {
-        return document.body.innerHTML.toLowerCase().includes('captcha');
-      });
-      
-      if (stillCaptcha) {
-        console.log("Unable to bypass CAPTCHA, falling back to URL analysis");
-        throw new Error("CAPTCHA blocking access");
-      }
-    }
-    
-    // Scroll like a human would
-    await autoScroll(listingPage);
 
-    // Get the final HTML content
+    const UA = _.sample([
+      "Mozilla/5.0 … Chrome/125.0.0.0 Safari/537.36",
+      "Mozilla/5.0 … Edg/125.0.0.0",
+      "Mozilla/5.0 … Firefox/125.0",
+    ]);
+    await listingPage.setUserAgent(UA);
+
+    // Navigate to the URL
+    await listingPage.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
+
+    // Wait for the content to load
+    await listingPage.waitForSelector("body", { timeout: 5000 });
+
+    // Extract the HTML content
     const html = await listingPage.content();
     const $ = cheerio.load(html);
+    const bodyH = $("body").html()?.trim() ?? ""; // markup inside <body>
+
+    console.log("2");
 
     /* --------------------------------------------------
      *  2)  parse core fields with extended selectors
      * -------------------------------------------------- */
-    let addressText = '';
-    
+    let addressText = "";
+
     // Try multiple address selectors for different sites
     const addressSelectors = [
-      '[data-testid*="address"]', 
-      'h1',
-      '.address',
+      '[data-testid*="address"]',
+      "h1",
+      ".address",
       '[data-testid="home-details-summary-headline"]',
-      '.property-header h1',
-      '.property-address',
-      '.listing-details-address'
+      ".property-header h1",
+      ".property-address",
+      ".listing-details-address",
     ];
-    
+
     for (const selector of addressSelectors) {
       const element = $(selector).first();
       if (element.length > 0) {
@@ -118,6 +73,8 @@ export async function extractPropertyWithPuppeteer(
         if (addressText) break;
       }
     }
+
+    console.log("3:" + bodyH);
 
     const data: PropertyAIData = {
       address: addressText || "Address unavailable",
@@ -147,20 +104,20 @@ export async function extractPropertyWithPuppeteer(
       sellerEmail: "",
       listedby: "",
     };
-    
+
     // Parse address for city, state, zip if not found individually
     if (data.address !== "Address unavailable") {
-      const addressParts = data.address.split(',').map(part => part.trim());
+      const addressParts = data.address.split(",").map((part) => part.trim());
       if (addressParts.length >= 3) {
         // Typical format: "123 Main St, City, State ZIP"
         const lastPart = addressParts[addressParts.length - 1];
         const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5})/);
-        
+
         if (stateZipMatch) {
           data.state = stateZipMatch[1];
           data.zip = stateZipMatch[2];
         }
-        
+
         // City is typically the second to last part
         if (addressParts.length >= 2) {
           data.city = addressParts[addressParts.length - 2];
@@ -172,14 +129,14 @@ export async function extractPropertyWithPuppeteer(
      *  3)  pull agent name & phone using multiple selectors
      * -------------------------------------------------- */
     const agentSelectors = [
-      '[class*="listing-agent"]', 
-      '[data-testid*="ListingAgent"]', 
+      '[class*="listing-agent"]',
+      '[data-testid*="ListingAgent"]',
       ':contains("Listed by")',
-      '.agent-info',
-      '.listing-agent-information',
-      '[data-testid*="agent"]'
+      ".agent-info",
+      ".listing-agent-information",
+      '[data-testid*="agent"]',
     ];
-    
+
     let agentBlock = "";
     for (const selector of agentSelectors) {
       const element = $(selector).first();
@@ -255,7 +212,8 @@ const EMPTY_PROPERTY: PropertyAIData = {
 async function launchBrowser(): Promise<Browser> {
   return puppeteer.launch({
     headless: true, // Use headless mode for replit environment
-    executablePath: "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium",
+    executablePath:
+      "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -282,209 +240,224 @@ async function prepPage(page: Page) {
   // Randomize Chrome version to appear as different browsers
   const chromeVersion = Math.floor(Math.random() * 5) + 120;
   const userAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion}.0.0.0 Safari/537.36`;
-  
+
   await page.setUserAgent(userAgent);
-  
+
   // Set a realistic viewport and device scale factor
-  await page.setViewport({ 
-    width: 1920, 
+  await page.setViewport({
+    width: 1920,
     height: 1080,
     deviceScaleFactor: 1,
     hasTouch: false,
     isLandscape: true,
-    isMobile: false
+    isMobile: false,
   });
-  
+
   // Set cookies to appear as a returning visitor
   await page.setCookie({
-    name: 'returning_visitor',
-    value: 'true',
-    domain: '.zillow.com',
+    name: "returning_visitor",
+    value: "true",
+    domain: ".zillow.com",
     expires: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
     httpOnly: false,
     secure: true,
-    sameSite: 'None'
+    sameSite: "None",
   });
-  
+
   // Set headers that make the request appear more realistic
   await page.setExtraHTTPHeaders({
-    'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Cache-Control': 'max-age=0',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'cross-site',
-    'Sec-Fetch-User': '?1',
-    'Sec-CH-UA': `"Google Chrome";v="${chromeVersion}", "Chromium";v="${chromeVersion}", "Not-A.Brand";v="99"`,
-    'Sec-CH-UA-Mobile': '?0',
-    'Sec-CH-UA-Platform': '"Windows"'
+    "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+    Accept:
+      "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Cache-Control": "max-age=0",
+    Connection: "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "cross-site",
+    "Sec-Fetch-User": "?1",
+    "Sec-CH-UA": `"Google Chrome";v="${chromeVersion}", "Chromium";v="${chromeVersion}", "Not-A.Brand";v="99"`,
+    "Sec-CH-UA-Mobile": "?0",
+    "Sec-CH-UA-Platform": '"Windows"',
   });
-  
+
   // Inject scripts to modify the browser environment and evade detection
   await page.evaluateOnNewDocument(() => {
     // ----- 1. Make navigator properties consistent with our user agent -----
-    Object.defineProperty(navigator, 'webdriver', { get: () => false });
-    Object.defineProperty(navigator, 'language', { get: () => 'en-US' });
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es'] });
-    
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+    Object.defineProperty(navigator, "language", { get: () => "en-US" });
+    Object.defineProperty(navigator, "languages", {
+      get: () => ["en-US", "en", "es"],
+    });
+
     // ----- 2. Create convincing plugins array -----
     const plugins = [
       {
-        name: 'Chrome PDF Plugin',
-        filename: 'internal-pdf-viewer',
-        description: 'Portable Document Format',
-        mimeTypes: [{ type: 'application/pdf', suffixes: 'pdf' }]
+        name: "Chrome PDF Plugin",
+        filename: "internal-pdf-viewer",
+        description: "Portable Document Format",
+        mimeTypes: [{ type: "application/pdf", suffixes: "pdf" }],
       },
       {
-        name: 'Chrome PDF Viewer',
-        filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
-        description: '',
-        mimeTypes: [{ type: 'application/pdf', suffixes: 'pdf' }]
+        name: "Chrome PDF Viewer",
+        filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+        description: "",
+        mimeTypes: [{ type: "application/pdf", suffixes: "pdf" }],
       },
       {
-        name: 'Native Client',
-        filename: 'internal-nacl-plugin',
-        description: '',
+        name: "Native Client",
+        filename: "internal-nacl-plugin",
+        description: "",
         mimeTypes: [
-          { type: 'application/x-nacl', suffixes: 'nacl' },
-          { type: 'application/x-pnacl', suffixes: 'pnacl' }
-        ]
-      }
+          { type: "application/x-nacl", suffixes: "nacl" },
+          { type: "application/x-pnacl", suffixes: "pnacl" },
+        ],
+      },
     ];
-    
+
     // Define plugins property to return our fake plugins
-    Object.defineProperty(navigator, 'plugins', {
+    Object.defineProperty(navigator, "plugins", {
       get: () => {
-        const pluginArray = plugins.map(plugin => {
-          const mimeTypes = plugin.mimeTypes.map(mt => {
-            return { type: mt.type, suffixes: mt.suffixes, description: '' };
+        const pluginArray = plugins.map((plugin) => {
+          const mimeTypes = plugin.mimeTypes.map((mt) => {
+            return { type: mt.type, suffixes: mt.suffixes, description: "" };
           });
-          
+
           return {
             name: plugin.name,
             filename: plugin.filename,
             description: plugin.description,
             length: mimeTypes.length,
             item: (index: number) => mimeTypes[index],
-            namedItem: (name: string) => mimeTypes.find(mt => mt.type === name)
+            namedItem: (name: string) =>
+              mimeTypes.find((mt) => mt.type === name),
           };
         });
-        
+
         // Make the array iterable
         pluginArray.item = (index: number) => pluginArray[index];
-        pluginArray.namedItem = (name: string) => pluginArray.find(p => p.name === name);
+        pluginArray.namedItem = (name: string) =>
+          pluginArray.find((p) => p.name === name);
         pluginArray.refresh = () => {};
-        
-        return Object.defineProperty(pluginArray, 'length', { value: pluginArray.length });
-      }
+
+        return Object.defineProperty(pluginArray, "length", {
+          value: pluginArray.length,
+        });
+      },
     });
-    
+
     // ----- 3. Remove automation-specific attributes -----
-    
+
     // Spoof screen dimensions to match viewport
-    Object.defineProperty(window.screen, 'width', { get: () => 1920 });
-    Object.defineProperty(window.screen, 'height', { get: () => 1080 });
-    Object.defineProperty(window.screen, 'availWidth', { get: () => 1920 });
-    Object.defineProperty(window.screen, 'availHeight', { get: () => 1040 });
-    Object.defineProperty(window.screen, 'colorDepth', { get: () => 24 });
-    Object.defineProperty(window.screen, 'pixelDepth', { get: () => 24 });
-    
+    Object.defineProperty(window.screen, "width", { get: () => 1920 });
+    Object.defineProperty(window.screen, "height", { get: () => 1080 });
+    Object.defineProperty(window.screen, "availWidth", { get: () => 1920 });
+    Object.defineProperty(window.screen, "availHeight", { get: () => 1040 });
+    Object.defineProperty(window.screen, "colorDepth", { get: () => 24 });
+    Object.defineProperty(window.screen, "pixelDepth", { get: () => 24 });
+
     // ----- 4. Mock user interaction functions -----
     const originalQuerySelector = document.querySelector;
-    document.querySelector = function(...args) {
+    document.querySelector = function (...args) {
       // Add a slight delay to querySelector to appear more human
       const start = Date.now();
       while (Date.now() - start < 5) {} // Small delay
       return originalQuerySelector.apply(this, args);
     };
-    
+
     // ----- 5. Fake WebGL to match real browsers -----
     const getParameter = WebGLRenderingContext.prototype.getParameter;
-    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+    WebGLRenderingContext.prototype.getParameter = function (parameter) {
       // Spoof renderer info
       if (parameter === 37445) {
-        return 'Google Inc. (NVIDIA)';
+        return "Google Inc. (NVIDIA)";
       }
       if (parameter === 37446) {
-        return 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1080 Direct3D11 vs_5_0 ps_5_0)';
+        return "ANGLE (NVIDIA, NVIDIA GeForce GTX 1080 Direct3D11 vs_5_0 ps_5_0)";
       }
-      
+
       return getParameter.apply(this, [parameter]);
     };
-    
+
     // ----- 6. Add generic browser features -----
-    
+
     // Add notification API
-    if (!('Notification' in window)) {
+    if (!("Notification" in window)) {
       window.Notification = {
-        permission: 'default',
-        requestPermission: async () => 'default'
+        permission: "default",
+        requestPermission: async () => "default",
       };
     }
-    
+
     // ----- 7. Hide automation flags -----
     // Remove flag used by CloudFlare and others
     delete (window as any)._phantom;
     delete (window as any).__nightmare;
     delete (window as any).callPhantom;
-    
+
     // Add regular Chrome functions
     window.chrome = {
       app: {
         isInstalled: false,
-        InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
-        RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+        InstallState: {
+          DISABLED: "disabled",
+          INSTALLED: "installed",
+          NOT_INSTALLED: "not_installed",
+        },
+        RunningState: {
+          CANNOT_RUN: "cannot_run",
+          READY_TO_RUN: "ready_to_run",
+          RUNNING: "running",
+        },
       },
       runtime: {
         OnInstalledReason: {
-          CHROME_UPDATE: 'chrome_update',
-          INSTALL: 'install',
-          SHARED_MODULE_UPDATE: 'shared_module_update',
-          UPDATE: 'update'
+          CHROME_UPDATE: "chrome_update",
+          INSTALL: "install",
+          SHARED_MODULE_UPDATE: "shared_module_update",
+          UPDATE: "update",
         },
         OnRestartRequiredReason: {
-          APP_UPDATE: 'app_update',
-          OS_UPDATE: 'os_update',
-          PERIODIC: 'periodic'
+          APP_UPDATE: "app_update",
+          OS_UPDATE: "os_update",
+          PERIODIC: "periodic",
         },
         PlatformArch: {
-          ARM: 'arm',
-          ARM64: 'arm64',
-          MIPS: 'mips',
-          MIPS64: 'mips64',
-          X86_32: 'x86-32',
-          X86_64: 'x86-64'
+          ARM: "arm",
+          ARM64: "arm64",
+          MIPS: "mips",
+          MIPS64: "mips64",
+          X86_32: "x86-32",
+          X86_64: "x86-64",
         },
         PlatformNaclArch: {
-          ARM: 'arm',
-          MIPS: 'mips',
-          MIPS64: 'mips64',
-          X86_32: 'x86-32',
-          X86_64: 'x86-64'
+          ARM: "arm",
+          MIPS: "mips",
+          MIPS64: "mips64",
+          X86_32: "x86-32",
+          X86_64: "x86-64",
         },
         PlatformOs: {
-          ANDROID: 'android',
-          CROS: 'cros',
-          LINUX: 'linux',
-          MAC: 'mac',
-          OPENBSD: 'openbsd',
-          WIN: 'win'
+          ANDROID: "android",
+          CROS: "cros",
+          LINUX: "linux",
+          MAC: "mac",
+          OPENBSD: "openbsd",
+          WIN: "win",
         },
         RequestUpdateCheckStatus: {
-          NO_UPDATE: 'no_update',
-          THROTTLED: 'throttled',
-          UPDATE_AVAILABLE: 'update_available'
-        }
-      }
+          NO_UPDATE: "no_update",
+          THROTTLED: "throttled",
+          UPDATE_AVAILABLE: "update_available",
+        },
+      },
     };
-    
+
     // Mock permissions API used by newer sites
-    if (!('permissions' in navigator)) {
+    if (!("permissions" in navigator)) {
       (navigator as any).permissions = {
-        query: async () => ({ state: 'prompt', onchange: null })
+        query: async () => ({ state: "prompt", onchange: null }),
       };
     }
   });
@@ -493,25 +466,26 @@ async function prepPage(page: Page) {
 /* ---------- ultra-realistic human-like scrolling and interaction ---------- */
 async function autoScroll(page: Page) {
   // First, wait a bit like a human would after loading the page
-  await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 2000));
-  
-  // Initial mouse movement to a random position
-  await page.mouse.move(
-    200 + Math.random() * 400, 
-    100 + Math.random() * 150
+  await new Promise((resolve) =>
+    setTimeout(resolve, 1500 + Math.random() * 2000),
   );
-  
+
+  // Initial mouse movement to a random position
+  await page.mouse.move(200 + Math.random() * 400, 100 + Math.random() * 150);
+
   // Simulate clicking on something to get focus (common human behavior)
   if (Math.random() > 0.5) {
     await page.mouse.click(
       250 + Math.random() * 300,
-      150 + Math.random() * 100
+      150 + Math.random() * 100,
     );
-    
+
     // Small delay after clicking
-    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500));
+    await new Promise((resolve) =>
+      setTimeout(resolve, 300 + Math.random() * 500),
+    );
   }
-  
+
   // Simplified scrolling to avoid JavaScript evaluation issues
   // Scroll down a few times with random pauses to simulate human behavior
   for (let i = 0; i < 5; i++) {
@@ -519,49 +493,57 @@ async function autoScroll(page: Page) {
     await page.evaluate(() => {
       window.scrollBy(0, 400 + Math.floor(Math.random() * 300));
     });
-    
+
     // Random pause between scrolls
-    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+    await new Promise((resolve) =>
+      setTimeout(resolve, 800 + Math.random() * 1200),
+    );
   }
-  
+
   // Scroll back up a bit to appear more human-like
   await page.evaluate(() => {
     window.scrollBy(0, -100 - Math.floor(Math.random() * 100));
   });
-  
+
   // Final pause to simulate reading the content
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1500));
-  
+  await new Promise((resolve) =>
+    setTimeout(resolve, 1000 + Math.random() * 1500),
+  );
+
   // Wiggle mouse a bit at current location (humans fidget)
   const currentPosition = await page.evaluate(() => {
-    return { 
-      x: window.scrollX + window.innerWidth / 2, 
-      y: window.scrollY + 300
+    return {
+      x: window.scrollX + window.innerWidth / 2,
+      y: window.scrollY + 300,
     };
   });
-  
+
   // Small random mouse movements around current position
   for (let i = 0; i < 3; i++) {
     if (Math.random() > 0.3) {
       await page.mouse.move(
         currentPosition.x + (Math.random() * 40 - 20),
         currentPosition.y + (Math.random() * 40 - 20),
-        { steps: 5 } // Move in steps for more human-like motion
+        { steps: 5 }, // Move in steps for more human-like motion
       );
-      
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 300));
+
+      await new Promise((resolve) =>
+        setTimeout(resolve, 100 + Math.random() * 300),
+      );
     }
   }
-  
+
   // Final mouse movement to a random position on the visible page
   await page.mouse.move(
-    300 + Math.random() * 600, 
+    300 + Math.random() * 600,
     200 + Math.random() * 400,
-    { steps: 10 } // More steps for smoother, more human-like motion
+    { steps: 10 }, // More steps for smoother, more human-like motion
   );
-  
+
   // Wait a bit more before continuing
-  await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+  await new Promise((resolve) =>
+    setTimeout(resolve, 800 + Math.random() * 1200),
+  );
 }
 
 /* ---------- quick regex helpers ---------- */
