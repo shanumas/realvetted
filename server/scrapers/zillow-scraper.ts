@@ -539,27 +539,49 @@ function extractAgentName(agentText: string): string {
   if (!agentText) return '';
   
   // Pattern 1: Explicit "Listed by: Agent Name" format
-  const listedByMatch = agentText.match(/Listed by:?\s*([^,]+)/i);
+  const listedByMatch = agentText.match(/(?:Listed by|Listing Agent|Agent):?\s*([^,\(\r\n]+)/i);
   if (listedByMatch && listedByMatch[1]) {
-    return listedByMatch[1].trim();
+    // Remove any trailing "License" or other common suffixes
+    return listedByMatch[1].replace(/(?:\s+License|\s+Lic|\s+REALTOR®|\s+DRE).*$/i, '').trim();
   }
   
-  // Pattern 2: Name at start up to first comma or separator
-  const startMatch = agentText.match(/^([^,|:]+)/i);
+  // Pattern 2: Name at start up to first comma, parenthesis, or separator
+  const startMatch = agentText.match(/^([^,|\:|\(|\r\n]+)/i);
   if (startMatch && startMatch[1]) {
-    return startMatch[1].trim();
+    // Make sure we're not capturing headings or labels
+    const candidate = startMatch[1].trim();
+    if (candidate.length > 3 && !candidate.match(/^(listing|agent|broker|contact|phone|email|about)$/i)) {
+      return candidate;
+    }
   }
   
   // Pattern 3: Look for common name patterns (first name followed by last name)
-  // This is a more aggressive approach and might have false positives
-  const nameMatch = agentText.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/);
+  // This targets patterns like "John Smith" or "Jane A. Doe" or "Robert James Wilson"
+  const nameMatch = agentText.match(/\b([A-Z][a-z]+(?:\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]+){1,2})\b/);
   if (nameMatch && nameMatch[1]) {
     return nameMatch[1].trim();
+  }
+  
+  // Pattern 4: Look for name following "with" or "from" (common in "John Smith with XYZ Realty")
+  const withMatch = agentText.match(/(?:with|from|of)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\b/i);
+  if (withMatch && withMatch[1]) {
+    return withMatch[1].trim();
+  }
+  
+  // Pattern 5: Look for a name in parentheses (sometimes agents are indicated this way)
+  const parenthesesMatch = agentText.match(/\(([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})\)/);
+  if (parenthesesMatch && parenthesesMatch[1]) {
+    return parenthesesMatch[1].trim();
   }
   
   // If we can't extract a clean name, return the first 30 characters 
   // (better than nothing but will need manual cleanup)
   if (agentText.length > 30) {
+    // Try to cut at a reasonable point like a comma or period
+    const truncateMatch = agentText.substring(0, 50).match(/^(.+?)(?:[,\.\r\n]|$)/);
+    if (truncateMatch && truncateMatch[1]) {
+      return truncateMatch[1].trim();
+    }
     return agentText.substring(0, 30).trim() + '...';
   }
   
