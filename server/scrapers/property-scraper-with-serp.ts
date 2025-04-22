@@ -46,34 +46,57 @@ export async function scrapePropertyListing(
 
   const headers = { "User-Agent": "Mozilla/5.0" };
 
-  // Use Puppeteer to fetch the actual property page HTML
+  // Attempt to use direct HTTP request first, as it's more reliable in Replit environment
   let pageContent = "";
   try {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox", 
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu"
-      ]
+    // Use axios to fetch the page with appropriate headers to avoid bot detection
+    const response = await axios.get(realtorUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Upgrade-Insecure-Requests': '1'
+      },
+      timeout: 30000
     });
+    
+    pageContent = response.data;
+    console.log("Successfully fetched property page using direct HTTP request");
+  } catch (httpError) {
+    console.error("Error during direct HTTP request:", httpError);
+    
+    // Fallback to Puppeteer if direct HTTP request fails
+    console.log("Falling back to Puppeteer for fetching property page...");
+    try {
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          "--no-sandbox", 
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--disable-gpu"
+        ]
+      });
 
-    const page = await browser.newPage();
-    await page.setUserAgent("Mozilla/5.0");
-    await page.goto(realtorUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 30000,
-    });
+      const page = await browser.newPage();
+      await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+      await page.goto(realtorUrl, {
+        waitUntil: "domcontentloaded",
+        timeout: 30000,
+      });
 
-    // Get the page content
-    pageContent = await page.content(); // Get the entire page HTML
-
-    await browser.close();
-  } catch (error) {
-    console.error("Error during Puppeteer request:", error);
-    throw new Error("Failed to fetch the property page using Puppeteer.");
+      // Get the page content
+      pageContent = await page.content();
+      await browser.close();
+      
+      console.log("Successfully fetched property page using Puppeteer fallback");
+    } catch (puppeteerError) {
+      console.error("Error during Puppeteer fallback request:", puppeteerError);
+      throw new Error("Failed to fetch the property page using both direct HTTP and Puppeteer fallback.");
+    }
   }
 
   // Parse the HTML using Cheerio
