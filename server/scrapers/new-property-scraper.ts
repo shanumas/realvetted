@@ -137,6 +137,9 @@ ${snippets}
 Be as detailed as possible, but do not make up information that is not present in the data.
 If a data point is not available, use null or empty string.
 
+Carefully look for listing agent information, which often appears as "Listed by: [Agent Name]" or similar patterns.
+When extracting agent details, be sure to separate the agent's name from their license number (often formatted as "DRE #XXXXXXXX") and phone number.
+
 Extract the following fields:
 - address: Full property address
 - city: City name
@@ -150,10 +153,13 @@ Extract the following fields:
 - yearBuilt: Year the property was built (as a string, e.g. "1998")
 - description: Property description
 - features: Array of property features
-- listingAgentName: Name of listing agent
-- listingAgentPhone: Phone number of listing agent
-- listingAgentCompany: Real estate company
-- listingAgentLicenseNo: License number if available
+- listingAgentName: Name of listing agent (e.g., "Gary J. Snow" from "Listed by: Gary J. Snow DRE #01452902")
+- listingAgentPhone: Phone number of listing agent (e.g., "415-601-5223")
+- listingAgentCompany: Real estate company (e.g., "Vantage Realty")
+- listingAgentLicenseNo: License number if available (e.g., "DRE #01452902" or just "01452902")
+
+Example agent information that might appear:
+"Listed by: Gary J. Snow DRE #01452902 415-601-5223, Vantage Realty 415-846-4685"
 
 Return only valid JSON.`,
         },
