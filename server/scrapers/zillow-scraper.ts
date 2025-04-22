@@ -167,9 +167,27 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     // Extract property description
     const description = $('[data-testid="hdp-description-container"] [data-testid="expanded-description"]').text().trim();
     
-    // Extract listing agent information from the attribution tag
-    const listingAgentText = $('[data-testid="attribution-LISTING_AGENT"]').text().trim();
-    const brokerText = $('[data-testid="attribution-BROKER"]').text().trim();
+    // Extract listing agent information using multiple potential selectors
+    let listingAgentText = $('[data-testid="attribution-LISTING_AGENT"]').text().trim();
+    
+    // If primary selector doesn't work, try fallback selectors
+    if (!listingAgentText) {
+      listingAgentText = $('.ds-listing-agent-display-name').text().trim() ||
+                        $('.agent-info-container').text().trim() ||
+                        $('[data-testid*="listing-agent"]').text().trim() ||
+                        $('a[href*="agent"]').text().trim();
+    }
+    
+    // Extract broker information using multiple potential selectors
+    let brokerText = $('[data-testid="attribution-BROKER"]').text().trim();
+    
+    // If primary broker selector doesn't work, try fallback selectors
+    if (!brokerText) {
+      brokerText = $('.ds-listing-broker-display-name').text().trim() ||
+                  $('.broker-info').text().trim() ||
+                  $('[data-testid*="broker"]').text().trim() ||
+                  $('span:contains("Brokered by")').text().trim();
+    }
     
     console.log(`Listing agent text: ${listingAgentText}`);
     console.log(`Broker text: ${brokerText}`);
@@ -245,7 +263,7 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
         const addressParts = part.split('-');
         if (addressParts.length >= 3) {
           // Last 3 parts are typically City-STATE-ZIP
-          city = addressParts[addressParts.length - 3].replace(/_/g, ' ');
+          city = cleanCityName(addressParts[addressParts.length - 3]);
           state = addressParts[addressParts.length - 2];
           zip = addressParts[addressParts.length - 1].split('/')[0]; // Remove trailing slash if present
         }
@@ -407,7 +425,7 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     // Use puppeteer for the Google search to avoid rate limiting
     const browser = await puppeteer.launch({
       headless: "new",
-      executablePath: process.env.CHROME_BIN || '/nix/store/4axlc1snam3a6x0bj9q55jvr7n7n17a5-chromium-114.0.5735.198/bin/chromium',
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -477,6 +495,43 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     console.error('Error finding Zillow URL:', error.message || String(error));
     return null;
   }
+}
+
+/**
+ * Clean city name from URL format by replacing dashes and underscores,
+ * and applying proper capitalization
+ * @param cityText Raw city name text from URL (typically has dashes)
+ * @returns Cleaned city name
+ */
+function cleanCityName(cityText: string): string {
+  if (!cityText) return '';
+  
+  // Replace dashes and underscores with spaces
+  let cleanedCity = cityText.replace(/[-_]/g, ' ');
+  
+  // Remove any numeric prefixes
+  cleanedCity = cleanedCity.replace(/^\d+\s+/, '');
+  
+  // Capitalize first letter of each word
+  cleanedCity = cleanedCity
+    .split(' ')
+    .map(word => {
+      if (!word) return '';
+      // Common words that should not be capitalized (unless first word)
+      const lowercaseWords = ['of', 'the', 'and', 'in', 'on', 'at', 'by', 'for', 'with'];
+      if (lowercaseWords.includes(word.toLowerCase())) {
+        return word.toLowerCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ');
+    
+  // Ensure first letter is always capitalized
+  if (cleanedCity.length > 0) {
+    cleanedCity = cleanedCity.charAt(0).toUpperCase() + cleanedCity.slice(1);
+  }
+  
+  return cleanedCity;
 }
 
 /**
