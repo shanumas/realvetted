@@ -175,7 +175,12 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
       listingAgentText = $('.ds-listing-agent-display-name').text().trim() ||
                         $('.agent-info-container').text().trim() ||
                         $('[data-testid*="listing-agent"]').text().trim() ||
-                        $('a[href*="agent"]').text().trim();
+                        $('a[href*="agent"]').text().trim() ||
+                        $('.StyledSellerDetails').text().trim() ||
+                        $('.agent-name').text().trim() ||
+                        $('.agent-card-container').text().trim() ||
+                        $('.agent-banner span').text().trim() ||
+                        $('[data-testid*="contact-info"]').text().trim();
     }
     
     // Extract broker information using multiple potential selectors
@@ -186,7 +191,13 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
       brokerText = $('.ds-listing-broker-display-name').text().trim() ||
                   $('.broker-info').text().trim() ||
                   $('[data-testid*="broker"]').text().trim() ||
-                  $('span:contains("Brokered by")').text().trim();
+                  $('span:contains("Brokered by")').text().trim() ||
+                  $('[data-testid*="office"]').text().trim() ||
+                  $('.company-name').text().trim() ||
+                  $('.broker-name').text().trim() ||
+                  $('.broker-card-container').text().trim() ||
+                  $('.Source-sc-1wn4sd6-0').text().trim() ||
+                  $('*:contains("Brokered by")').text().trim();
     }
     
     console.log(`Listing agent text: ${listingAgentText}`);
