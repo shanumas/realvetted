@@ -1,17 +1,23 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 import { extractPropertyWithPuppeteer } from "./scrapers/puppeteer-direct-scraper";
+import { getRealtorUrlFromAnyRealEstateUrl, processPropertyWithSerpApi } from "./scrapers/serpapi-extractor";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Flag to control whether to use SerpAPI as a preliminary step
+const USE_SERPAPI_PRELIMINARY_STEP = true;
+
 /**
  * Extract property data from a URL
  * 
- * This function uses direct scraping with an enhanced Puppeteer setup to extract property data 
- * from any real estate listing URL, with specific handling for popular sites like Realtor.com, Zillow, etc.
+ * This function uses a multi-step approach to extract property data:
+ * 1. SerpAPI to find a Realtor.com URL for the property (if enabled)
+ * 2. Direct scraping with Puppeteer on either the Realtor.com URL or original URL
+ * 3. Fallback to URL analysis if scraping fails
  * 
  * @param url The URL of the property listing
  * @returns The extracted property data
@@ -29,14 +35,47 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
-    // Use enhanced Puppeteer scraping with anti-detection measures
+    // Step 1: For Zillow and other heavily protected sites, try to get a Realtor.com URL first
+    if (USE_SERPAPI_PRELIMINARY_STEP && shouldUseSerpApi(url)) {
+      console.log(`Using SerpAPI to find a Realtor.com URL for: ${url}`);
+      try {
+        const realtorUrl = await getRealtorUrlFromAnyRealEstateUrl(url);
+        
+        if (realtorUrl) {
+          console.log(`✅ Found Realtor.com equivalent URL: ${realtorUrl}`);
+          console.log(`Attempting extraction from Realtor.com URL instead...`);
+          
+          try {
+            // Try to extract from Realtor.com URL
+            const propertyData = await extractPropertyWithPuppeteer(realtorUrl);
+            
+            // Add original URL as the source
+            return {
+              ...propertyData,
+              propertyUrl: url, // Keep the original URL as the source
+              _realtorUrl: realtorUrl, // For debugging/tracking
+            };
+          } catch (realtorExtractionError) {
+            console.error("Extraction from Realtor.com URL failed:", realtorExtractionError);
+            console.log("Falling back to original URL extraction");
+          }
+        } else {
+          console.log("No Realtor.com URL found via SerpAPI, proceeding with direct extraction");
+        }
+      } catch (serpApiError) {
+        console.error("SerpAPI step failed:", serpApiError);
+        console.log("Proceeding with direct URL extraction");
+      }
+    }
+    
+    // Step 2: Try direct extraction with Puppeteer (either on original URL or if SerpAPI failed)
     console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
     try {
       return await extractPropertyWithPuppeteer(url);
-    } catch (error) {
-      console.error("Enhanced Puppeteer scraping failed:", error);
+    } catch (puppeteerError) {
+      console.error("Enhanced Puppeteer scraping failed:", puppeteerError);
       
-      // Fallback method: URL analysis with OpenAI if scraping fails
+      // Step 3: Fallback to URL analysis with OpenAI if scraping fails
       console.log("Falling back to URL analysis");
       return await extractFromUrlStructure(url);
     }
@@ -73,6 +112,42 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     };
     
     return fallbackResult;
+  }
+}
+
+/**
+ * Determine if we should use SerpAPI for this URL based on the domain
+ * 
+ * @param url The URL to check
+ * @returns True if SerpAPI should be used for this domain
+ */
+function shouldUseSerpApi(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    const hostname = urlObj.hostname.toLowerCase();
+    
+    // Sites with strong anti-bot protection that warrant using SerpAPI
+    const stronglyProtectedSites = [
+      'zillow.com',
+      'www.zillow.com',
+      'trulia.com',
+      'www.trulia.com',
+      'redfin.com',
+      'www.redfin.com',
+      'compass.com',
+      'www.compass.com'
+    ];
+    
+    // Don't use SerpAPI if we're already on Realtor.com
+    if (hostname.includes('realtor.com')) {
+      return false;
+    }
+    
+    // Check if this is a site with strong protection
+    return stronglyProtectedSites.some(site => hostname.includes(site));
+  } catch (error) {
+    console.error('Error checking URL for SerpAPI:', error);
+    return false;
   }
 }
 
