@@ -228,22 +228,27 @@ function extractAddressFromUrl(url: string): { streetAddress: string, city: stri
     }
     
     // If we still don't have an address, look for address-like structure in URL
-    const addressLikeRegex = /(\d+)[-\s]+([^-\s]+)[-\s]+([^-\s]+)[-\s]+([^-\s,]+)[,-\s]+([A-Za-z]{2})(?:[-\s]+(\d{5}))?/;
-    const match = url.match(addressLikeRegex);
-    
-    if (match) {
-      const streetNumber = match[1];
-      const streetName = `${match[2]} ${match[3]}`;
-      const city = match[4];
-      const state = match[5].toUpperCase();
-      const zip = match[6] || '';
+    try {
+      const addressLikeRegex = /(\d+)[-\s]+([^-\s]+)[-\s]+([^-\s]+)[-\s]+([^-\s,]+)[,-\s]+([A-Za-z]{2})(?:[-\s]+(\d{5}))?/;
+      const match = url.match(addressLikeRegex);
       
-      return {
-        streetAddress: `${streetNumber} ${streetName}`,
-        city,
-        state,
-        zip
-      };
+      if (match) {
+        const streetNumber = match[1];
+        const streetName = `${match[2]} ${match[3]}`;
+        const city = match[4];
+        const state = match[5].toUpperCase();
+        const zip = match[6] || '';
+        
+        return {
+          streetAddress: `${streetNumber} ${streetName}`,
+          city,
+          state,
+          zip
+        };
+      }
+    } catch (error) {
+      console.error('Error extracting address using regex:', error);
+      // Continue to other methods
     }
     
     // Cannot parse the URL

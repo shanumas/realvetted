@@ -1897,11 +1897,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Use web search to find information about the property URL
-        // This avoids direct scraping and potential blocking from real estate websites
+        // Use enhanced extraction flow with SerpAPI integration
+        // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
+        // This approach bypasses blocking mechanisms on sites like Zillow
         const propertyData = await extractPropertyFromUrl(url);
+        
+        // Add timestamp and source information
+        const resultWithMeta = {
+          ...propertyData,
+          _extractionTimestamp: new Date().toISOString(),
+          _extractionSource: url
+        };
 
-        res.json(propertyData);
+        res.json(resultWithMeta);
       } catch (error) {
         console.error("Property URL extraction error:", error);
         res.status(500).json({
@@ -1938,16 +1946,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Race between the actual extraction and the timeout
+      // Race between the enhanced extraction (with SerpAPI) and the timeout
       const propertyData = await Promise.race([
         extractPropertyFromUrl(url),
         timeoutPromise
       ]);
 
-      // Add source URL to the result data
+      // Add extraction metadata to the result data
       const resultWithSource = {
         ...propertyData,
         _extractionSource: url,
-        _extractionTimestamp: new Date().toISOString()
+        _extractionTimestamp: new Date().toISOString(),
+        _extractionMethod: propertyData._realtorUrl ? 'serpapi+direct' : 'direct'
       };
 
       res.json(resultWithSource);

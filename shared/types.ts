@@ -33,6 +33,11 @@ export interface PropertyAIData {
   description?: string; // Property description
   features?: string[]; // Property features/amenities
   imageUrls?: string[]; // Property image URLs
+  // Metadata for extraction process (internal use)
+  _realtorUrl?: string; // URL from Realtor.com used for extraction via SerpAPI
+  _extractionMethod?: string; // Method used to extract property data (direct, serpapi, url-analysis)
+  _extractionTimestamp?: string; // Timestamp when the extraction was performed
+  _extractionSource?: string; // Original URL that was used for extraction
 }
 
 // Similar to PropertyAIData but allows address to be optional when extracting from HTML
