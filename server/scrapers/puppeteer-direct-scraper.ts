@@ -79,20 +79,17 @@ export async function extractPropertyWithPuppeteer(url: string): Promise<Propert
       });
     });
 
-    // Navigate to the URL with a pageload timeout and wait for network idle
+    // Navigate to the URL with a pageload timeout
     await page.goto(url, { 
-      waitUntil: ["domcontentloaded", "networkidle2"],
-      timeout: 60000 
+      waitUntil: "domcontentloaded",
+      timeout: 20000 
     });
 
-    // Wait a bit like a human would
-    await page.waitForTimeout(3000);
+    // Wait a bit like a human would (shorter time)
+    await page.waitForTimeout(1000);
 
-    // Scroll down to load any lazy-loaded content
-    await autoScroll(page);
-
-    // Wait a bit more after scrolling
-    await page.waitForTimeout(2000);
+    // Skip scrolling for now to avoid timeouts
+    // await autoScroll(page);
 
     // Extract the HTML content
     const htmlContent = await page.content();
