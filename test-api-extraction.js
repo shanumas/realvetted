@@ -14,7 +14,7 @@ const api = axios.create({
 
 // Login credentials (use test account)
 const credentials = {
-  email: 'admin@propertymatch.com',
+  email: '76@0.com',
   password: 'password'
 };
 
