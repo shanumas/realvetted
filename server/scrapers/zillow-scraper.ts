@@ -21,7 +21,7 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     // Enhanced browser configuration to avoid detection
     browser = await puppeteer.launch({
       headless: "new",
-      executablePath: process.env.CHROME_BIN || undefined,
+      executablePath: process.env.CHROME_BIN || '/nix/store/4axlc1snam3a6x0bj9q55jvr7n7n17a5-chromium-114.0.5735.198/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -29,6 +29,7 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
         '--disable-accelerated-2d-canvas',
         '--disable-gpu',
         '--window-size=1920,1080',
+        '--single-process',
       ],
       ignoreHTTPSErrors: true,
     });
@@ -391,11 +392,13 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     // Use puppeteer for the Google search to avoid rate limiting
     const browser = await puppeteer.launch({
       headless: "new",
-      executablePath: process.env.CHROME_BIN || undefined,
+      executablePath: process.env.CHROME_BIN || '/nix/store/4axlc1snam3a6x0bj9q55jvr7n7n17a5-chromium-114.0.5735.198/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
+        '--disable-dev-shm-usage', 
+        '--disable-gpu',
+        '--single-process',
       ]
     });
     
