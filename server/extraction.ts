@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
-import { extractZillowPropertyData, findZillowUrl } from "./scrapers/zillow-scraper";
-import { extractPropertyWithSerpApi } from "./scrapers/property-serpapi-scraper";
+import { extractPropertyWithDirectScraping } from "./scrapers/direct-html-scraper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
@@ -11,11 +10,7 @@ const openai = new OpenAI({
 /**
  * Extract property data from a URL
  * 
- * This function uses multiple strategies to extract property data:
- * 1. First tries SerpAPI if the key is available (avoids anti-scraping measures)
- * 2. If SerpAPI fails or isn't available, tries a direct Zillow scraper if it's a Zillow URL
- * 3. If not a Zillow URL, tries to find a corresponding Zillow URL and scrape that
- * 4. As a last resort, falls back to analyzing the URL structure with OpenAI
+ * This function uses direct scraping with Puppeteer to extract property data from any real estate listing URL
  * 
  * @param url The URL of the property listing
  * @returns The extracted property data
@@ -33,50 +28,20 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
-    // First try using SerpAPI if the key is available
-    // This bypasses anti-scraping measures on real estate sites
-    if (process.env.SERPAPI_KEY) {
-      try {
-        console.log("Attempting extraction with SerpAPI to bypass anti-scraping...");
-        return await extractPropertyWithSerpApi(url);
-      } catch (error) {
-        console.error("SerpAPI extraction failed:", error);
-        console.log("Falling back to direct scraping methods...");
-      }
-    } else {
-      console.log("SerpAPI key not available. Using direct extraction methods.");
-    }
-    
-    // Check for required API keys for fallback methods
+    // Check for required API key
     if (!process.env.OPENAI_API_KEY) {
-      console.log("OpenAI API key is missing. Cannot use fallback extraction methods.");
-      throw new Error("OpenAI API key is required for property data extraction when SerpAPI is unavailable");
+      console.log("OpenAI API key is missing. Cannot extract property data.");
+      throw new Error("OpenAI API key is required for property data extraction");
     }
 
-    // Next, check if it's a Zillow URL or find a corresponding Zillow URL
-    let zillowUrl = url;
-    
-    if (!url.includes('zillow.com')) {
-      console.log("Not a Zillow URL. Searching for corresponding Zillow listing...");
-      const foundUrl = await findZillowUrl(url);
-      
-      if (foundUrl) {
-        console.log(`Found Zillow URL: ${foundUrl}`);
-        zillowUrl = foundUrl;
-      } else {
-        console.log("No Zillow URL found. Falling back to URL analysis.");
-        return await extractFromUrlStructure(url);
-      }
-    }
-    
-    // Use specialized Zillow scraper
+    // Use direct scraping with Puppeteer to extract data from any real estate listing
+    console.log(`Using direct scraping with Puppeteer for URL: ${url}`);
     try {
-      console.log(`Using specialized Zillow scraper with anti-scraping measures for URL: ${zillowUrl}`);
-      return await extractZillowPropertyData(zillowUrl);
+      return await extractPropertyWithDirectScraping(url);
     } catch (error) {
-      console.error("Zillow scraping failed:", error);
+      console.error("Direct scraping failed:", error);
       
-      // Fallback method: URL analysis with OpenAI
+      // Fallback method: URL analysis with OpenAI if scraping fails
       console.log("Falling back to URL analysis");
       return await extractFromUrlStructure(url);
     }
