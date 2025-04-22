@@ -1915,10 +1915,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Temporary test endpoint for extracting property details without authentication
+  // Test endpoint for extracting property details from different real estate sites
   app.post("/api/test/extract-property-from-url", async (req, res) => {
     try {
       const { url } = req.body;
+      const timeoutSeconds = req.body.timeout || 45; // Default 45 second timeout
 
       if (!url || typeof url !== "string") {
         return res.status(400).json({
@@ -1927,19 +1928,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`Test endpoint: Extracting property from URL: ${url}`);
-      // Use the extraction function directly
-      const propertyData = await extractPropertyFromUrl(url);
+      console.log(`Test endpoint: Extracting property from URL: ${url} (timeout: ${timeoutSeconds}s)`);
+      
+      // Create a timeout promise to prevent hanging extraction attempts
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Property extraction timed out after ${timeoutSeconds} seconds`));
+        }, timeoutSeconds * 1000);
+      });
+      
+      // Race between the actual extraction and the timeout
+      const propertyData = await Promise.race([
+        extractPropertyFromUrl(url),
+        timeoutPromise
+      ]);
 
-      res.json(propertyData);
+      // Add source URL to the result data
+      const resultWithSource = {
+        ...propertyData,
+        _extractionSource: url,
+        _extractionTimestamp: new Date().toISOString()
+      };
+
+      res.json(resultWithSource);
     } catch (error) {
       console.error("Property URL extraction error:", error);
-      res.status(500).json({
+      
+      // Determine specific error type for better client-side handling
+      let errorType = "EXTRACTION_ERROR";
+      let statusCode = 500;
+      
+      if (error instanceof Error) {
+        if (error.message.includes("timed out")) {
+          errorType = "TIMEOUT_ERROR";
+          statusCode = 408; // Request Timeout
+        } else if (error.message.includes("CAPTCHA") || error.message.includes("detected as a bot")) {
+          errorType = "CAPTCHA_ERROR";
+          statusCode = 403; // Forbidden
+        } else if (error.message.includes("Invalid URL") || error.message.includes("URL is required")) {
+          errorType = "INVALID_URL_ERROR";
+          statusCode = 400; // Bad Request
+        }
+      }
+      
+      res.status(statusCode).json({
         success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to extract property data from URL",
+        error: error instanceof Error ? error.message : "Failed to extract property data from URL",
+        errorType: errorType
       });
     }
   });
@@ -1957,6 +1992,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .form-group { margin-bottom: 15px; }
           label { display: block; margin-bottom: 5px; font-weight: bold; }
           input[type="url"] { width: 100%; padding: 8px; font-size: 16px; }
+          input[type="number"] { width: 80px; padding: 8px; font-size: 16px; }
           button { background: #3498db; color: white; border: none; padding: 10px 15px; cursor: pointer; font-size: 16px; }
           button:hover { background: #2980b9; }
           #results { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
@@ -1965,30 +2001,125 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .property-section h3 { margin-bottom: 5px; color: #2c3e50; }
           .property-field { margin-bottom: 5px; }
           .property-field strong { margin-right: 10px; min-width: 120px; display: inline-block; }
+          .tab-container { display: flex; margin-top: 20px; border-bottom: 1px solid #ddd; }
+          .tab { padding: 10px 15px; cursor: pointer; background: #f5f5f5; }
+          .tab.active { background: #fff; border: 1px solid #ddd; border-bottom: none; }
+          .sites-container { display: flex; flex-wrap: wrap; margin-top: 20px; }
+          .site-card { border: 1px solid #ddd; padding: 10px; margin: 5px; cursor: pointer; width: 200px; text-align: center; }
+          .site-card:hover { background: #f5f5f5; }
+          .error-card { border-left: 4px solid #e74c3c; padding: 10px; margin-top: 10px; background: #fcf0f0; }
+          .success-card { border-left: 4px solid #2ecc71; padding: 10px; margin-top: 10px; background: #f0fcf5; }
+          .flex-row { display: flex; align-items: center; }
+          .flex-row label { margin-right: 10px; margin-bottom: 0; }
         </style>
       </head>
       <body>
         <h1>Property Extraction Tester</h1>
-        <div class="form-group">
-          <label for="urlInput">Enter Property URL:</label>
-          <input type="url" id="urlInput" placeholder="https://www.zillow.com/homedetails/..." required>
+        
+        <div class="tab-container">
+          <div class="tab active" onclick="switchTab('url-tab')">Test by URL</div>
+          <div class="tab" onclick="switchTab('sites-tab')">Sample Real Estate Sites</div>
         </div>
-        <button onclick="testExtraction()">Extract Property Data</button>
+        
+        <div id="url-tab" class="tab-content">
+          <div class="form-group">
+            <label for="urlInput">Enter Property URL:</label>
+            <input type="url" id="urlInput" placeholder="https://www.zillow.com/homedetails/..." required>
+          </div>
+          
+          <div class="form-group flex-row">
+            <label for="timeoutInput">Timeout (seconds):</label>
+            <input type="number" id="timeoutInput" value="45" min="10" max="120">
+          </div>
+          
+          <button onclick="testExtraction()">Extract Property Data</button>
+        </div>
+        
+        <div id="sites-tab" class="tab-content" style="display:none;">
+          <h3>Select a real estate site to test:</h3>
+          <p>These are pre-configured test URLs for different real estate websites.</p>
+          
+          <div class="sites-container">
+            <div class="site-card" onclick="selectSite('https://www.homes.com/property/509-lake-shore-ter-s-lake-quivira-ks-66217/id-400026765562/')">
+              <strong>Homes.com</strong>
+              <p>Regional site with less protection</p>
+            </div>
+            
+            <div class="site-card" onclick="selectSite('https://www.homefinder.com/property/4-bedrooms-2-bathrooms-Residential-115246227-9902-Corella-Ave-Whittier-California-90603')">
+              <strong>HomeFinder</strong>
+              <p>Smaller listing site</p>
+            </div>
+            
+            <div class="site-card" onclick="selectSite('https://www.trulia.com/p/ca/santa-clara/1883-hillebrant-pl-santa-clara-ca-95050--2084636767')">
+              <strong>Trulia</strong>
+              <p>Mid-tier listing site</p>
+            </div>
+            
+            <div class="site-card" onclick="selectSite('https://www.redfin.com/TX/Austin/4513-Spanish-Oak-Trl-78731/home/31264436')">
+              <strong>Redfin</strong>
+              <p>Popular listing site</p>
+            </div>
+            
+            <div class="site-card" onclick="selectSite('https://www.realtor.com/realestateandhomes-detail/321-Cedros-Ave-Unit-A_Solana-Beach_CA_92075_M25131-96845')">
+              <strong>Realtor.com</strong>
+              <p>Major listing site</p>
+            </div>
+            
+            <div class="site-card" onclick="selectSite('https://www.zillow.com/homedetails/122-N-Clark-Dr-Los-Angeles-CA-90048/20516854_zpid/')">
+              <strong>Zillow</strong>
+              <p>Major listing site (strongest protection)</p>
+            </div>
+          </div>
+        </div>
         
         <div id="results" style="display: none;">
           <h2>Extraction Results</h2>
-          <div id="loader" style="display: none;">Loading...</div>
-          <div id="errorMessage" style="color: red; display: none;"></div>
+          <div id="loader" style="display: none;">
+            <p>Extracting data from property listing...</p>
+            <p>This may take up to <span id="timeoutDisplay">45</span> seconds.</p>
+          </div>
+          <div id="errorMessage" style="display: none;" class="error-card"></div>
           <div id="propertyData"></div>
         </div>
         
         <script>
+          function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(tab => {
+              tab.style.display = 'none';
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+              tab.classList.remove('active');
+            });
+            
+            // Show the selected tab content
+            document.getElementById(tabId).style.display = 'block';
+            
+            // Set the clicked tab as active
+            event.currentTarget.classList.add('active');
+          }
+          
+          function selectSite(url) {
+            document.getElementById('urlInput').value = url;
+            switchTab('url-tab');
+            
+            // Scroll to the URL input
+            document.getElementById('urlInput').scrollIntoView({ behavior: 'smooth' });
+          }
+          
           async function testExtraction() {
             const url = document.getElementById('urlInput').value;
+            const timeout = parseInt(document.getElementById('timeoutInput').value) || 45;
+            
             if (!url) {
               alert('Please enter a property URL');
               return;
             }
+            
+            // Update timeout display
+            document.getElementById('timeoutDisplay').textContent = timeout;
             
             const resultsDiv = document.getElementById('results');
             const loaderDiv = document.getElementById('loader');
@@ -2000,20 +2131,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             errorDiv.style.display = 'none';
             propertyDataDiv.innerHTML = '';
             
+            // Scroll to results
+            resultsDiv.scrollIntoView({ behavior: 'smooth' });
+            
             try {
               const response = await fetch('/api/test/extract-property-from-url', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ url })
+                body: JSON.stringify({ url, timeout })
               });
               
+              const data = await response.json();
+              
               if (!response.ok) {
-                throw new Error('Failed to extract property data');
+                throw new Error(data.error || 'Failed to extract property data');
               }
               
-              const data = await response.json();
               displayPropertyData(data);
             } catch (error) {
               errorDiv.textContent = error.message;

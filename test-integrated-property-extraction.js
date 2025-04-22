@@ -2,11 +2,19 @@
 
 import axios from 'axios';
 
-// Test URLs from different formats and sources
+// Test URLs from different real estate sites to find one that works best
 const testUrls = [
-  "https://www.zillow.com/homedetails/122-N-Clark-Dr-Los-Angeles-CA-90048/20516854_zpid/",
-  "https://www.zillow.com/homedetails/456-Park-Ave-New-York-NY-10022/12345_zpid/",
-  "https://www.zillow.com/homedetails/123-Main-St-San-Jose-CA-95113/12345_zpid/"
+  // Smaller regional/local sites (typically have less anti-bot protection)
+  "https://www.homes.com/property/509-lake-shore-ter-s-lake-quivira-ks-66217/id-400026765562/",
+  "https://www.homefinder.com/property/4-bedrooms-2-bathrooms-Residential-115246227-9902-Corella-Ave-Whittier-California-90603",
+  
+  // Mid-tier sites
+  "https://www.trulia.com/p/ca/santa-clara/1883-hillebrant-pl-santa-clara-ca-95050--2084636767",
+  "https://www.redfin.com/TX/Austin/4513-Spanish-Oak-Trl-78731/home/31264436",
+  
+  // Major sites (have the most aggressive protection)
+  "https://www.realtor.com/realestateandhomes-detail/321-Cedros-Ave-Unit-A_Solana-Beach_CA_92075_M25131-96845",
+  "https://www.zillow.com/homedetails/122-N-Clark-Dr-Los-Angeles-CA-90048/20516854_zpid/"
 ];
 
 // Helper function to format the result data
