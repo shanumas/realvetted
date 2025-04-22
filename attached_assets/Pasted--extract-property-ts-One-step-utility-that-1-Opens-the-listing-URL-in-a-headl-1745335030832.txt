@@ -1,0 +1,218 @@
+/**
+ * extract‑property.ts
+ *
+ * One‑step utility that:
+ *   1. Opens the listing URL in a headless Chrome instance
+ *   2. Pulls the obvious facts (address, price, beds, baths, etc.)
+ *   3. Reads the “Listed by” name, Googles it, opens the first result,
+ *      and scrapes the first e‑mail address it finds
+ */
+
+import puppeteer, { Browser, Page } from "puppeteer";
+import * as cheerio from "cheerio";
+import { PropertyAIData } from "@shared/types";
+
+/** ------------ main exported function ------------ */
+export async function extractPropertyWithPuppeteer(
+  url: string,
+): Promise<PropertyAIData> {
+  const browser = await launchBrowser();
+  try {
+    /* --------------------------------------------------
+     *  1)  scrape listing page
+     * -------------------------------------------------- */
+    const listingPage = await browser.newPage();
+    await prepPage(listingPage);
+    await listingPage.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await autoScroll(listingPage); // in case stats are lazy‑loaded
+
+    const html = await listingPage.content();
+    const $ = cheerio.load(html);
+
+    /* --------------------------------------------------
+     *  2)  parse core fields
+     * -------------------------------------------------- */
+    const data: PropertyAIData = {
+      address  : $('[data-testid*="address"], h1').first().text().trim() || "Address unavailable",
+      city     : "",
+      state    : "",
+      zip      : "",
+      price    : extractNumber(html, /\$[\d,]+\b/),
+      bedrooms : extractNumber(html, /(\d+)\s*bed/i, true),
+      bathrooms: extractNumber(html, /(\d+(\.\d+)?)\s*bath/i, true),
+      squareFeet: extractNumber(html, /(\d[,.\d]*)\s*sq\s*ft/i),
+      propertyType: guessType(html),
+      yearBuilt: extractNumber(html, /built\s*in\s*(\d{4})/i, true),
+      description: $('meta[name="description"]').attr("content") || "",
+      features : grabFeatures($),
+      imageUrls: grabImages($),
+      propertyUrl: url,
+      /* placeholders below */
+      listingAgentName : "",
+      listingAgentPhone: "",
+      listingAgentEmail: "",
+      listingAgentCompany: "",
+      listingAgentLicenseNo: "",
+      sellerName: "",
+      sellerPhone: "",
+      sellerCompany: "",
+      sellerLicenseNo: "",
+      sellerEmail: "",
+      listedby: "",
+    };
+
+    /* --------------------------------------------------
+     *  3)  pull agent name & phone from page
+     * -------------------------------------------------- */
+    const agentBlock =
+      $('[class*="listing-agent"], [data-testid*="ListingAgent"], :contains("Listed by")').first().text();
+
+    const agentNameMatch = agentBlock.match(/listed by[:\s]*([A-Z][A-Za-z.\s']+)/i);
+    if (agentNameMatch) {
+      data.listingAgentName = agentNameMatch[1].trim();
+      data.listedby = `Listed by: ${data.listingAgentName}`;
+    }
+
+    const phoneMatch = agentBlock.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
+    if (phoneMatch) data.listingAgentPhone = phoneMatch[1];
+
+    /* --------------------------------------------------
+     *  4)  look up agent e‑mail (Google → first site)
+     * -------------------------------------------------- */
+    if (data.listingAgentName) {
+      data.listingAgentEmail = await findAgentEmail(browser, data.listingAgentName);
+    }
+
+    return data;
+  } catch (err) {
+    console.error("❌ extractPropertyWithPuppeteer failed:", err);
+    return { ...EMPTY_PROPERTY, propertyUrl: url };
+  } finally {
+    await browser.close();
+  }
+}
+
+/* ==================================================
+ *             ── helpers below ──
+ * ================================================== */
+
+const EMPTY_PROPERTY: PropertyAIData = {
+  address: "Address unavailable",
+  city: "",
+  state: "",
+  zip: "",
+  propertyType: "",
+  bedrooms: "",
+  bathrooms: "",
+  squareFeet: "",
+  price: "",
+  yearBuilt: "",
+  description: "",
+  features: [],
+  listingAgentName: "",
+  listingAgentPhone: "",
+  listingAgentEmail: "",
+  listingAgentCompany: "",
+  listingAgentLicenseNo: "",
+  propertyUrl: "",
+  imageUrls: [],
+  sellerName: "",
+  sellerPhone: "",
+  sellerCompany: "",
+  sellerLicenseNo: "",
+  sellerEmail: "",
+  listedby: "",
+};
+
+/* ---------- launch Chrome with minimal flags ---------- */
+async function launchBrowser(): Promise<Browser> {
+  return puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+    ],
+  });
+}
+
+/* ---------- standard page preparations ---------- */
+async function prepPage(page: Page) {
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+  );
+  await page.setViewport({ width: 1440, height: 900 });
+  await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
+}
+
+/* ---------- naive auto‑scroll to trigger lazy loads ---------- */
+async function autoScroll(page: Page) {
+  await page.evaluate(async () => {
+    await new Promise<void>((resolve) => {
+      let y = 0;
+      const step = 400;
+      const timer = setInterval(() => {
+        window.scrollBy(0, step);
+        y += step;
+        if (y >= document.body.scrollHeight) {
+          clearInterval(timer);
+          resolve();
+        }
+      }, 120);
+    });
+  });
+}
+
+/* ---------- quick regex helpers ---------- */
+function extractNumber(html: string, re: RegExp, plain = false): string {
+  const m = html.match(re);
+  if (!m) return "";
+  return plain ? m[1] ?? "" : (m[0] ?? "").replace(/[^\d.]/g, "");
+}
+
+function guessType(html: string): string {
+  const types = ["Single Family", "Condo", "Townhouse", "Multi‑Family", "Apartment", "Mobile", "Land"];
+  return types.find((t) => html.includes(t)) || "";
+}
+
+/* ---------- gather bullet‑list features if present ---------- */
+function grabFeatures($: cheerio.CheerioAPI): string[] {
+  const list: string[] = [];
+  $('ul li').each((_, el) => {
+    const txt = $(el).text().trim();
+    if (txt && list.length < 50) list.push(txt);
+  });
+  return Array.from(new Set(list));
+}
+
+/* ---------- small helper to collect primary images ---------- */
+function grabImages($: cheerio.CheerioAPI): string[] {
+  const imgs: string[] = [];
+  $('img[src*="https://"], img[data-src*="https://"]').each((_, el) => {
+    const src = $(el).attr("src") || $(el).attr("data-src") || "";
+    if (src && imgs.length < 10) imgs.push(src);
+  });
+  return imgs;
+}
+
+/* ---------- Google → first result → first email ---------- */
+async function findAgentEmail(browser: Browser, name: string): Promise<string> {
+  const page = await browser.newPage();
+  try {
+    await prepPage(page);
+    const query = encodeURIComponent(`${name} realtor email`);
+    await page.goto(`https://www.google.com/search?q=${query}`, { waitUntil: "domcontentloaded" });
+
+    const firstHref = await page.$eval("div.yuRUbf > a", (a) => (a as HTMLAnchorElement).href);
+    await page.goto(firstHref, { waitUntil: "domcontentloaded", timeout: 20_000 });
+
+    const html = await page.content();
+    const emailMatch = html.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
+    return emailMatch ? emailMatch[0] : "";
+  } catch {
+    return "";
+  } finally {
+    await page.close();
+  }
+}

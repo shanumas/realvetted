@@ -5,16 +5,20 @@ import { setupAuth } from "./auth";
 import { setupWebSocketServer } from "./websocket";
 import { exec, execSync } from "child_process";
 import {
-  extractPropertyData,
-  verifyKYCDocuments,
   findAgentsForProperty,
-  extractIDData,
   validatePrequalificationDocument,
 } from "./openai";
 import { extractPropertyFromUrl } from "./extraction";
-import { sendTourRequestEmail, sendPrequalificationApprovalEmail } from "./email-service";
+import {
+  sendTourRequestEmail,
+  sendPrequalificationApprovalEmail,
+} from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
-import { createVeriffSession, checkVeriffSessionStatus, processVeriffWebhook } from "./veriff";
+import {
+  createVeriffSession,
+  checkVeriffSessionStatus,
+  processVeriffWebhook,
+} from "./veriff";
 import {
   propertySchema,
   agentLeadSchema,
@@ -100,31 +104,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/attached_assets",
     express.static(path.join(process.cwd(), "attached_assets")),
   );
-  
+
   // Ensure upload directory is accessible
   console.log("Upload directories:");
   console.log(" - Uploads dir path:", uploadsDir);
   console.log(" - Prequalification dir path:", prequalificationDir);
-  
+
   // Serve PDF files with optional fillable mode and prefilling capabilities
   app.get("/api/docs/:filename", async (req, res) => {
     try {
       const { filename } = req.params;
-      const fillable = req.query.fillable === 'true';
-      const prefill = req.query.prefill as string || '';
-      const inline = req.query.inline !== 'false'; // Default to inline viewing unless specified
-      
+      const fillable = req.query.fillable === "true";
+      const prefill = (req.query.prefill as string) || "";
+      const inline = req.query.inline !== "false"; // Default to inline viewing unless specified
+
       // Only allow specific PDF files to be served
-      if (!['brbc.pdf', 'brsr.pdf'].includes(filename)) {
+      if (!["brbc.pdf", "brsr.pdf"].includes(filename)) {
         return res.status(404).json({
           success: false,
           error: "File not found",
         });
       }
-      
+
       // Create file path
       const filePath = path.join(process.cwd(), "uploads", "pdf", filename);
-      
+
       // Check if file exists
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({
@@ -132,50 +136,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "File not found",
         });
       }
-      
+
       // Read the PDF file
       let pdfBuffer = fs.readFileSync(filePath);
-      
+
       // Handle BRBC PDF prefilling
-      if (filename === 'brbc.pdf' && prefill === 'buyer' && req.user) {
+      if (filename === "brbc.pdf" && prefill === "buyer" && req.user) {
         // Get buyer name from the current logged-in user
-        const buyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
+        const buyerName =
+          `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() ||
+          req.user.email;
         const buyerId = req.user.id;
-        
+
         // Fill the BRBC form with the current user's information
         try {
           // Generate a unique cache key based on the user ID to ensure each user gets their own PDF
           const cacheKey = `brbc_user_${buyerId}_${Date.now()}`;
-          
+
           // Fill the BRBC form with current user's information
           pdfBuffer = await fillBrbcForm(buyerName);
-          console.log(`Prefilled BRBC form for buyer: ${buyerName} (ID: ${buyerId})`);
+          console.log(
+            `Prefilled BRBC form for buyer: ${buyerName} (ID: ${buyerId})`,
+          );
         } catch (error) {
           console.error("Error prefilling BRBC form:", error);
           // If prefilling fails, use the original PDF
         }
       }
-      
+
       // Set headers for PDF viewing
       res.setHeader("Content-Type", "application/pdf");
-      
+
       // Set appropriate content disposition
       if (inline) {
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       } else {
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${filename}"`,
+        );
       }
-      
+
       // Add headers for fillable PDFs
       if (fillable) {
         // Add headers to prevent caching for editable PDFs
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+        res.setHeader(
+          "Cache-Control",
+          "no-store, no-cache, must-revalidate, proxy-revalidate",
+        );
         res.setHeader("Pragma", "no-cache");
         res.setHeader("Expires", "0");
         // Set custom header to indicate this is editable
         res.setHeader("X-PDF-Editable", "true");
       }
-      
+
       // Send the PDF directly to the client
       res.send(pdfBuffer);
     } catch (error) {
@@ -194,296 +208,339 @@ export async function registerRoutes(app: Express): Promise<Server> {
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
     fileFilter: (req, file, cb) => {
       // Accept images and PDF files
-      if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+      if (
+        file.mimetype.startsWith("image/") ||
+        file.mimetype === "application/pdf"
+      ) {
         cb(null, true);
       } else {
         cb(null, false);
       }
-    }
+    },
   });
 
   // -------- API Routes --------
 
   // User routes
-  
+
   // Pre-qualification approval request endpoint
   // Endpoint to set manual approval requested status
-  app.post("/api/buyer/set-manual-approval-requested", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(400).json({ error: "User not found" });
-      }
-      
-      const { manualApprovalRequested } = req.body;
-      
-      // Update the user's manualApprovalRequested status
-      await storage.updateUser(userId, { manualApprovalRequested: !!manualApprovalRequested });
-      
-      return res.json({ success: true });
-    } catch (error) {
-      console.error("Error setting manual approval requested status:", error);
-      return res.status(500).json({ 
-        error: "Failed to update manual approval status", 
-        details: error.message 
-      });
-    }
-  });
-
-  app.post("/api/buyer/prequalification-approval", isAuthenticated, hasRole(["buyer"]), upload.any(), async (req, res) => {
-    try {
-      console.log("Received manual approval request");
-      
-      // Get user information
-      const user = await storage.getUser(req.user!.id);
-      
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: "User not found"
-        });
-      }
-      
-      // Ensure user has uploaded a pre-qualification document previously
-      // (This is optional - we can allow manual approvals even without a document)
-      const hasPrequalDocument = !!user.prequalificationDocUrl;
-      const prequalDocUrl = user.prequalificationDocUrl || "";
-      
-      console.log("Form data:", req.body);
-      console.log("Files:", req.files);
-      
-      // Extract form data
-      const approvalFormData = {
-        desiredLoanAmount: req.body.desiredLoanAmount,
-        monthlyIncome: req.body.monthlyIncome,
-        employmentStatus: req.body.employmentStatus,
-        creditScore: req.body.creditScore,
-        downPaymentAmount: req.body.downPaymentAmount,
-        additionalNotes: req.body.additionalNotes
-      };
-      
-      // Process supporting documents if any
-      const supportingDocs = req.files as Express.Multer.File[];
-      const supportingDocsUrls: string[] = [];
-      
-      if (supportingDocs && supportingDocs.length > 0) {
-        // Create directory if it doesn't exist
-        await fs.promises.mkdir(
-          path.join(process.cwd(), "uploads", "supporting_docs"),
-          { recursive: true }
-        );
-        
-        // Process each uploaded supporting document
-        for (const file of supportingDocs) {
-          const fileName = `supporting_${req.user!.id}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${file.originalname.split('.').pop()}`;
-          const filePath = path.join(process.cwd(), "uploads", "supporting_docs", fileName);
-          
-          // Save file to disk
-          await fs.promises.writeFile(filePath, file.buffer);
-          
-          // Add URL to array
-          const fileUrl = `/uploads/supporting_docs/${fileName}`;
-          supportingDocsUrls.push(fileUrl);
+  app.post(
+    "/api/buyer/set-manual-approval-requested",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(400).json({ error: "User not found" });
         }
-      }
-      
-      // Send approval request email with form data and supporting docs
-      await sendPrequalificationApprovalEmail(
-        user, 
-        prequalDocUrl,
-        approvalFormData,
-        supportingDocsUrls
-      );
-      
-      res.json({
-        success: true,
-        message: "Pre-qualification approval request sent",
-        supportingDocsCount: supportingDocsUrls.length
-      });
-    } catch (error) {
-      console.error("Error requesting pre-qualification approval:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to send pre-qualification approval request"
-      });
-    }
-  });
-  
-  // Pre-qualification document upload
-  app.post("/api/buyer/prequalification", isAuthenticated, hasRole(["buyer"]), (req, res, next) => {
-    console.log("Received prequalification upload request");
-    console.log("Content-Type:", req.headers['content-type']);
-    console.log("Request body:", req.body);
-    console.log("Request has files?", !!req.files);
-    next();
-  }, upload.single("file"), async (req, res) => {
-    try {
-      console.log("After multer middleware");
-      console.log("req.file:", req.file);
-      console.log("req.body:", req.body);
-      
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: "No file uploaded"
-        });
-      }
 
-      // Get the uploaded file
-      const file = req.file;
-      
-      // Generate a unique filename
-      const fileName = `prequalification_${req.user!.id}_${Date.now()}.${file.originalname.split('.').pop()}`;
-      
-      // Save the file to disk
-      const filePath = path.join(prequalificationDir, fileName);
-      fs.writeFileSync(filePath, file.buffer);
-      
-      // Update user record with prequalification info
-      const fileUrl = `/uploads/prequalification/${fileName}`;
-      
-      try {
-        await storage.updateUser(req.user!.id, {
-          verificationMethod: "prequalification",
-          prequalificationDocUrl: fileUrl,
-          prequalificationValidated: false, // Will be validated via AI in the next step
-          profileStatus: "pending" // Set to pending until validated
+        const { manualApprovalRequested } = req.body;
+
+        // Update the user's manualApprovalRequested status
+        await storage.updateUser(userId, {
+          manualApprovalRequested: !!manualApprovalRequested,
         });
-        console.log("User record updated with prequalification info");
-      } catch (updateError) {
-        console.error("Error updating user record:", updateError);
-        // Continue the process even if the update fails
+
+        return res.json({ success: true });
+      } catch (error) {
+        console.error("Error setting manual approval requested status:", error);
+        return res.status(500).json({
+          error: "Failed to update manual approval status",
+          details: error.message,
+        });
       }
-      
-      // Use OpenAI to extract information from the document for validation
+    },
+  );
+
+  app.post(
+    "/api/buyer/prequalification-approval",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    upload.any(),
+    async (req, res) => {
       try {
-        // Validate the document using AI
+        console.log("Received manual approval request");
+
+        // Get user information
         const user = await storage.getUser(req.user!.id);
+
         if (!user) {
-          throw new Error("User not found");
+          return res.status(404).json({
+            success: false,
+            error: "User not found",
+          });
         }
-        
-        // Check if user has exceeded the maximum number of attempts (3)
-        const currentAttempts = user.prequalificationAttempts || 0;
-        if (currentAttempts >= 3) {
+
+        // Ensure user has uploaded a pre-qualification document previously
+        // (This is optional - we can allow manual approvals even without a document)
+        const hasPrequalDocument = !!user.prequalificationDocUrl;
+        const prequalDocUrl = user.prequalificationDocUrl || "";
+
+        console.log("Form data:", req.body);
+        console.log("Files:", req.files);
+
+        // Extract form data
+        const approvalFormData = {
+          desiredLoanAmount: req.body.desiredLoanAmount,
+          monthlyIncome: req.body.monthlyIncome,
+          employmentStatus: req.body.employmentStatus,
+          creditScore: req.body.creditScore,
+          downPaymentAmount: req.body.downPaymentAmount,
+          additionalNotes: req.body.additionalNotes,
+        };
+
+        // Process supporting documents if any
+        const supportingDocs = req.files as Express.Multer.File[];
+        const supportingDocsUrls: string[] = [];
+
+        if (supportingDocs && supportingDocs.length > 0) {
+          // Create directory if it doesn't exist
+          await fs.promises.mkdir(
+            path.join(process.cwd(), "uploads", "supporting_docs"),
+            { recursive: true },
+          );
+
+          // Process each uploaded supporting document
+          for (const file of supportingDocs) {
+            const fileName = `supporting_${req.user!.id}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}.${file.originalname.split(".").pop()}`;
+            const filePath = path.join(
+              process.cwd(),
+              "uploads",
+              "supporting_docs",
+              fileName,
+            );
+
+            // Save file to disk
+            await fs.promises.writeFile(filePath, file.buffer);
+
+            // Add URL to array
+            const fileUrl = `/uploads/supporting_docs/${fileName}`;
+            supportingDocsUrls.push(fileUrl);
+          }
+        }
+
+        // Send approval request email with form data and supporting docs
+        await sendPrequalificationApprovalEmail(
+          user,
+          prequalDocUrl,
+          approvalFormData,
+          supportingDocsUrls,
+        );
+
+        res.json({
+          success: true,
+          message: "Pre-qualification approval request sent",
+          supportingDocsCount: supportingDocsUrls.length,
+        });
+      } catch (error) {
+        console.error("Error requesting pre-qualification approval:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to send pre-qualification approval request",
+        });
+      }
+    },
+  );
+
+  // Pre-qualification document upload
+  app.post(
+    "/api/buyer/prequalification",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    (req, res, next) => {
+      console.log("Received prequalification upload request");
+      console.log("Content-Type:", req.headers["content-type"]);
+      console.log("Request body:", req.body);
+      console.log("Request has files?", !!req.files);
+      next();
+    },
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        console.log("After multer middleware");
+        console.log("req.file:", req.file);
+        console.log("req.body:", req.body);
+
+        if (!req.file) {
           return res.status(400).json({
             success: false,
-            error: "You have exceeded the maximum number of verification attempts (3). Please contact support for assistance."
+            error: "No file uploaded",
           });
         }
-        
-        // Increment the attempts counter
-        console.log(`Pre-qualification attempt ${currentAttempts + 1}/3 for user ID ${req.user!.id}`);
-        
-        // Perform validation
-        const validationResult = await validatePrequalificationDocument(
-          filePath,
-          {
-            firstName: user.firstName,
-            lastName: user.lastName
+
+        // Get the uploaded file
+        const file = req.file;
+
+        // Generate a unique filename
+        const fileName = `prequalification_${req.user!.id}_${Date.now()}.${file.originalname.split(".").pop()}`;
+
+        // Save the file to disk
+        const filePath = path.join(prequalificationDir, fileName);
+        fs.writeFileSync(filePath, file.buffer);
+
+        // Update user record with prequalification info
+        const fileUrl = `/uploads/prequalification/${fileName}`;
+
+        try {
+          await storage.updateUser(req.user!.id, {
+            verificationMethod: "prequalification",
+            prequalificationDocUrl: fileUrl,
+            prequalificationValidated: false, // Will be validated via AI in the next step
+            profileStatus: "pending", // Set to pending until validated
+          });
+          console.log("User record updated with prequalification info");
+        } catch (updateError) {
+          console.error("Error updating user record:", updateError);
+          // Continue the process even if the update fails
+        }
+
+        // Use OpenAI to extract information from the document for validation
+        try {
+          // Validate the document using AI
+          const user = await storage.getUser(req.user!.id);
+          if (!user) {
+            throw new Error("User not found");
           }
-        );
-        
-        // Update user record based on validation result
-        if (validationResult.validated) {
-          // Success - update user record with validation information
-          await storage.updateUser(req.user!.id, {
-            prequalificationValidated: true,
-            profileStatus: "verified",
-            prequalificationData: validationResult.data,
-            prequalificationMessage: validationResult.message,
-            prequalificationAttempts: currentAttempts + 1
-          });
-          
-          console.log(`User ID ${req.user!.id} verified through pre-qualification document.`);
-        } else {
-          // Failed validation - store the failed document URL and update attempt count
-          const failedUrls = user.failedPrequalificationUrls || [];
-          failedUrls.push(fileUrl); // Add current failed document to history
-          
-          await storage.updateUser(req.user!.id, {
-            prequalificationValidated: false,
-            profileStatus: "pending",
-            prequalificationData: validationResult.data,
-            prequalificationMessage: validationResult.message,
-            prequalificationAttempts: currentAttempts + 1,
-            failedPrequalificationUrls: failedUrls
-          });
-          
-          console.log(`User ID ${req.user!.id} pre-qualification document failed validation: ${validationResult.message}`);
+
+          // Check if user has exceeded the maximum number of attempts (3)
+          const currentAttempts = user.prequalificationAttempts || 0;
+          if (currentAttempts >= 3) {
+            return res.status(400).json({
+              success: false,
+              error:
+                "You have exceeded the maximum number of verification attempts (3). Please contact support for assistance.",
+            });
+          }
+
+          // Increment the attempts counter
+          console.log(
+            `Pre-qualification attempt ${currentAttempts + 1}/3 for user ID ${req.user!.id}`,
+          );
+
+          // Perform validation
+          const validationResult = await validatePrequalificationDocument(
+            filePath,
+            {
+              firstName: user.firstName,
+              lastName: user.lastName,
+            },
+          );
+
+          // Update user record based on validation result
+          if (validationResult.validated) {
+            // Success - update user record with validation information
+            await storage.updateUser(req.user!.id, {
+              prequalificationValidated: true,
+              profileStatus: "verified",
+              prequalificationData: validationResult.data,
+              prequalificationMessage: validationResult.message,
+              prequalificationAttempts: currentAttempts + 1,
+            });
+
+            console.log(
+              `User ID ${req.user!.id} verified through pre-qualification document.`,
+            );
+          } else {
+            // Failed validation - store the failed document URL and update attempt count
+            const failedUrls = user.failedPrequalificationUrls || [];
+            failedUrls.push(fileUrl); // Add current failed document to history
+
+            await storage.updateUser(req.user!.id, {
+              prequalificationValidated: false,
+              profileStatus: "pending",
+              prequalificationData: validationResult.data,
+              prequalificationMessage: validationResult.message,
+              prequalificationAttempts: currentAttempts + 1,
+              failedPrequalificationUrls: failedUrls,
+            });
+
+            console.log(
+              `User ID ${req.user!.id} pre-qualification document failed validation: ${validationResult.message}`,
+            );
+          }
+        } catch (validationError) {
+          console.error(
+            "Error validating pre-qualification document:",
+            validationError,
+          );
+          // Don't fail the request, just leave as pending for manual review
         }
-      } catch (validationError) {
-        console.error("Error validating pre-qualification document:", validationError);
-        // Don't fail the request, just leave as pending for manual review
+
+        // Return success
+        const updatedUser = await storage.getUser(req.user!.id);
+        res.json({
+          success: true,
+          data: updatedUser,
+        });
+      } catch (error) {
+        console.error("Pre-qualification upload error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to upload pre-qualification document",
+        });
       }
-      
-      // Return success
-      const updatedUser = await storage.getUser(req.user!.id);
-      res.json({
-        success: true,
-        data: updatedUser
-      });
-    } catch (error) {
-      console.error("Pre-qualification upload error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to upload pre-qualification document"
-      });
-    }
-  });
-  
+    },
+  );
+
   // Buyer identity verification endpoint
-  app.post("/api/buyer/verify-identity", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
-    try {
-      // Update user's verification method
-      await storage.updateUser(req.user!.id, {
-        verificationMethod: "kyc"
-      });
-      
-      // Create a Veriff session for the user
-      const sessionData = await createVeriffSession(req.user!);
-      
-      res.json({
-        success: true,
-        redirectUrl: sessionData.url,
-        sessionId: sessionData.sessionId
-      });
-    } catch (error) {
-      console.error("Verification initiation error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to start verification process"
-      });
-    }
-  });
-  
+  app.post(
+    "/api/buyer/verify-identity",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        // Update user's verification method
+        await storage.updateUser(req.user!.id, {
+          verificationMethod: "kyc",
+        });
+
+        // Create a Veriff session for the user
+        const sessionData = await createVeriffSession(req.user!);
+
+        res.json({
+          success: true,
+          redirectUrl: sessionData.url,
+          sessionId: sessionData.sessionId,
+        });
+      } catch (error) {
+        console.error("Verification initiation error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to start verification process",
+        });
+      }
+    },
+  );
+
   // Look up agent license
   app.get("/api/agent/license-lookup", async (req, res) => {
     try {
       const { licenseNumber } = req.query;
-      
-      if (!licenseNumber || typeof licenseNumber !== 'string') {
+
+      if (!licenseNumber || typeof licenseNumber !== "string") {
         return res.status(400).json({
           success: false,
-          error: "License number is required"
+          error: "License number is required",
         });
       }
-      
+
       const licenseData = await lookupCaliforniaLicense(licenseNumber);
-      
+
       res.json({
         success: true,
-        data: licenseData
+        data: licenseData,
       });
     } catch (error) {
       console.error("License lookup error:", error);
       res.status(500).json({
-        success: false, 
-        error: "Failed to look up license information"
+        success: false,
+        error: "Failed to look up license information",
       });
     }
   });
-  
+
   // Veriff integration routes
   app.post("/api/veriff/create-session", isAuthenticated, async (req, res) => {
     try {
@@ -491,104 +548,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.user) {
         return res.status(401).json({
           success: false,
-          error: "Unauthorized"
+          error: "Unauthorized",
         });
       }
-      
+
       // Create a Veriff session
       const sessionData = await createVeriffSession(req.user);
-      
+
       res.json({
         success: true,
         url: sessionData.url,
-        sessionId: sessionData.sessionId
+        sessionId: sessionData.sessionId,
       });
     } catch (error) {
       console.error("Veriff session creation error:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to create verification session"
+        error: "Failed to create verification session",
       });
     }
   });
-  
+
   // Check Veriff session status
-  app.get("/api/veriff/status/:sessionId", isAuthenticated, async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      
-      if (!sessionId) {
-        return res.status(400).json({
-          success: false,
-          error: "Session ID is required"
-        });
-      }
-      
-      console.log(`Checking verification status for session: ${sessionId}`);
-      
+  app.get(
+    "/api/veriff/status/:sessionId",
+    isAuthenticated,
+    async (req, res) => {
       try {
-        const status = await checkVeriffSessionStatus(sessionId);
-        console.log(`Received verification status: ${status}`);
-        
-        // If the status is approved or success, update the user's profile status
-        if ((status === 'approved' || status === 'success') && req.user) {
-          await storage.updateUser(req.user.id, {
-            profileStatus: 'verified'
+        const { sessionId } = req.params;
+
+        if (!sessionId) {
+          return res.status(400).json({
+            success: false,
+            error: "Session ID is required",
           });
-          
-          // Log the verification
-          console.log(`User ID ${req.user.id} automatically verified via background check.`);
         }
-        
-        // Return both status and decision fields for backward compatibility
-        res.json({
-          success: true,
-          status,
-          decision: status, // Include decision field since frontend expects it
-          // Add explicit boolean for UI convenience
-          isVerified: status === 'approved' || status === 'success'
-        });
-      } catch (veriffError) {
-        console.log("Verification not found or still in progress");
-        
-        // Return a more user-friendly response with both status and decision fields
-        res.json({
-          success: true,
-          status: "pending",
-          decision: "pending", // Include decision field since frontend expects it
-          isVerified: false,
-          message: "Verification is still in progress or not yet started"
+
+        console.log(`Checking verification status for session: ${sessionId}`);
+
+        try {
+          const status = await checkVeriffSessionStatus(sessionId);
+          console.log(`Received verification status: ${status}`);
+
+          // If the status is approved or success, update the user's profile status
+          if ((status === "approved" || status === "success") && req.user) {
+            await storage.updateUser(req.user.id, {
+              profileStatus: "verified",
+            });
+
+            // Log the verification
+            console.log(
+              `User ID ${req.user.id} automatically verified via background check.`,
+            );
+          }
+
+          // Return both status and decision fields for backward compatibility
+          res.json({
+            success: true,
+            status,
+            decision: status, // Include decision field since frontend expects it
+            // Add explicit boolean for UI convenience
+            isVerified: status === "approved" || status === "success",
+          });
+        } catch (veriffError) {
+          console.log("Verification not found or still in progress");
+
+          // Return a more user-friendly response with both status and decision fields
+          res.json({
+            success: true,
+            status: "pending",
+            decision: "pending", // Include decision field since frontend expects it
+            isVerified: false,
+            message: "Verification is still in progress or not yet started",
+          });
+        }
+      } catch (error) {
+        console.error("Veriff status check error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to check verification status",
         });
       }
-    } catch (error) {
-      console.error("Veriff status check error:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to check verification status"
-      });
-    }
-  });
-  
+    },
+  );
+
   // Webhook for Veriff callbacks
   app.post("/api/veriff/webhook", async (req, res) => {
     try {
       // Validate webhook authenticity if needed
-      
+
       const webhookData = req.body;
-      
+
       // Process the webhook data
       await processVeriffWebhook(webhookData);
-      
+
       res.status(200).send("Webhook received");
     } catch (error) {
       console.error("Veriff webhook processing error:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to process webhook"
+        error: "Failed to process webhook",
       });
     }
   });
-  
+
   app.put("/api/users/kyc", isAuthenticated, async (req, res) => {
     try {
       const data = kycUpdateSchema.parse(req.body);
@@ -601,52 +664,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (data.idFrontUrl && data.idBackUrl) {
         try {
           // First, try to extract data from the ID documents
-          let idFrontBase64 = '';
-          let idBackBase64 = '';
-          
+          let idFrontBase64 = "";
+          let idBackBase64 = "";
+
           try {
             // Convert the image URLs to base64 for AI processing
             // In a real implementation, we would fetch these from storage
             // For now we'll use a mock implementation
             const fetchImage = async (url: string): Promise<string> => {
               // Remove the URL part and just use the data if it's already a data URL
-              if (url.startsWith('data:')) {
-                return url.split(',')[1];
+              if (url.startsWith("data:")) {
+                return url.split(",")[1];
               }
-              
+
               // In a real app we'd fetch the image from URL
               // For now return empty string as mock
-              return '';
+              return "";
             };
-            
+
             idFrontBase64 = await fetchImage(data.idFrontUrl);
             idBackBase64 = await fetchImage(data.idBackUrl);
-            
+
             // Extract ID data if we have base64 content
             if (idFrontBase64 && idBackBase64) {
               const idData = await extractIDData(idFrontBase64, idBackBase64);
-              
+
               // Save extracted ID data to user profile
               if (idData && Object.keys(idData).length > 0) {
                 await storage.updateUser(req.user.id, {
                   firstName: idData.firstName || req.user.firstName,
                   lastName: idData.lastName || req.user.lastName,
-                  dateOfBirth: idData.dateOfBirth ? new Date(idData.dateOfBirth) : req.user.dateOfBirth,
+                  dateOfBirth: idData.dateOfBirth
+                    ? new Date(idData.dateOfBirth)
+                    : req.user.dateOfBirth,
                   addressLine1: idData.addressLine1 || req.user.addressLine1,
                   addressLine2: idData.addressLine2 || req.user.addressLine2,
                   city: idData.city || req.user.city,
                   state: idData.state || req.user.state,
                   zip: idData.zip || req.user.zip,
                 });
-                
-                console.log("Updated user profile with extracted ID data:", idData);
+
+                console.log(
+                  "Updated user profile with extracted ID data:",
+                  idData,
+                );
               }
             }
           } catch (extractError) {
-            console.error("Error extracting data from ID documents:", extractError);
+            console.error(
+              "Error extracting data from ID documents:",
+              extractError,
+            );
             // Continue with verification even if extraction fails
           }
-          
+
           // Now verify the ID documents
           const verificationResult = await verifyKYCDocuments(
             req.user.id,
@@ -669,7 +740,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // If this is an agent, create leads for existing properties
             if (req.user.role === "agent") {
               try {
-                
                 // Create leads for this agent for appropriate properties
                 const properties = await storage.getAllProperties();
                 const agent = await storage.getUser(req.user.id);
@@ -732,10 +802,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const redirectUrl = req.user && req.user.role === 'agent' && updatedUser.profileStatus === 'verified' 
-        ? '/agent/referral-agreement' 
-        : null;
-        
+      const redirectUrl =
+        req.user &&
+        req.user.role === "agent" &&
+        updatedUser.profileStatus === "verified"
+          ? "/agent/referral-agreement"
+          : null;
+
       res.json({
         success: true,
         data: updatedUser,
@@ -751,65 +824,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Helper function to standardize license numbers from various formats
-  function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
+  function cleanLicenseNumber(
+    licenseNo: string | null | undefined,
+  ): string | null | undefined {
     if (!licenseNo) return licenseNo;
-    
+
     // Look for patterns with colon that typically separate descriptive text from license numbers
     // Examples: "CALBRE: 01234567", "License: 01234567", "DRE: 01234567"
     const colonMatch = licenseNo.match(/(?::|#)\s*([A-Z0-9][\w.-]{4,})\b/i);
     if (colonMatch && colonMatch[1]) {
       return colonMatch[1];
     }
-    
+
     // First, remove any prefix like "DRE", "DRE #", "CalDRE", etc.
-    const prefixesPattern = /^(?:DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
+    const prefixesPattern =
+      /^(?:DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
     let cleaned = licenseNo.replace(prefixesPattern, "").trim();
-    
+
     // Look for State format with letter and period (e.g., S.0123456 for Nevada)
     const stateFormatInText = licenseNo.match(/\b([A-Z]\.\d{5,})\b/i);
     if (stateFormatInText && stateFormatInText[1]) {
-      return stateFormatInText[1].replace('.', '');
+      return stateFormatInText[1].replace(".", "");
     }
-    
+
     // Handle format where license number might be wrapped in parentheses
     // e.g., "John Doe (License #01234567)" or "Jane Smith (S.0123456)"
-    const parenthesesMatch = cleaned.match(/\((?:[^\)]*?)(?:(?:([A-Z])\.(\d{5,}))|(?:(?:[^\d]*)(\d{5,})))(?:[^\d]*?)\)?/i);
+    const parenthesesMatch = cleaned.match(
+      /\((?:[^\)]*?)(?:(?:([A-Z])\.(\d{5,}))|(?:(?:[^\d]*)(\d{5,})))(?:[^\d]*?)\)?/i,
+    );
     if (parenthesesMatch) {
       // Check for state code format (S.0123456)
       if (parenthesesMatch[1] && parenthesesMatch[2]) {
         return parenthesesMatch[1] + parenthesesMatch[2]; // Combine letter and number
-      } 
+      }
       // Standard numeric format
       else if (parenthesesMatch[3]) {
         return parenthesesMatch[3];
       }
     }
-    
+
     // If there's a comma followed by a pattern that looks like a license number, extract it
     // e.g., "John Doe, #01234567"
     const commaMatch = cleaned.match(/,\s*(?:#?\s*)([A-Z]?[\d]{5,})\b/i);
     if (commaMatch && commaMatch[1]) {
       return commaMatch[1];
     }
-    
-    // Plain license number without any text 
+
+    // Plain license number without any text
     // Avoid matching when there's extra non-numeric text
     const justNumber = /^\s*#?\s*(\d{5,}(?:-\w+)?)\s*(?:\(Active\))?$/i;
     const numberMatch = cleaned.match(justNumber);
     if (numberMatch && numberMatch[1]) {
       return numberMatch[1];
     }
-    
+
     // Last resort for complex cases - find the first number sequence that could be a license
     const anyNumberMatch = licenseNo.match(/\b([A-Z]?\d{5,}(?:-\w+)?)\b/i);
     if (anyNumberMatch && anyNumberMatch[1]) {
       return anyNumberMatch[1];
     }
-    
+
     // If no good pattern match, just remove non-alphanumeric chars (defensive fallback)
     cleaned = cleaned.replace(/[^A-Z0-9.-]/gi, "");
-    
-    // If the cleaned result is too long (likely it contains other text), 
+
+    // If the cleaned result is too long (likely it contains other text),
     // find something that looks like a license number in it
     if (cleaned.length > 10) {
       const candidateMatch = cleaned.match(/([A-Z]?\d{5,}(?:-\w+)?)/i);
@@ -817,7 +895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return candidateMatch[1];
       }
     }
-    
+
     return cleaned;
   }
 
@@ -830,19 +908,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Clean up license numbers before validation
         if (req.body.sellerLicenseNo) {
-          req.body.sellerLicenseNo = cleanLicenseNumber(req.body.sellerLicenseNo);
+          req.body.sellerLicenseNo = cleanLicenseNumber(
+            req.body.sellerLicenseNo,
+          );
         }
         if (req.body.listingAgentLicenseNo) {
-          req.body.listingAgentLicenseNo = cleanLicenseNumber(req.body.listingAgentLicenseNo);
+          req.body.listingAgentLicenseNo = cleanLicenseNumber(
+            req.body.listingAgentLicenseNo,
+          );
         }
-        
+
         // Convert numeric fields to numbers if they're strings
-        ['price', 'bedrooms', 'bathrooms', 'squareFeet', 'yearBuilt'].forEach(field => {
-          if (typeof req.body[field] === 'string' && req.body[field]) {
-            req.body[field] = Number(req.body[field]);
-          }
-        });
-        
+        ["price", "bedrooms", "bathrooms", "squareFeet", "yearBuilt"].forEach(
+          (field) => {
+            if (typeof req.body[field] === "string" && req.body[field]) {
+              req.body[field] = Number(req.body[field]);
+            }
+          },
+        );
+
         const propertyData = propertySchema.parse({
           ...req.body,
           createdBy: req.user.id,
@@ -1828,43 +1912,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
               : "Failed to extract property data from URL",
         });
       }
-    }
-  );
-  
-  // Temporary test endpoint for extracting property details without authentication
-  app.post(
-    "/api/test/extract-property-from-url",
-    async (req, res) => {
-      try {
-        const { url } = req.body;
-
-        if (!url || typeof url !== "string") {
-          return res.status(400).json({
-            success: false,
-            error: "Property URL is required",
-          });
-        }
-
-        console.log(`Test endpoint: Extracting property from URL: ${url}`);
-        // Use the extraction function directly
-        const propertyData = await extractPropertyFromUrl(url);
-
-        res.json(propertyData);
-      } catch (error) {
-        console.error("Property URL extraction error:", error);
-        res.status(500).json({
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to extract property data from URL",
-        });
-      }
     },
   );
-  
+
+  // Temporary test endpoint for extracting property details without authentication
+  app.post("/api/test/extract-property-from-url", async (req, res) => {
+    try {
+      const { url } = req.body;
+
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "Property URL is required",
+        });
+      }
+
+      console.log(`Test endpoint: Extracting property from URL: ${url}`);
+      // Use the extraction function directly
+      const propertyData = await extractPropertyFromUrl(url);
+
+      res.json(propertyData);
+    } catch (error) {
+      console.error("Property URL extraction error:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to extract property data from URL",
+      });
+    }
+  });
+
   // Web-based test endpoint for property extraction
-  app.get('/api/test/property-extractor', (req, res) => {
+  app.get("/api/test/property-extractor", (req, res) => {
     res.send(`
       <!DOCTYPE html>
       <html>
@@ -2138,36 +2219,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         // Query all agreements of type "agent_referral"
-        const allAgreements = await storage.getAgreementsByType("agent_referral");
-        
+        const allAgreements =
+          await storage.getAgreementsByType("agent_referral");
+
         // Get the agent details for each agreement
         const agreementsWithDetails = await Promise.all(
           allAgreements.map(async (agreement) => {
             const agent = await storage.getUser(agreement.agentId);
             return {
               ...agreement,
-              agent: agent ? {
-                id: agent.id,
-                name: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
-                email: agent.email,
-                licenseNumber: agent.licenseNumber
-              } : null
+              agent: agent
+                ? {
+                    id: agent.id,
+                    name:
+                      `${agent.firstName || ""} ${agent.lastName || ""}`.trim() ||
+                      agent.email,
+                    email: agent.email,
+                    licenseNumber: agent.licenseNumber,
+                  }
+                : null,
             };
-          })
+          }),
         );
-        
+
         res.json({
           success: true,
-          data: agreementsWithDetails
+          data: agreementsWithDetails,
         });
       } catch (error) {
         console.error("Error fetching agent referral agreements:", error);
         res.status(500).json({
           success: false,
-          error: "Failed to fetch agent referral agreements"
+          error: "Failed to fetch agent referral agreements",
         });
       }
-    }
+    },
   );
 
   app.get(
@@ -2187,7 +2273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-  
+
   // Get buyer journey metrics for admin dashboard
   app.get(
     "/api/admin/buyer-journey-metrics",
@@ -2198,28 +2284,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get all buyers
         const buyers = await storage.getUsersByRole("buyer");
         const totalBuyers = buyers.length;
-        
+
         // Get all properties
         const properties = await storage.getAllProperties();
-        const propertiesWithBuyerIds = properties.filter(property => property.createdBy !== null);
-        
+        const propertiesWithBuyerIds = properties.filter(
+          (property) => property.createdBy !== null,
+        );
+
         // Count unique buyers who have created properties
-        const uniqueBuyersWithProperties = new Set(propertiesWithBuyerIds.map(property => property.createdBy));
+        const uniqueBuyersWithProperties = new Set(
+          propertiesWithBuyerIds.map((property) => property.createdBy),
+        );
         const buyersWithProperties = uniqueBuyersWithProperties.size;
-        
+
         // Get all messages
         const allMessages = await storage.getMessagesByProperty(0, true);
-        
+
         // Count unique buyers who have messaged with agents
         const uniqueBuyersWithMessages = new Set();
-        allMessages.forEach(message => {
+        allMessages.forEach((message) => {
           const sender = message.senderId;
           const receiver = message.receiverId;
-          
+
           // Get the sender and receiver details
-          const senderDetails = buyers.find(user => user.id === sender);
-          const receiverDetails = buyers.find(user => user.id === receiver);
-          
+          const senderDetails = buyers.find((user) => user.id === sender);
+          const receiverDetails = buyers.find((user) => user.id === receiver);
+
           // If sender is a buyer and receiver is an agent, or vice versa, count this buyer
           if (senderDetails && senderDetails.role === "buyer") {
             uniqueBuyersWithMessages.add(sender);
@@ -2229,14 +2319,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         const buyersWithMessages = uniqueBuyersWithMessages.size;
-        
+
         // Get all viewing requests
-        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
-        
+        const allViewingRequests = await storage.getViewingRequestsByProperty(
+          0,
+          true,
+        );
+
         // Count unique buyers who have made viewing requests
-        const uniqueBuyersWithViewings = new Set(allViewingRequests.map(request => request.buyerId));
+        const uniqueBuyersWithViewings = new Set(
+          allViewingRequests.map((request) => request.buyerId),
+        );
         const buyersWithViewings = uniqueBuyersWithViewings.size;
-        
+
         res.json({
           success: true,
           data: {
@@ -2245,12 +2340,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
             buyersWithMessages,
             buyersWithViewings,
             conversionRates: {
-              toProperties: totalBuyers > 0 ? (buyersWithProperties / totalBuyers) * 100 : 0,
-              toMessages: buyersWithProperties > 0 ? (buyersWithMessages / buyersWithProperties) * 100 : 0,
-              toViewings: buyersWithMessages > 0 ? (buyersWithViewings / buyersWithMessages) * 100 : 0,
-              overall: totalBuyers > 0 ? (buyersWithViewings / totalBuyers) * 100 : 0
-            }
-          }
+              toProperties:
+                totalBuyers > 0
+                  ? (buyersWithProperties / totalBuyers) * 100
+                  : 0,
+              toMessages:
+                buyersWithProperties > 0
+                  ? (buyersWithMessages / buyersWithProperties) * 100
+                  : 0,
+              toViewings:
+                buyersWithMessages > 0
+                  ? (buyersWithViewings / buyersWithMessages) * 100
+                  : 0,
+              overall:
+                totalBuyers > 0 ? (buyersWithViewings / totalBuyers) * 100 : 0,
+            },
+          },
         });
       } catch (error) {
         console.error("Get buyer journey metrics error:", error);
@@ -2261,7 +2366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-  
+
   // Agent Journey Metrics
   app.get(
     "/api/admin/agent-journey-metrics",
@@ -2272,27 +2377,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get all agents
         const agents = await storage.getUsersByRole("agent");
         const totalAgents = agents.length;
-        
+
         // Get all properties
         const properties = await storage.getAllProperties();
-        
+
         // Count unique agents who have been assigned to properties
-        const uniqueAgentsWithProperties = new Set(properties.filter(property => property.agentId !== null).map(property => property.agentId));
+        const uniqueAgentsWithProperties = new Set(
+          properties
+            .filter((property) => property.agentId !== null)
+            .map((property) => property.agentId),
+        );
         const agentsWithAssignedProperties = uniqueAgentsWithProperties.size;
-        
+
         // Get all messages
         const allMessages = await storage.getMessagesByProperty(0, true);
-        
+
         // Count unique agents who have sent/received messages
         const uniqueAgentsWithMessages = new Set();
-        allMessages.forEach(message => {
+        allMessages.forEach((message) => {
           const sender = message.senderId;
           const receiver = message.receiverId;
-          
+
           // Get the sender and receiver details
-          const senderDetails = agents.find(user => user.id === sender);
-          const receiverDetails = agents.find(user => user.id === receiver);
-          
+          const senderDetails = agents.find((user) => user.id === sender);
+          const receiverDetails = agents.find((user) => user.id === receiver);
+
           // If sender is an agent, count them
           if (senderDetails && senderDetails.role === "agent") {
             uniqueAgentsWithMessages.add(sender);
@@ -2303,21 +2412,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         const agentsWithMessages = uniqueAgentsWithMessages.size;
-        
+
         // Get all viewing requests
-        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
-        
+        const allViewingRequests = await storage.getViewingRequestsByProperty(
+          0,
+          true,
+        );
+
         // Count unique agents who have handled viewing requests
-        const uniqueAgentsWithViewings = new Set(allViewingRequests.filter(request => request.agentId !== null).map(request => request.agentId));
+        const uniqueAgentsWithViewings = new Set(
+          allViewingRequests
+            .filter((request) => request.agentId !== null)
+            .map((request) => request.agentId),
+        );
         const agentsWithViewings = uniqueAgentsWithViewings.size;
-        
+
         // Get all agreements
         const allAgreements = await storage.getAgreementsByType("all");
-        
+
         // Count unique agents who have agreements
-        const uniqueAgentsWithAgreements = new Set(allAgreements.filter(agreement => agreement.agentId !== null).map(agreement => agreement.agentId));
+        const uniqueAgentsWithAgreements = new Set(
+          allAgreements
+            .filter((agreement) => agreement.agentId !== null)
+            .map((agreement) => agreement.agentId),
+        );
         const agentsWithAgreements = uniqueAgentsWithAgreements.size;
-        
+
         res.json({
           success: true,
           data: {
@@ -2327,13 +2447,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             agentsWithViewings,
             agentsWithAgreements,
             conversionRates: {
-              toProperties: totalAgents > 0 ? (agentsWithAssignedProperties / totalAgents) * 100 : 0,
-              toMessages: agentsWithAssignedProperties > 0 ? (agentsWithMessages / agentsWithAssignedProperties) * 100 : 0,
-              toViewings: agentsWithMessages > 0 ? (agentsWithViewings / agentsWithMessages) * 100 : 0,
-              toAgreements: agentsWithViewings > 0 ? (agentsWithAgreements / agentsWithViewings) * 100 : 0,
-              overall: totalAgents > 0 ? (agentsWithAgreements / totalAgents) * 100 : 0
-            }
-          }
+              toProperties:
+                totalAgents > 0
+                  ? (agentsWithAssignedProperties / totalAgents) * 100
+                  : 0,
+              toMessages:
+                agentsWithAssignedProperties > 0
+                  ? (agentsWithMessages / agentsWithAssignedProperties) * 100
+                  : 0,
+              toViewings:
+                agentsWithMessages > 0
+                  ? (agentsWithViewings / agentsWithMessages) * 100
+                  : 0,
+              toAgreements:
+                agentsWithViewings > 0
+                  ? (agentsWithAgreements / agentsWithViewings) * 100
+                  : 0,
+              overall:
+                totalAgents > 0
+                  ? (agentsWithAgreements / totalAgents) * 100
+                  : 0,
+            },
+          },
         });
       } catch (error) {
         console.error("Get agent journey metrics error:", error);
@@ -2344,7 +2479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
-  
+
   // Seller Journey Metrics
   app.get(
     "/api/admin/seller-journey-metrics",
@@ -2355,27 +2490,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Get all sellers
         const sellers = await storage.getUsersByRole("seller");
         const totalSellers = sellers.length;
-        
+
         // Get all properties
         const properties = await storage.getAllProperties();
-        
+
         // Count unique sellers who have properties
-        const uniqueSellersWithProperties = new Set(properties.filter(property => property.sellerId !== null).map(property => property.sellerId));
+        const uniqueSellersWithProperties = new Set(
+          properties
+            .filter((property) => property.sellerId !== null)
+            .map((property) => property.sellerId),
+        );
         const sellersWithListedProperties = uniqueSellersWithProperties.size;
-        
+
         // Get all messages
         const allMessages = await storage.getMessagesByProperty(0, true);
-        
+
         // Count unique sellers who have sent/received messages
         const uniqueSellersWithMessages = new Set();
-        allMessages.forEach(message => {
+        allMessages.forEach((message) => {
           const sender = message.senderId;
           const receiver = message.receiverId;
-          
+
           // Get the sender and receiver details
-          const senderDetails = sellers.find(user => user.id === sender);
-          const receiverDetails = sellers.find(user => user.id === receiver);
-          
+          const senderDetails = sellers.find((user) => user.id === sender);
+          const receiverDetails = sellers.find((user) => user.id === receiver);
+
           // If sender is a seller, count them
           if (senderDetails && senderDetails.role === "seller") {
             uniqueSellersWithMessages.add(sender);
@@ -2386,25 +2525,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
         const sellersWithMessages = uniqueSellersWithMessages.size;
-        
+
         // Get all viewing requests for seller's properties
-        const allViewingRequests = await storage.getViewingRequestsByProperty(0, true);
-        
+        const allViewingRequests = await storage.getViewingRequestsByProperty(
+          0,
+          true,
+        );
+
         // Find properties with sellers
-        const propertiesWithSellers = properties.filter(property => property.sellerId !== null);
-        
+        const propertiesWithSellers = properties.filter(
+          (property) => property.sellerId !== null,
+        );
+
         // Count unique sellers who have viewing requests for their properties
         const sellersWithViewingRequests = new Set();
-        
-        allViewingRequests.forEach(request => {
-          const property = propertiesWithSellers.find(p => p.id === request.propertyId);
+
+        allViewingRequests.forEach((request) => {
+          const property = propertiesWithSellers.find(
+            (p) => p.id === request.propertyId,
+          );
           if (property && property.sellerId) {
             sellersWithViewingRequests.add(property.sellerId);
           }
         });
-        
+
         const sellersWithViewingRequestsCount = sellersWithViewingRequests.size;
-        
+
         res.json({
           success: true,
           data: {
@@ -2413,12 +2559,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sellersWithMessages,
             sellersWithViewingRequests: sellersWithViewingRequestsCount,
             conversionRates: {
-              toProperties: totalSellers > 0 ? (sellersWithListedProperties / totalSellers) * 100 : 0,
-              toMessages: sellersWithListedProperties > 0 ? (sellersWithMessages / sellersWithListedProperties) * 100 : 0,
-              toViewings: sellersWithMessages > 0 ? (sellersWithViewingRequestsCount / sellersWithMessages) * 100 : 0,
-              overall: totalSellers > 0 ? (sellersWithViewingRequestsCount / totalSellers) * 100 : 0
-            }
-          }
+              toProperties:
+                totalSellers > 0
+                  ? (sellersWithListedProperties / totalSellers) * 100
+                  : 0,
+              toMessages:
+                sellersWithListedProperties > 0
+                  ? (sellersWithMessages / sellersWithListedProperties) * 100
+                  : 0,
+              toViewings:
+                sellersWithMessages > 0
+                  ? (sellersWithViewingRequestsCount / sellersWithMessages) *
+                    100
+                  : 0,
+              overall:
+                totalSellers > 0
+                  ? (sellersWithViewingRequestsCount / totalSellers) * 100
+                  : 0,
+            },
+          },
         });
       } catch (error) {
         console.error("Get seller journey metrics error:", error);
@@ -2806,41 +2965,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const agreementId = parseInt(req.params.id);
       const agreement = await storage.getAgreement(agreementId);
-      
+
       if (!agreement) {
         return res.status(404).json({
           success: false,
           error: "Agreement not found",
         });
       }
-      
+
       // Get the property to check permissions
-      const property = await storage.getPropertyWithParticipants(agreement.propertyId);
-      
+      const property = await storage.getPropertyWithParticipants(
+        agreement.propertyId,
+      );
+
       if (!property) {
         return res.status(404).json({
           success: false,
           error: "Property not found",
         });
       }
-      
+
       // Verify user has permission to access this agreement
       const userId = req.user!.id;
       const userRole = req.user!.role;
-      
+
       const hasAccess =
         userRole === "admin" ||
         (userRole === "buyer" && property.buyerId === userId) ||
         (userRole === "agent" && property.agentId === userId) ||
         (userRole === "seller" && property.sellerId === userId);
-        
+
       if (!hasAccess) {
         return res.status(403).json({
           success: false,
           error: "You don't have permission to access this agreement",
         });
       }
-      
+
       // Return the agreement with its document URL
       res.json({
         success: true,
@@ -2859,54 +3020,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-  
+
   // Serve the actual PDF content of an agreement
   app.get("/api/agreements/:id/view-pdf", isAuthenticated, async (req, res) => {
     try {
       const agreementId = parseInt(req.params.id);
       const agreement = await storage.getAgreement(agreementId);
-      
+
       if (!agreement) {
         return res.status(404).json({
           success: false,
           error: "Agreement not found",
         });
       }
-      
+
       // Get the property to check permissions
-      const property = await storage.getPropertyWithParticipants(agreement.propertyId);
-      
+      const property = await storage.getPropertyWithParticipants(
+        agreement.propertyId,
+      );
+
       if (!property) {
         return res.status(404).json({
           success: false,
           error: "Property not found",
         });
       }
-      
+
       // Verify user has permission to access this agreement
       const userId = req.user!.id;
       const userRole = req.user!.role;
-      
+
       const hasAccess =
         userRole === "admin" ||
         (userRole === "buyer" && property.buyerId === userId) ||
         (userRole === "agent" && property.agentId === userId) ||
         (userRole === "seller" && property.sellerId === userId);
-        
+
       if (!hasAccess) {
         return res.status(403).json({
           success: false,
           error: "You don't have permission to access this agreement",
         });
       }
-      
+
       if (!agreement.documentUrl) {
         return res.status(404).json({
           success: false,
           error: "No document URL found for this agreement",
         });
       }
-      
+
       // Prepare file path from document URL
       let filePath = "";
       if (agreement.documentUrl.startsWith("/uploads/")) {
@@ -2914,7 +3077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         filePath = path.join(process.cwd(), "uploads", agreement.documentUrl);
       }
-      
+
       // Check if file exists
       try {
         await fs.promises.access(filePath, fs.constants.F_OK);
@@ -2925,24 +3088,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Document file not found",
         });
       }
-      
+
       // If user is an agent viewing an agreement created by a buyer, we need to regenerate the PDF
       // to ensure it includes the buyer's changes and signature
-      if (userRole === "agent" && agreement.type === "agency_disclosure" && 
-          agreement.buyerId && agreement.buyerId !== userId &&
-          agreement.status === "signed_by_buyer") {
-          
-        console.log("Agent viewing buyer-signed agreement, regenerating PDF with signatures...");
-        
+      if (
+        userRole === "agent" &&
+        agreement.type === "agency_disclosure" &&
+        agreement.buyerId &&
+        agreement.buyerId !== userId &&
+        agreement.status === "signed_by_buyer"
+      ) {
+        console.log(
+          "Agent viewing buyer-signed agreement, regenerating PDF with signatures...",
+        );
+
         try {
           // Get the buyer and agent
           const buyer = await storage.getUser(agreement.buyerId);
           const agent = await storage.getUser(userId);
-          
+
           if (!buyer || !agent) {
             throw new Error("Could not find buyer or agent");
           }
-          
+
           // Prepare form data
           const formDataForPdf: AgencyDisclosureFormData = {
             buyerName1: buyer
@@ -2961,32 +3129,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
             propertyZip: property.zip || "",
             isEditable: false,
           };
-          
+
           // Generate the PDF with data
           let pdfBuffer = await fillAgencyDisclosureForm(formDataForPdf);
-          
+
           // Add buyer signature if available
           if (agreement.buyerSignature) {
             pdfBuffer = await addSignatureToPdf(
               pdfBuffer,
               agreement.buyerSignature,
-              "buyer1"
+              "buyer1",
             );
           }
-          
+
           // Add agent signature if available
           if (agreement.agentSignature) {
             pdfBuffer = await addSignatureToPdf(
               pdfBuffer,
               agreement.agentSignature,
-              "agent"
+              "agent",
             );
           }
-          
+
           // Set response headers
           res.setHeader("Content-Type", "application/pdf");
-          res.setHeader("Content-Disposition", `inline; filename="Agency_Disclosure_${agreementId}.pdf"`);
-          
+          res.setHeader(
+            "Content-Disposition",
+            `inline; filename="Agency_Disclosure_${agreementId}.pdf"`,
+          );
+
           // Send the regenerated PDF
           return res.send(pdfBuffer);
         } catch (error) {
@@ -2994,14 +3165,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // If regeneration fails, fall back to serving the static file
         }
       }
-      
+
       // Read and serve the file
       const fileBuffer = await fs.promises.readFile(filePath);
-      
+
       // Set response headers
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `inline; filename="Agreement_${agreementId}.pdf"`);
-      
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="Agreement_${agreementId}.pdf"`,
+      );
+
       // Send the file
       res.send(fileBuffer);
     } catch (error) {
@@ -3508,110 +3682,128 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         const agreements = await storage.getAgreementsByProperty(propertyId);
         const userId = req.user!.id;
         const userRole = req.user!.role;
-        
+
         // Check if user is an agent and should use buyer-signed forms
         if (userRole === "agent") {
           // First check for buyer-signed agreements that the agent should use
           const buyerSignedAgreements = agreements.filter(
-            (a) => 
-              a.type === "agency_disclosure" && 
-              a.status === "signed_by_buyer" && 
-              a.buyerSignature
+            (a) =>
+              a.type === "agency_disclosure" &&
+              a.status === "signed_by_buyer" &&
+              a.buyerSignature,
           );
-          
+
           if (buyerSignedAgreements.length > 0) {
-            const latestSignedAgreement = 
+            const latestSignedAgreement =
               buyerSignedAgreements[buyerSignedAgreements.length - 1];
-            
+
             console.log(
               "Agent user found buyer-signed agreement ID:",
-              latestSignedAgreement.id
+              latestSignedAgreement.id,
             );
-            
+
             try {
               // Get the PDF file path from document URL
               let pdfPath = "";
-              if (latestSignedAgreement.documentUrl && latestSignedAgreement.documentUrl.startsWith("/uploads/")) {
-                pdfPath = path.join(process.cwd(), latestSignedAgreement.documentUrl.substring(1));
+              if (
+                latestSignedAgreement.documentUrl &&
+                latestSignedAgreement.documentUrl.startsWith("/uploads/")
+              ) {
+                pdfPath = path.join(
+                  process.cwd(),
+                  latestSignedAgreement.documentUrl.substring(1),
+                );
                 console.log("Using buyer-signed document from path:", pdfPath);
               }
-              
+
               let pdfBuffer;
-              
+
               // Try to load the buyer-signed PDF if available
               if (pdfPath && fs.existsSync(pdfPath)) {
                 try {
                   pdfBuffer = fs.readFileSync(pdfPath);
-                  console.log("Successfully loaded buyer-signed PDF from file system");
+                  console.log(
+                    "Successfully loaded buyer-signed PDF from file system",
+                  );
                 } catch (readError) {
-                  console.error("Error reading buyer-signed PDF file:", readError);
+                  console.error(
+                    "Error reading buyer-signed PDF file:",
+                    readError,
+                  );
                   // Will fall back to generating from template
                 }
               }
-              
+
               // If we couldn't load from file or if file doesn't exist, generate a new one
               if (!pdfBuffer) {
-                console.log("Generating from template with buyer's signature data");
-                
+                console.log(
+                  "Generating from template with buyer's signature data",
+                );
+
                 // Get buyer information
                 let buyer = null;
                 if (latestSignedAgreement.buyerId) {
                   buyer = await storage.getUser(latestSignedAgreement.buyerId);
                 }
-                
+
                 // Get agent information (current user)
                 let agent = await storage.getUser(userId);
-                
+
                 // Prepare form data - pre-fill with buyer's info
                 const formDataWithBuyerInfo = {
                   ...formData,
                   buyerName1: buyer
-                    ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || 
+                    ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() ||
                       buyer.email
                     : "",
-                  isEditable: true
+                  isEditable: true,
                 };
-                
+
                 // Generate a fresh PDF with the form data
-                pdfBuffer = await fillAgencyDisclosureForm(formDataWithBuyerInfo);
-                
+                pdfBuffer = await fillAgencyDisclosureForm(
+                  formDataWithBuyerInfo,
+                );
+
                 // Add the buyer's signature from the agreement
                 if (latestSignedAgreement.buyerSignature) {
                   pdfBuffer = await addSignatureToPdf(
                     pdfBuffer,
                     latestSignedAgreement.buyerSignature,
-                    "buyer1"
+                    "buyer1",
                   );
                 }
               }
-              
+
               // Set appropriate headers
               res.setHeader("Content-Type", "application/pdf");
               res.setHeader(
                 "Content-Disposition",
-                `inline; filename="Agency_Disclosure_Preview.pdf"`
+                `inline; filename="Agency_Disclosure_Preview.pdf"`,
               );
-              
+
               if (isEditable) {
                 console.log("Keeping form fields editable as requested");
                 res.setHeader(
                   "Cache-Control",
-                  "no-store, no-cache, must-revalidate, proxy-revalidate"
+                  "no-store, no-cache, must-revalidate, proxy-revalidate",
                 );
                 res.setHeader("Pragma", "no-cache");
                 res.setHeader("Expires", "0");
                 res.setHeader("X-PDF-Editable", "true");
               }
-              
+
               // Send the PDF to the client
               return res.send(pdfBuffer);
             } catch (error) {
-              console.error("Error processing buyer-signed form for agent:", error);
+              console.error(
+                "Error processing buyer-signed form for agent:",
+                error,
+              );
               // Continue to standard process if an error occurs
             }
           }
         }
-        
+
         // If we're not an agent or couldn't process the buyer-signed agreement,
         // continue with the normal flow: check for edited PDF content
         const agencyDisclosureAgreements = agreements.filter(
@@ -4577,15 +4769,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     async (req, res) => {
       try {
         console.log("Viewing request payload:", req.body);
-        
+
         // Add buyer ID explicitly
         const mergedData = {
           ...req.body,
           buyerId: req.user!.id,
         };
-        
+
         console.log("Merged request data before validation:", mergedData);
-        
+
         // We'll validate the data more manually to better handle errors
         if (!mergedData.propertyId) {
           return res.status(400).json({
@@ -4593,27 +4785,27 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             error: "Property ID is required",
           });
         }
-        
+
         if (!mergedData.requestedDate || !mergedData.requestedEndDate) {
           return res.status(400).json({
             success: false,
             error: "Requested viewing dates are required",
           });
         }
-        
+
         // Convert string dates to Date objects
         const requestData = {
           ...mergedData,
           requestedDate: new Date(mergedData.requestedDate),
           requestedEndDate: new Date(mergedData.requestedEndDate),
         };
-        
+
         console.log("Processed request data:", requestData);
 
         // Get the property
         const property = await storage.getProperty(requestData.propertyId);
         console.log("Found property:", property);
-        
+
         if (!property) {
           return res.status(404).json({
             success: false,
@@ -4623,13 +4815,13 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
         // Buyer should be able to view any listed property, so we don't need to check if they created it
         // Just ensure the property is in a status that allows viewing requests
-        if (property.status !== 'active' && property.status !== 'pending') {
+        if (property.status !== "active" && property.status !== "pending") {
           return res.status(403).json({
             success: false,
             error: "This property is not available for viewing requests",
           });
         }
-        
+
         // Make sure the property has a seller and/or agent to review the request
         if (!property.sellerId && !property.agentId) {
           return res.status(403).json({
@@ -4637,19 +4829,27 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             error: "This property doesn't have a seller or agent assigned yet",
           });
         }
-        
+
         // If the property has an agent, verify that the buyer has signed a BRBC with this agent
         if (property.agentId) {
           // Check if there's a global BRBC agreement between the buyer and agent
-          const globalBrbc = await storage.getGlobalBRBCForBuyerAgent(req.user!.id, property.agentId);
-          
+          const globalBrbc = await storage.getGlobalBRBCForBuyerAgent(
+            req.user!.id,
+            property.agentId,
+          );
+
           // If no global BRBC exists or it's not completed, return an error
-          if (!globalBrbc || (globalBrbc.status !== 'completed' && globalBrbc.status !== 'signed_by_buyer')) {
+          if (
+            !globalBrbc ||
+            (globalBrbc.status !== "completed" &&
+              globalBrbc.status !== "signed_by_buyer")
+          ) {
             return res.status(403).json({
               success: false,
-              error: "You must sign a Buyer Representation and Brokerage Confirmation (BRBC) with this agent before requesting a viewing",
+              error:
+                "You must sign a Buyer Representation and Brokerage Confirmation (BRBC) with this agent before requesting a viewing",
               requiresBrbc: true,
-              agentId: property.agentId
+              agentId: property.agentId,
             });
           }
         }
@@ -4658,7 +4858,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         // Only handle explicit override requests
         if (requestData.override) {
           // Get the most recent viewing request for this property by this buyer
-          const existingRequests = await storage.getViewingRequestsByBuyer(req.user!.id);
+          const existingRequests = await storage.getViewingRequestsByBuyer(
+            req.user!.id,
+          );
           const existingRequestForProperty = existingRequests.find(
             (request) =>
               request.propertyId === requestData.propertyId &&
@@ -4666,7 +4868,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
                 request.status === "approved" ||
                 request.status === "rescheduled"),
           );
-          
+
           if (existingRequestForProperty) {
             // Update the existing request to be canceled
             await storage.updateViewingRequest(existingRequestForProperty.id, {
@@ -4767,32 +4969,40 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         try {
           // Get buyer data
           const buyer = await storage.getUser(req.user!.id);
-          
+
           // Get buyer's agent data (if assigned)
           let agent = undefined;
           if (property.agentId) {
             agent = await storage.getUser(property.agentId);
           }
-          
+
           // Determine the listing agent's email
-          const listingAgentEmail = property.listingAgentEmail || property.sellerEmail;
-          
+          const listingAgentEmail =
+            property.listingAgentEmail || property.sellerEmail;
+
           if (buyer && listingAgentEmail) {
             // Send the email notification
             await sendTourRequestEmail(
-              viewingRequest, 
-              property, 
-              buyer, 
-              agent, 
-              listingAgentEmail
+              viewingRequest,
+              property,
+              buyer,
+              agent,
+              listingAgentEmail,
             );
-            
-            console.log(`Sent tour request notification email to: ${listingAgentEmail}`);
+
+            console.log(
+              `Sent tour request notification email to: ${listingAgentEmail}`,
+            );
           } else {
-            console.warn("Could not send tour request email - missing buyer or listing agent email");
+            console.warn(
+              "Could not send tour request email - missing buyer or listing agent email",
+            );
           }
         } catch (emailError) {
-          console.error("Failed to send tour request email notification:", emailError);
+          console.error(
+            "Failed to send tour request email notification:",
+            emailError,
+          );
           // Continue without failing the whole request
         }
 
@@ -5306,296 +5516,340 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
   // Agent Referral Agreement routes
   // Get agent referral agreement
-  app.get("/api/agreements/agent-referral", isAuthenticated, hasRole(["agent"]), async (req, res) => {
-    try {
-      // Find if the agent already has a referral agreement
-      const existingAgreements = await storage.getAgreementsByAgent(req.user.id);
-      const referralAgreements = existingAgreements.filter(
-        (a) => a.type === "agent_referral"
-      );
-      
-      if (referralAgreements.length > 0) {
-        // Return the most recent agreement
-        const latestAgreement = referralAgreements[referralAgreements.length - 1];
-        
+  app.get(
+    "/api/agreements/agent-referral",
+    isAuthenticated,
+    hasRole(["agent"]),
+    async (req, res) => {
+      try {
+        // Find if the agent already has a referral agreement
+        const existingAgreements = await storage.getAgreementsByAgent(
+          req.user.id,
+        );
+        const referralAgreements = existingAgreements.filter(
+          (a) => a.type === "agent_referral",
+        );
+
+        if (referralAgreements.length > 0) {
+          // Return the most recent agreement
+          const latestAgreement =
+            referralAgreements[referralAgreements.length - 1];
+
+          return res.json({
+            success: true,
+            data: {
+              id: latestAgreement.id,
+              status: latestAgreement.status,
+              documentUrl: latestAgreement.documentUrl,
+              date: latestAgreement.date,
+            },
+          });
+        }
+
+        // No agreement found
         return res.json({
           success: true,
-          data: {
-            id: latestAgreement.id,
-            status: latestAgreement.status,
-            documentUrl: latestAgreement.documentUrl,
-            date: latestAgreement.date,
-          }
+          data: null,
         });
-      }
-      
-      // No agreement found
-      return res.json({
-        success: true,
-        data: null
-      });
-    } catch (error) {
-      console.error("Error fetching agent referral agreement:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to retrieve agent referral agreement"
-      });
-    }
-  });
-  
-  // Get prefilled agent referral agreement PDF
-  app.get("/api/agreements/agent-referral/pdf", isAuthenticated, hasRole(["agent"]), async (req, res) => {
-    try {
-      // Get the current agent
-      const agent = await storage.getUser(req.user.id);
-      
-      if (!agent) {
-        return res.status(404).json({
+      } catch (error) {
+        console.error("Error fetching agent referral agreement:", error);
+        res.status(500).json({
           success: false,
-          error: "Agent not found"
+          error: "Failed to retrieve agent referral agreement",
         });
       }
-      
-      // Prepare the PDF data with agent's information
-      const formData = {
-        agentName: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
-        licenseNumber: agent.licenseNumber || '',
-        address: agent.addressLine1 || '',
-        city: agent.city || '',
-        state: agent.state || '',
-        zip: agent.zip || '',
-        date: new Date().toISOString().split('T')[0],
-        isEditable: true, // Keep it editable for signing
-        brokerageName: agent.brokerageName || '',
-        phoneNumber: agent.phone || '',
-        email: agent.email || ''
-      };
-      
-      // Generate the PDF with agent data pre-filled
-      const pdfBuffer = await fillAgentReferralForm(formData);
-      
-      // Set response headers
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="agent_referral_agreement.pdf"');
-      
-      // Send PDF as response
-      res.send(pdfBuffer);
-    } catch (error) {
-      console.error("Error generating agent referral agreement PDF:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to generate agent referral agreement PDF"
-      });
-    }
-  });
-  
-  // Preview agent referral agreement
-  app.post("/api/agreements/agent-referral/preview", isAuthenticated, hasRole(["agent"]), async (req, res) => {
-    try {
-      const {
-        agentName,
-        licenseNumber,
-        address,
-        city,
-        state,
-        zip,
-        signature: agentSignature,
-        date,
-        // New fields
-        brokerageName,
-        phoneNumber,
-        email
-      } = req.body;
+    },
+  );
 
-      if (!agentSignature) {
-        return res.status(400).json({
+  // Get prefilled agent referral agreement PDF
+  app.get(
+    "/api/agreements/agent-referral/pdf",
+    isAuthenticated,
+    hasRole(["agent"]),
+    async (req, res) => {
+      try {
+        // Get the current agent
+        const agent = await storage.getUser(req.user.id);
+
+        if (!agent) {
+          return res.status(404).json({
+            success: false,
+            error: "Agent not found",
+          });
+        }
+
+        // Prepare the PDF data with agent's information
+        const formData = {
+          agentName:
+            `${agent.firstName || ""} ${agent.lastName || ""}`.trim() ||
+            agent.email,
+          licenseNumber: agent.licenseNumber || "",
+          address: agent.addressLine1 || "",
+          city: agent.city || "",
+          state: agent.state || "",
+          zip: agent.zip || "",
+          date: new Date().toISOString().split("T")[0],
+          isEditable: true, // Keep it editable for signing
+          brokerageName: agent.brokerageName || "",
+          phoneNumber: agent.phone || "",
+          email: agent.email || "",
+        };
+
+        // Generate the PDF with agent data pre-filled
+        const pdfBuffer = await fillAgentReferralForm(formData);
+
+        // Set response headers
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="agent_referral_agreement.pdf"',
+        );
+
+        // Send PDF as response
+        res.send(pdfBuffer);
+      } catch (error) {
+        console.error("Error generating agent referral agreement PDF:", error);
+        res.status(500).json({
           success: false,
-          error: "Agent signature is required"
+          error: "Failed to generate agent referral agreement PDF",
         });
       }
-      
-      // Get the current agent for fallback values
-      const agent = await storage.getUser(req.user!.id);
-      
-      // Prepare the PDF document with form data
-      const formData = {
-        agentName: agentName || `${agent!.firstName || ''} ${agent!.lastName || ''}`.trim() || agent!.email,
-        licenseNumber: licenseNumber || agent?.licenseNumber || '',
-        address: address || agent?.addressLine1 || '',
-        city: city || agent?.city || '',
-        state: state || agent?.state || '',
-        zip: zip || agent?.zip || '',
-        agentSignature,
-        date: date || new Date().toISOString().split('T')[0],
-        isEditable: false,
-        // Add the new fields with fallbacks
-        brokerageName: brokerageName || agent?.brokerageName || '',
-        phoneNumber: phoneNumber || agent?.phone || '',
-        email: email || agent?.email || ''
-      };
-      
-      // Generate the PDF with agent data
-      const pdfBuffer = await fillAgentReferralForm(formData);
-      
-      // Add signature to PDF
-      const signedPdfBuffer = await addSignatureToPdf(
-        pdfBuffer,
-        agentSignature,
-        "agent"
-      );
-      
-      // Set response headers
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="agent_referral_agreement_preview.pdf"');
-      
-      // Send PDF as response
-      res.send(signedPdfBuffer);
-    } catch (error) {
-      console.error("Error generating preview for agent referral agreement:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to generate preview for agent referral agreement"
-      });
-    }
-  });
+    },
+  );
+
+  // Preview agent referral agreement
+  app.post(
+    "/api/agreements/agent-referral/preview",
+    isAuthenticated,
+    hasRole(["agent"]),
+    async (req, res) => {
+      try {
+        const {
+          agentName,
+          licenseNumber,
+          address,
+          city,
+          state,
+          zip,
+          signature: agentSignature,
+          date,
+          // New fields
+          brokerageName,
+          phoneNumber,
+          email,
+        } = req.body;
+
+        if (!agentSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Agent signature is required",
+          });
+        }
+
+        // Get the current agent for fallback values
+        const agent = await storage.getUser(req.user!.id);
+
+        // Prepare the PDF document with form data
+        const formData = {
+          agentName:
+            agentName ||
+            `${agent!.firstName || ""} ${agent!.lastName || ""}`.trim() ||
+            agent!.email,
+          licenseNumber: licenseNumber || agent?.licenseNumber || "",
+          address: address || agent?.addressLine1 || "",
+          city: city || agent?.city || "",
+          state: state || agent?.state || "",
+          zip: zip || agent?.zip || "",
+          agentSignature,
+          date: date || new Date().toISOString().split("T")[0],
+          isEditable: false,
+          // Add the new fields with fallbacks
+          brokerageName: brokerageName || agent?.brokerageName || "",
+          phoneNumber: phoneNumber || agent?.phone || "",
+          email: email || agent?.email || "",
+        };
+
+        // Generate the PDF with agent data
+        const pdfBuffer = await fillAgentReferralForm(formData);
+
+        // Add signature to PDF
+        const signedPdfBuffer = await addSignatureToPdf(
+          pdfBuffer,
+          agentSignature,
+          "agent",
+        );
+
+        // Set response headers
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader(
+          "Content-Disposition",
+          'inline; filename="agent_referral_agreement_preview.pdf"',
+        );
+
+        // Send PDF as response
+        res.send(signedPdfBuffer);
+      } catch (error) {
+        console.error(
+          "Error generating preview for agent referral agreement:",
+          error,
+        );
+        res.status(500).json({
+          success: false,
+          error: "Failed to generate preview for agent referral agreement",
+        });
+      }
+    },
+  );
 
   // Submit agent referral agreement
-  app.post("/api/agreements/agent-referral", isAuthenticated, hasRole(["agent"]), async (req, res) => {
-    try {
-      const { signature: agentSignature, date } = req.body;
-      
-      if (!agentSignature) {
-        return res.status(400).json({
-          success: false,
-          error: "Agent signature is required"
+  app.post(
+    "/api/agreements/agent-referral",
+    isAuthenticated,
+    hasRole(["agent"]),
+    async (req, res) => {
+      try {
+        const { signature: agentSignature, date } = req.body;
+
+        if (!agentSignature) {
+          return res.status(400).json({
+            success: false,
+            error: "Agent signature is required",
+          });
+        }
+
+        // Get the current agent
+        const agent = await storage.getUser(req.user.id);
+
+        if (!agent) {
+          return res.status(404).json({
+            success: false,
+            error: "Agent not found",
+          });
+        }
+
+        // Find if the agent already has a referral agreement
+        const existingAgreements = await storage.getAgreementsByAgent(
+          req.user.id,
+        );
+        const referralAgreements = existingAgreements.filter(
+          (a) => a.type === "agent_referral",
+        );
+
+        // If agreement exists, just update it
+        if (referralAgreements.length > 0) {
+          const latestAgreement =
+            referralAgreements[referralAgreements.length - 1];
+          return res.json({
+            success: true,
+            data: {
+              id: latestAgreement.id,
+              status: latestAgreement.status,
+              documentUrl: latestAgreement.documentUrl,
+              date: latestAgreement.date,
+            },
+          });
+        }
+
+        // Create a new agreement
+        // Prepare the PDF document with agent's data from their profile
+        const formData = {
+          agentName:
+            `${agent.firstName || ""} ${agent.lastName || ""}`.trim() ||
+            agent.email,
+          licenseNumber: agent.licenseNumber || "",
+          address: agent.addressLine1 || "",
+          city: agent.city || "",
+          state: agent.state || "",
+          zip: agent.zip || "",
+          agentSignature,
+          date: date || new Date().toISOString().split("T")[0],
+          isEditable: false,
+          // Add the agent profile data
+          brokerageName: agent.brokerageName || "",
+          phoneNumber: agent.phone || "",
+          email: agent.email || "",
+        };
+
+        // Generate the PDF with agent data
+        const pdfBuffer = await fillAgentReferralForm(formData);
+
+        // Add signature to PDF
+        const signedPdfBuffer = await addSignatureToPdf(
+          pdfBuffer,
+          agentSignature,
+          "agent",
+        );
+
+        // Save PDF to disk
+        const uniqueId = Date.now();
+        const filename = `agent_referral_${req.user.id}_${uniqueId}.pdf`;
+
+        // Create directory if it doesn't exist
+        await fs.promises.mkdir(
+          path.join(process.cwd(), "uploads", "agreements"),
+          { recursive: true },
+        );
+
+        const filePath = path.join(
+          process.cwd(),
+          "uploads",
+          "agreements",
+          filename,
+        );
+
+        await fs.promises.writeFile(filePath, signedPdfBuffer);
+
+        // Create a URL for the document
+        const documentUrl = `/uploads/agreements/${filename}`;
+
+        // Use property ID 0 to indicate this is not associated with a specific property
+        // This will ensure any "NaN" errors are avoided
+        const propertyId = 0;
+
+        // Look for a placeholder buyer for system agreements
+        let buyerId = 0;
+        try {
+          const adminUsers = await storage.getUsersByRole("admin");
+          if (adminUsers.length > 0) {
+            buyerId = adminUsers[0].id;
+          }
+        } catch (error) {
+          console.warn(
+            "Could not find admin user, using 0 as buyerId placeholder",
+          );
+        }
+
+        // Create an agreement record
+        const agreement = await storage.createAgreement({
+          propertyId,
+          agentId: req.user.id,
+          buyerId, // Use admin or 0 as placeholder
+          type: "agent_referral",
+          agreementText: "Agent Referral Fee Agreement (25% to Randy Brummett)",
+          agentSignature,
+          date: new Date(),
+          status: "completed",
+          documentUrl,
         });
-      }
-      
-      // Get the current agent
-      const agent = await storage.getUser(req.user.id);
-      
-      if (!agent) {
-        return res.status(404).json({
-          success: false,
-          error: "Agent not found"
-        });
-      }
-      
-      // Find if the agent already has a referral agreement
-      const existingAgreements = await storage.getAgreementsByAgent(req.user.id);
-      const referralAgreements = existingAgreements.filter(
-        (a) => a.type === "agent_referral"
-      );
-      
-      // If agreement exists, just update it
-      if (referralAgreements.length > 0) {
-        const latestAgreement = referralAgreements[referralAgreements.length - 1];
-        return res.json({
+
+        res.json({
           success: true,
           data: {
-            id: latestAgreement.id,
-            status: latestAgreement.status,
-            documentUrl: latestAgreement.documentUrl,
-            date: latestAgreement.date,
-          }
+            id: agreement.id,
+            status: agreement.status,
+            documentUrl,
+            date: agreement.date,
+          },
+        });
+      } catch (error) {
+        console.error("Error creating agent referral agreement:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to create agent referral agreement",
         });
       }
-      
-      // Create a new agreement
-      // Prepare the PDF document with agent's data from their profile
-      const formData = {
-        agentName: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email,
-        licenseNumber: agent.licenseNumber || '',
-        address: agent.addressLine1 || '',
-        city: agent.city || '',
-        state: agent.state || '',
-        zip: agent.zip || '',
-        agentSignature,
-        date: date || new Date().toISOString().split('T')[0],
-        isEditable: false,
-        // Add the agent profile data
-        brokerageName: agent.brokerageName || '',
-        phoneNumber: agent.phone || '',
-        email: agent.email || ''
-      };
-      
-      // Generate the PDF with agent data
-      const pdfBuffer = await fillAgentReferralForm(formData);
-      
-      // Add signature to PDF
-      const signedPdfBuffer = await addSignatureToPdf(
-        pdfBuffer,
-        agentSignature,
-        "agent"
-      );
-      
-      // Save PDF to disk
-      const uniqueId = Date.now();
-      const filename = `agent_referral_${req.user.id}_${uniqueId}.pdf`;
-      
-      // Create directory if it doesn't exist
-      await fs.promises.mkdir(
-        path.join(process.cwd(), "uploads", "agreements"),
-        { recursive: true }
-      );
-      
-      const filePath = path.join(
-        process.cwd(),
-        "uploads",
-        "agreements",
-        filename
-      );
-      
-      await fs.promises.writeFile(filePath, signedPdfBuffer);
-      
-      // Create a URL for the document
-      const documentUrl = `/uploads/agreements/${filename}`;
-      
-      // Use property ID 0 to indicate this is not associated with a specific property
-      // This will ensure any "NaN" errors are avoided
-      const propertyId = 0;
-      
-      // Look for a placeholder buyer for system agreements
-      let buyerId = 0;
-      try {
-        const adminUsers = await storage.getUsersByRole("admin");
-        if (adminUsers.length > 0) {
-          buyerId = adminUsers[0].id;
-        }
-      } catch (error) {
-        console.warn("Could not find admin user, using 0 as buyerId placeholder");
-      }
-      
-      // Create an agreement record
-      const agreement = await storage.createAgreement({
-        propertyId,
-        agentId: req.user.id,
-        buyerId, // Use admin or 0 as placeholder
-        type: "agent_referral",
-        agreementText: "Agent Referral Fee Agreement (25% to Randy Brummett)",
-        agentSignature,
-        date: new Date(),
-        status: "completed",
-        documentUrl,
-      });
-      
-      res.json({
-        success: true,
-        data: {
-          id: agreement.id,
-          status: agreement.status,
-          documentUrl,
-          date: agreement.date,
-        }
-      });
-    } catch (error) {
-      console.error("Error creating agent referral agreement:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to create agent referral agreement"
-      });
-    }
-  });
+    },
+  );
 
   // Update a property's agent email
   app.patch(
@@ -5633,7 +5887,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         if (!(isSeller || isAssignedAgent || isBuyer || isAdmin)) {
           return res.status(403).json({
             success: false,
-            error: "You don't have permission to update this property's agent email",
+            error:
+              "You don't have permission to update this property's agent email",
           });
         }
 
@@ -5647,13 +5902,13 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           propertyId: propertyId,
           userId: userId,
           activity: "Agent email updated",
-          details: { 
+          details: {
             previousEmail: property.sellerEmail,
             newEmail: agentEmail,
             updatedBy: {
               id: userId,
-              role: role
-            }
+              role: role,
+            },
           },
         });
 
@@ -5694,62 +5949,73 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         res.status(500).json({
           success: false,
           error:
-            error instanceof Error ? error.message : "Failed to update agent email",
+            error instanceof Error
+              ? error.message
+              : "Failed to update agent email",
         });
       }
     },
   );
-  
+
   // API Endpoint to get all agreements for a buyer
-  app.get("/api/buyer/agreements", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
-    try {
-      const buyerId = req.user?.id;
-      
-      if (!buyerId) {
-        return res.status(401).json({
+  app.get(
+    "/api/buyer/agreements",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const buyerId = req.user?.id;
+
+        if (!buyerId) {
+          return res.status(401).json({
+            success: false,
+            error: "Unauthorized",
+          });
+        }
+
+        // Get all agreements where the current user is the buyer
+        const agreements = await storage.getAgreementsByBuyer(buyerId);
+
+        res.json(agreements);
+      } catch (error) {
+        console.error("Error getting buyer agreements:", error);
+        res.status(500).json({
           success: false,
-          error: "Unauthorized",
+          error: "Failed to get buyer agreements",
         });
       }
-      
-      // Get all agreements where the current user is the buyer
-      const agreements = await storage.getAgreementsByBuyer(buyerId);
-      
-      res.json(agreements);
-    } catch (error) {
-      console.error("Error getting buyer agreements:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to get buyer agreements",
-      });
-    }
-  });
-  
+    },
+  );
+
   // API Endpoint to create a global BRBC agreement between a buyer and agent
   app.post("/api/global-brbc", isAuthenticated, async (req, res) => {
     try {
       const { agentId, signatureData, details } = req.body;
-      
+
       if (!req.user) {
         return res.status(401).json({
           success: false,
           error: "Unauthorized",
         });
       }
-      
+
       const buyerId = req.user.id;
-      
+
       // Check if this buyer already has a global BRBC with this agent
-      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(buyerId, agentId);
-      
-      if (existingAgreement && existingAgreement.status === 'completed') {
+      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(
+        buyerId,
+        agentId,
+      );
+
+      if (existingAgreement && existingAgreement.status === "completed") {
         return res.status(400).json({
           success: false,
-          error: "A global BRBC agreement already exists between this buyer and agent",
-          agreementId: existingAgreement.id
+          error:
+            "A global BRBC agreement already exists between this buyer and agent",
+          agreementId: existingAgreement.id,
         });
       }
-      
+
       // Get the agent information
       const agent = await storage.getUser(agentId);
       if (!agent) {
@@ -5758,7 +6024,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           error: "Agent not found",
         });
       }
-      
+
       // Create a global BRBC agreement
       const agreement = await storage.createAgreement({
         agentId: agentId,
@@ -5770,7 +6036,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         status: "signed_by_buyer", // Buyer has signed, waiting for agent
         isGlobal: true, // This is a global agreement
       });
-      
+
       res.json({
         success: true,
         data: agreement,
@@ -5783,233 +6049,273 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       });
     }
   });
-  
+
   // API Endpoint for signing BRBC form from the new integrated viewer
-  app.post("/api/buyer/agreements/sign-brbc", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
-    try {
-      const { signatureData, agreementType } = req.body;
+  app.post(
+    "/api/buyer/agreements/sign-brbc",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const { signatureData, agreementType } = req.body;
 
-      if (!signatureData) {
-        return res.status(400).json({ error: "Signature is required" });
-      }
+        if (!signatureData) {
+          return res.status(400).json({ error: "Signature is required" });
+        }
 
-      if (agreementType !== "global_brbc") {
-        return res.status(400).json({ error: "Invalid agreement type" });
-      }
+        if (agreementType !== "global_brbc") {
+          return res.status(400).json({ error: "Invalid agreement type" });
+        }
 
-      // Find the first available agent
-      const agents = await storage.getUsersByRole("agent");
-      
-      if (!agents || agents.length === 0) {
-        return res.status(404).json({
-          success: false,
-          error: "No agents available in the system",
-        });
-      }
-      
-      // Use the first agent as a default
-      const defaultAgent = agents[0];
-
-      // Generate a prefilled BRBC PDF
-      const buyerName = `${req.user!.firstName || ''} ${req.user!.lastName || ''}`.trim() || req.user!.email;
-      let pdfBuffer = await fillBrbcForm(buyerName);
-      
-      // Add the signature to the PDF
-      pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
-      
-      // Create upload directory if it doesn't exist
-      const agreementsDir = path.join(process.cwd(), "uploads", "agreements");
-      await fs.promises.mkdir(agreementsDir, { recursive: true });
-      
-      // Generate a unique filename for the signed document
-      const timestamp = Date.now();
-      const filename = `brbc_${req.user!.id}_${timestamp}.pdf`;
-      const filePath = path.join(agreementsDir, filename);
-      
-      // Save the signed document
-      fs.writeFileSync(filePath, pdfBuffer);
-      
-      // Document URL relative to uploads directory
-      const documentUrl = `/uploads/agreements/${filename}`;
-      
-      // Create agreement record in database
-      const agreement = await storage.createAgreement({
-        agentId: defaultAgent.id,
-        buyerId: req.user!.id,
-        type: "global_brbc",
-        agreementText: JSON.stringify({}),
-        buyerSignature: signatureData,
-        date: new Date(),
-        status: "signed_by_buyer",
-        isGlobal: true,
-        documentUrl: documentUrl
-      });
-      
-      return res.json({
-        success: true,
-        agreement
-      });
-    } catch (error) {
-      console.error("Error signing BRBC form:", error);
-      return res.status(500).json({
-        error: "Failed to sign agreement"
-      });
-    }
-  });
-  
-  // API Endpoint to save a BRBC PDF with signature (with multiple signature fields support)
-  app.post("/api/global-brbc/pdf-signature", isAuthenticated, hasRole(["buyer"]), async (req, res) => {
-    try {
-      const { 
-        signatureData,      // Main signature for sign1 field
-        initialsData,       // Initials for initial1 field 
-        buyer2SignatureData, // Optional second buyer signature for sign2 field
-        buyer2InitialsData,  // Optional second buyer initials for initial2 field
-        previewOnly,        // Flag to indicate this is just for preview (no DB save)
-        formFieldValues,    // Form field values from the client
-        details 
-      } = req.body;
-      
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: "Unauthorized",
-        });
-      }
-      
-      const buyerId = req.user.id;
-      
-      // Find the first available agent (only needed for non-preview mode)
-      let defaultAgent;
-      if (!previewOnly) {
+        // Find the first available agent
         const agents = await storage.getUsersByRole("agent");
-        
+
         if (!agents || agents.length === 0) {
           return res.status(404).json({
             success: false,
             error: "No agents available in the system",
           });
         }
-        
-        // Use the first agent as a default (this can be improved in the future)
-        defaultAgent = agents[0];
-      }
-      
-      // Get the buyer name from form fields or user data
-      const defaultBuyerName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || req.user.email;
-      const buyer1Name = details?.buyer1 || (formFieldValues?.buyer1) || defaultBuyerName;
-      
-      // Prepare form data for PDF generation
-      const formData = {
-        buyer2: details?.buyer2 || formFieldValues?.buyer2,
-        startDate: details?.startDate || formFieldValues?.today,
-        endDate: details?.endDate || formFieldValues?.['3Months'],
-        startDate2: details?.startDate2 || formFieldValues?.today2,
-        endDate2: details?.endDate2 || formFieldValues?.['3Months2'],
-        formFieldValues: formFieldValues
-      };
-      
-      // Generate a prefilled BRBC PDF with the specified buyer name and form data
-      let pdfBuffer = await fillBrbcForm(buyer1Name, formData);
-      
-      // Add all the signatures to the PDF
-      try {
-        console.log(`Adding signatures to PDF: primary=${!!signatureData}, initials=${!!initialsData}, buyer2=${!!buyer2SignatureData}, buyer2Initials=${!!buyer2InitialsData}`);
-        
-        // Add primary signature
-        if (signatureData) {
-          pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
-        }
-        
-        // Add primary buyer initials if provided
-        if (initialsData) {
-          pdfBuffer = await addSignatureToPdf(pdfBuffer, initialsData, "initial1");
-        }
-        
-        // Add second buyer signature if provided
-        if (buyer2SignatureData) {
-          pdfBuffer = await addSignatureToPdf(pdfBuffer, buyer2SignatureData, "sign2");
-        }
-        
-        // Add second buyer initials if provided
-        if (buyer2InitialsData) {
-          pdfBuffer = await addSignatureToPdf(pdfBuffer, buyer2InitialsData, "initial2");
-        }
-      } catch (error) {
-        console.error("Error adding signature to PDF:", error);
-        // Continue with the process even if signature addition fails
-      }
-      
-      // Create upload directory if it doesn't exist
-      const documentDir = path.join(process.cwd(), "uploads", "agreements");
-      await fs.promises.mkdir(documentDir, { recursive: true });
-      
-      // Save the PDF to the filesystem with a unique name
-      // For previews, include 'preview' in the filename to make it easy to identify
-      const timestamp = Date.now();
-      const filePrefix = previewOnly ? 'preview_brbc' : 'brbc';
-      const fileName = `${filePrefix}_${buyerId}_${timestamp}.pdf`;
-      const filePath = path.join(documentDir, fileName);
-      await fs.promises.writeFile(filePath, pdfBuffer);
-      
-      // Document URL relative to uploads directory
-      const documentUrl = `/uploads/agreements/${fileName}`;
-      
-      // If this is just a preview, return the URL without creating a database record
-      if (previewOnly) {
+
+        // Use the first agent as a default
+        const defaultAgent = agents[0];
+
+        // Generate a prefilled BRBC PDF
+        const buyerName =
+          `${req.user!.firstName || ""} ${req.user!.lastName || ""}`.trim() ||
+          req.user!.email;
+        let pdfBuffer = await fillBrbcForm(buyerName);
+
+        // Add the signature to the PDF
+        pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
+
+        // Create upload directory if it doesn't exist
+        const agreementsDir = path.join(process.cwd(), "uploads", "agreements");
+        await fs.promises.mkdir(agreementsDir, { recursive: true });
+
+        // Generate a unique filename for the signed document
+        const timestamp = Date.now();
+        const filename = `brbc_${req.user!.id}_${timestamp}.pdf`;
+        const filePath = path.join(agreementsDir, filename);
+
+        // Save the signed document
+        fs.writeFileSync(filePath, pdfBuffer);
+
+        // Document URL relative to uploads directory
+        const documentUrl = `/uploads/agreements/${filename}`;
+
+        // Create agreement record in database
+        const agreement = await storage.createAgreement({
+          agentId: defaultAgent.id,
+          buyerId: req.user!.id,
+          type: "global_brbc",
+          agreementText: JSON.stringify({}),
+          buyerSignature: signatureData,
+          date: new Date(),
+          status: "signed_by_buyer",
+          isGlobal: true,
+          documentUrl: documentUrl,
+        });
+
         return res.json({
           success: true,
-          data: {
-            pdfUrl: documentUrl, // URL to the preview PDF
-            preview: true
-          },
+          agreement,
+        });
+      } catch (error) {
+        console.error("Error signing BRBC form:", error);
+        return res.status(500).json({
+          error: "Failed to sign agreement",
         });
       }
-      
-      // Otherwise, create a database record for the final submission
-      const agreement = await storage.createAgreement({
-        agentId: defaultAgent.id,
-        buyerId: buyerId,
-        type: "global_brbc",
-        agreementText: JSON.stringify(details || {}),
-        buyerSignature: signatureData,
-        date: new Date(),
-        status: "signed_by_buyer", // Buyer has signed, waiting for agent
-        isGlobal: true, // This is a global agreement
-        documentUrl: documentUrl,
-      });
-      
-      res.json({
-        success: true,
-        data: agreement,
-      });
-    } catch (error) {
-      console.error("Error creating BRBC agreement with PDF:", error);
-      res.status(500).json({
-        success: false,
-        error: "Failed to create BRBC agreement",
-      });
-    }
-  });
-  
+    },
+  );
+
+  // API Endpoint to save a BRBC PDF with signature (with multiple signature fields support)
+  app.post(
+    "/api/global-brbc/pdf-signature",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const {
+          signatureData, // Main signature for sign1 field
+          initialsData, // Initials for initial1 field
+          buyer2SignatureData, // Optional second buyer signature for sign2 field
+          buyer2InitialsData, // Optional second buyer initials for initial2 field
+          previewOnly, // Flag to indicate this is just for preview (no DB save)
+          formFieldValues, // Form field values from the client
+          details,
+        } = req.body;
+
+        if (!req.user) {
+          return res.status(401).json({
+            success: false,
+            error: "Unauthorized",
+          });
+        }
+
+        const buyerId = req.user.id;
+
+        // Find the first available agent (only needed for non-preview mode)
+        let defaultAgent;
+        if (!previewOnly) {
+          const agents = await storage.getUsersByRole("agent");
+
+          if (!agents || agents.length === 0) {
+            return res.status(404).json({
+              success: false,
+              error: "No agents available in the system",
+            });
+          }
+
+          // Use the first agent as a default (this can be improved in the future)
+          defaultAgent = agents[0];
+        }
+
+        // Get the buyer name from form fields or user data
+        const defaultBuyerName =
+          `${req.user.firstName || ""} ${req.user.lastName || ""}`.trim() ||
+          req.user.email;
+        const buyer1Name =
+          details?.buyer1 || formFieldValues?.buyer1 || defaultBuyerName;
+
+        // Prepare form data for PDF generation
+        const formData = {
+          buyer2: details?.buyer2 || formFieldValues?.buyer2,
+          startDate: details?.startDate || formFieldValues?.today,
+          endDate: details?.endDate || formFieldValues?.["3Months"],
+          startDate2: details?.startDate2 || formFieldValues?.today2,
+          endDate2: details?.endDate2 || formFieldValues?.["3Months2"],
+          formFieldValues: formFieldValues,
+        };
+
+        // Generate a prefilled BRBC PDF with the specified buyer name and form data
+        let pdfBuffer = await fillBrbcForm(buyer1Name, formData);
+
+        // Add all the signatures to the PDF
+        try {
+          console.log(
+            `Adding signatures to PDF: primary=${!!signatureData}, initials=${!!initialsData}, buyer2=${!!buyer2SignatureData}, buyer2Initials=${!!buyer2InitialsData}`,
+          );
+
+          // Add primary signature
+          if (signatureData) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              signatureData,
+              "sign1",
+            );
+          }
+
+          // Add primary buyer initials if provided
+          if (initialsData) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              initialsData,
+              "initial1",
+            );
+          }
+
+          // Add second buyer signature if provided
+          if (buyer2SignatureData) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              buyer2SignatureData,
+              "sign2",
+            );
+          }
+
+          // Add second buyer initials if provided
+          if (buyer2InitialsData) {
+            pdfBuffer = await addSignatureToPdf(
+              pdfBuffer,
+              buyer2InitialsData,
+              "initial2",
+            );
+          }
+        } catch (error) {
+          console.error("Error adding signature to PDF:", error);
+          // Continue with the process even if signature addition fails
+        }
+
+        // Create upload directory if it doesn't exist
+        const documentDir = path.join(process.cwd(), "uploads", "agreements");
+        await fs.promises.mkdir(documentDir, { recursive: true });
+
+        // Save the PDF to the filesystem with a unique name
+        // For previews, include 'preview' in the filename to make it easy to identify
+        const timestamp = Date.now();
+        const filePrefix = previewOnly ? "preview_brbc" : "brbc";
+        const fileName = `${filePrefix}_${buyerId}_${timestamp}.pdf`;
+        const filePath = path.join(documentDir, fileName);
+        await fs.promises.writeFile(filePath, pdfBuffer);
+
+        // Document URL relative to uploads directory
+        const documentUrl = `/uploads/agreements/${fileName}`;
+
+        // If this is just a preview, return the URL without creating a database record
+        if (previewOnly) {
+          return res.json({
+            success: true,
+            data: {
+              pdfUrl: documentUrl, // URL to the preview PDF
+              preview: true,
+            },
+          });
+        }
+
+        // Otherwise, create a database record for the final submission
+        const agreement = await storage.createAgreement({
+          agentId: defaultAgent.id,
+          buyerId: buyerId,
+          type: "global_brbc",
+          agreementText: JSON.stringify(details || {}),
+          buyerSignature: signatureData,
+          date: new Date(),
+          status: "signed_by_buyer", // Buyer has signed, waiting for agent
+          isGlobal: true, // This is a global agreement
+          documentUrl: documentUrl,
+        });
+
+        res.json({
+          success: true,
+          data: agreement,
+        });
+      } catch (error) {
+        console.error("Error creating BRBC agreement with PDF:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to create BRBC agreement",
+        });
+      }
+    },
+  );
+
   // API Endpoint to check if a global BRBC agreement exists between buyer and agent
   app.get("/api/global-brbc/:agentId", isAuthenticated, async (req, res) => {
     try {
       const agentId = parseInt(req.params.agentId);
-      
+
       if (!req.user) {
         return res.status(401).json({
           success: false,
           error: "Unauthorized",
         });
       }
-      
+
       const buyerId = req.user.id;
-      
+
       // Check if this buyer already has a global BRBC with this agent
-      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(buyerId, agentId);
-      
-      if (existingAgreement && (existingAgreement.status === 'completed' || existingAgreement.status === 'signed_by_buyer')) {
+      const existingAgreement = await storage.getGlobalBRBCForBuyerAgent(
+        buyerId,
+        agentId,
+      );
+
+      if (
+        existingAgreement &&
+        (existingAgreement.status === "completed" ||
+          existingAgreement.status === "signed_by_buyer")
+      ) {
         // Return the existing agreement
         return res.json({
           success: true,
@@ -6017,7 +6323,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           agreement: existingAgreement,
         });
       }
-      
+
       // No agreement exists
       res.json({
         success: true,
