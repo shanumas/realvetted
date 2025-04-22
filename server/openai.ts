@@ -1,18 +1,47 @@
 import OpenAI from "openai";
-import { PropertyAIData } from "@shared/types";
-import { Property, User } from "@shared/schema";
-import { storage } from "./storage";
-import fs from "fs";
-import { extractTextFromPdf } from "./pdf-util";
-// Import pdf-parse properly for ESM compatibility
+import { PDFData } from 'pdf-parse';
+import { Property, User } from "@shared/types";
+import { infoLog, errorLog } from "./logging";
 import pdfParse from "pdf-parse";
 
-// Initialize the OpenAI client
+// Initialize OpenAI API client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || "dummy_key_for_development",
+  apiKey: process.env.OPENAI_API_KEY, // This will take API key from environment variable
 });
 
-// Define interfaces for extracted data
+/**
+ * Extract data from property listings
+ */
+export interface PropertyAIData {
+  address: string;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  propertyType?: string;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  squareFeet?: number | null;
+  price?: string | null;
+  yearBuilt?: number | null;
+  description?: string;
+  features?: string[];
+  sellerName?: string;
+  sellerPhone?: string;
+  sellerEmail?: string;
+  sellerCompany?: string;
+  sellerLicenseNo?: string;
+  propertyUrl?: string;
+  imageUrls?: string[];
+  listingAgentName?: string;
+  listingAgentPhone?: string;
+  listingAgentEmail?: string;
+  listingAgentCompany?: string;
+  listingAgentLicenseNo?: string;
+}
+
+/**
+ * Extract data from ID documents
+ */
 export interface ExtractedIDData {
   firstName?: string;
   lastName?: string;
@@ -26,6 +55,9 @@ export interface ExtractedIDData {
   expirationDate?: string;
 }
 
+/**
+ * Extract data from pre-qualification documents
+ */
 export interface PrequalificationData {
   documentType?: string;
   buyerName?: string;
@@ -38,24 +70,26 @@ export interface PrequalificationData {
   expirationDate?: string;
 }
 
-// Create a basic fallback property data when API is unavailable
+/**
+ * Create fallback property data when extraction fails
+ */
 function createFallbackPropertyData(address: string): PropertyAIData {
   return {
-    address: address || "Address unavailable",
-    city: undefined,
-    state: undefined,
-    zip: undefined,
+    address: address || "Address could not be extracted",
+    city: null,
+    state: null,
+    zip: null,
     propertyType: "Unknown",
-    bedrooms: undefined,
-    bathrooms: undefined,
-    squareFeet: undefined,
-    price: undefined,
-    yearBuilt: undefined,
-    description: "Property information could not be retrieved",
+    bedrooms: null,
+    bathrooms: null,
+    squareFeet: null,
+    price: null,
+    yearBuilt: null,
+    description: "Property information could not be extracted",
     features: [],
     sellerName: "",
     sellerPhone: "",
-    sellerEmail: "shanumas@gmail.com", // Fallback email
+    sellerEmail: "",
     sellerCompany: "",
     sellerLicenseNo: "",
     propertyUrl: "",
@@ -63,766 +97,640 @@ function createFallbackPropertyData(address: string): PropertyAIData {
   };
 }
 
-// Extract property data from an address
+/**
+ * Extract property data from HTML content
+ */
 export async function extractPropertyData(
-  address: string,
+  htmlContent: string,
+  url?: string,
 ): Promise<PropertyAIData> {
+  if (!htmlContent || htmlContent.trim().length < 100) {
+    throw new Error("HTML content is too short or empty");
+  }
+
   try {
-    // If there's no API key, use fallback data for development
+    // If no API key, return fallback data (avoiding any fake data)
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Using fallback data for property extraction (no API key)");
-      return createFallbackPropertyData(address);
+      console.log("No OpenAI API key provided, returning empty property data");
+      return createFallbackPropertyData(url || "Unknown address");
+    }
+
+    console.log("Extracting property data from HTML content...");
+
+    // Take the first 15000 characters to stay within API limits
+    const truncatedHtml = htmlContent.substring(0, 15000);
+
+    // Create a prompt to extract property details from HTML
+    const prompt = `
+      Extract real estate property details from this HTML snippet. Return ONLY a JSON object with the following structure:
+      {
+        "address": "full street address",
+        "city": "city name",
+        "state": "state abbreviation",
+        "zip": "zip code",
+        "propertyType": "home type (single family, condo, etc)",
+        "bedrooms": number of bedrooms,
+        "bathrooms": number of bathrooms,
+        "squareFeet": square footage as a number,
+        "price": "listing price with dollar sign",
+        "yearBuilt": year built as a number,
+        "description": "brief property description",
+        "features": ["feature1", "feature2", ...],
+        "sellerName": "listing agent name",
+        "sellerPhone": "listing agent phone",
+        "sellerEmail": "listing agent email",
+        "sellerCompany": "listing agent brokerage",
+        "sellerLicenseNo": "license number if available"
+      }
+      
+      DO NOT include any explanations or markdown syntax, just the JSON. If a field cannot be determined, use null.
+      
+      HTML:
+      ${truncatedHtml}
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Using the latest model for better extraction
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a specialized data extraction system that pulls real estate listing information from HTML content. Extract data accurately and provide only the requested JSON output.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    // Parse the JSON response
+    const extractedData = JSON.parse(content);
+
+    // Construct and return the property data
+    const propertyData: PropertyAIData = {
+      address: extractedData.address || "Address unavailable",
+      city: extractedData.city || null,
+      state: extractedData.state || null,
+      zip: extractedData.zip || null,
+      propertyType: extractedData.propertyType || "Unknown",
+      bedrooms: extractedData.bedrooms || null,
+      bathrooms: extractedData.bathrooms || null,
+      squareFeet: extractedData.squareFeet || null,
+      price: extractedData.price || null,
+      yearBuilt: extractedData.yearBuilt || null,
+      description: extractedData.description || "No description available",
+      features: extractedData.features || [],
+      sellerName: extractedData.sellerName || "",
+      sellerPhone: extractedData.sellerPhone || "",
+      sellerEmail: extractedData.sellerEmail || "",
+      sellerCompany: extractedData.sellerCompany || "",
+      sellerLicenseNo: extractedData.sellerLicenseNo || "",
+      propertyUrl: url || "",
+      imageUrls: [], // Images would need to be extracted separately
+    };
+
+    console.log("Successfully extracted property data from HTML");
+    return propertyData;
+  } catch (error) {
+    console.error("Error extracting property data from HTML:", error);
+    // Return minimal fallback data
+    return createFallbackPropertyData(url || "Unknown address");
+  }
+}
+
+/**
+ * Extract data from ID documents
+ */
+export async function extractIDData(
+  base64Image: string,
+): Promise<ExtractedIDData> {
+  try {
+    // If no API key, return empty data
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
+      console.log("No OpenAI API key provided, returning empty ID data");
+      return {}; // Empty object, no fake data
+    }
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Using the latest model for better extraction
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a specialized data extraction system that extracts information from ID documents.",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Extract the following information from this ID document:
+                1. First Name
+                2. Last Name
+                3. Date of Birth
+                4. Address (Line 1)
+                5. Address (Line 2, if present)
+                6. City
+                7. State
+                8. ZIP
+                9. ID Number
+                10. Expiration Date
+                
+                Format as a JSON object with these fields: firstName, lastName, dateOfBirth, 
+                addressLine1, addressLine2, city, state, zip, idNumber, expirationDate
+                
+                If any field cannot be clearly determined, return null for that field.`,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    // Parse the JSON response
+    const extractedData = JSON.parse(content);
+
+    return extractedData as ExtractedIDData;
+  } catch (error) {
+    console.error("Error extracting ID data:", error);
+    throw new Error(
+      `Failed to extract ID data: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
+    );
+  }
+}
+
+/**
+ * Validate pre-qualification document
+ */
+export async function validatePrequalificationDocument(
+  pdfText: string,
+): Promise<{ isValid: boolean; data: PrequalificationData }> {
+  try {
+    // If no API key, use mock for development 
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
+      console.log("No OpenAI API key provided, returning empty validation");
+      return { 
+        isValid: false, 
+        data: {} // Empty object, no fake data
+      };
     }
 
     const prompt = `
-      Given the property address "${address}", please extract the following details as if you were looking up real property data:
-      - Full Address (street, city, state, zip)
-      - Property Type (Single Family, Condo, etc.)
-      - Number of Bedrooms
-      - Number of Bathrooms
-      - Square Footage
-      - Estimated Price
-      - Year Built
-      - Seller's Email (if available)
-
-      Response must be a valid JSON object with these fields: address, city, state, zip, propertyType, bedrooms, bathrooms, squareFeet, price, yearBuilt, sellerEmail.
+      Analyze the following mortgage pre-qualification letter text. 
+      Is this a valid mortgage pre-qualification/pre-approval document?
+      
+      Extract the following information:
+      1. Document Type (Pre-qualification or Pre-approval)
+      2. Buyer's full name
+      3. First name
+      4. Last name
+      5. Lender's name
+      6. Loan amount
+      7. Loan type (conventional, FHA, VA, etc.)
+      8. Approval date (when the letter was issued)
+      9. Expiration date (if mentioned)
+      
+      Text:
+      ${pdfText}
+      
+      Return as a JSON object with these fields plus a "isValidDocument" boolean field.
+      Format names with proper capitalization.
     `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      model: "gpt-4o", // Using the latest model for better validation
       messages: [
         {
           role: "system",
           content:
-            "You are a real estate data extraction assistant. Extract property information from addresses and return structured data.",
+            "You are a specialized validation system for mortgage pre-qualification documents.",
         },
-        {
-          role: "user",
-          content: prompt,
-        },
+        { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },
     });
 
-    // Parse and return the response
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-    return result;
-  } catch (error) {
-    console.error("Error extracting property data:", error);
-    // If API call fails, return fallback data
-    return createFallbackPropertyData(address);
-  }
-}
-
-// Extract data from ID images
-export async function extractIDData(
-  idFrontBase64: string,
-  idBackBase64: string,
-): Promise<ExtractedIDData> {
-  try {
-    // If there's no API key, return empty data for development
-    if (
-      !process.env.OPENAI_API_KEY ||
-      process.env.OPENAI_API_KEY === "dummy_key_for_development"
-    ) {
-      console.log("Cannot extract ID data (no API key)");
-      return {};
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
     }
 
-    // Make Vision API request to OpenAI
-    const frontResponse = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an ID document parser that extracts information from ID cards/driver's licenses. Return a JSON object with the following fields if present: firstName, lastName, dateOfBirth (in YYYY-MM-DD format), addressLine1, addressLine2, city, state, zip, idNumber, expirationDate.",
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Extract all personal information from this ID document. Format date of birth as YYYY-MM-DD. Format the address into addressLine1, addressLine2, city, state, and zip. Return the data as JSON.",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${idFrontBase64 || ""}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
+    // Parse the JSON response
+    const result = JSON.parse(content);
+    
+    // Extract the validation data
+    const validationData: PrequalificationData = {
+      documentType: result.documentType || null,
+      buyerName: result.buyerName || null,
+      firstName: result.firstName || null,
+      lastName: result.lastName || null,
+      lenderName: result.lenderName || null,
+      loanAmount: result.loanAmount || null,
+      loanType: result.loanType || null,
+      approvalDate: result.approvalDate || null,
+      expirationDate: result.expirationDate || null,
+    };
 
-    const frontData = JSON.parse(
-      frontResponse.choices[0].message.content || "{}",
-    );
-
-    // Process back of ID card to get any additional info
-    const backResponse = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        {
-          role: "system",
-          content:
-            "Extract any additional information from the back of this ID card, such as address details or restrictions. Return JSON with any of these fields that are present: addressLine1, addressLine2, city, state, zip.",
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "This is the back of an ID card. Extract any additional information that isn't typically on the front, like address details or restrictions. Return data as JSON.",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${idBackBase64 || ""}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-    });
-
-    const backData = JSON.parse(
-      backResponse.choices[0].message.content || "{}",
-    );
-
-    // Merge data from front and back, prioritizing front data if there are conflicts
     return {
-      ...backData,
-      ...frontData,
+      isValid: result.isValidDocument === true,
+      data: validationData,
     };
   } catch (error) {
-    console.error("Error extracting data from ID:", error);
-    return {};
+    console.error("Error validating pre-qualification document:", error);
+    return {
+      isValid: false,
+      data: {},
+    };
   }
 }
 
-// Verify prequalification documents
-export async function validatePrequalificationDocument(
-  filePath: string,
-  userData: {
-    firstName: string | null;
-    lastName: string | null;
-  },
+/**
+ * Verify KYC documents
+ */
+export async function verifyKYCDocuments(
+  idFrontImage: string,
+  idBackImage: string,
+  selfieImage: string,
 ): Promise<{
-  validated: boolean;
-  data: PrequalificationData;
-  message: string;
+  isMatch: boolean;
+  confidence: number;
+  details: { [key: string]: any };
 }> {
   try {
-    // If there's no API key, check if the file is likely a prequalification letter based on basic validation
+    // If no API key, return not matched
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log(
-        "Using enhanced mock validation for prequalification document (no API key)",
-      );
-
-      // Read the file and extract first 1000 characters to check for keywords
-      try {
-        const fileBuffer = fs.readFileSync(filePath);
-        const fullContent = fileBuffer.toString("utf-8");
-        // Limit to first 1000 characters as per requirements
-        const fileContent = fullContent.substring(0, 1000).toLowerCase();
-
-        console.log(`Analyzing first 1000 characters of document for validation:
-${fileContent.substring(0, 100)}...`);
-
-        // Check for keywords that would indicate this is a prequalification letter
-        const prequalKeywords = [
-          "pre-qualification",
-          "prequalification",
-          "pre-approval",
-          "preapproval",
-          "pre qualify",
-          "prequalify",
-          "mortgage",
-          "loan approval",
-          "lender",
-          "qualification letter",
-        ];
-
-        // Check for lender names or terms
-        const lenderKeywords = [
-          "bank",
-          "mortgage",
-          "financial",
-          "credit union",
-          "lending",
-          "capital",
-          "home loan",
-        ];
-
-        // Check if the document contains mortgage-related terms
-        const mortgageKeywords = [
-          "loan amount",
-          "interest rate",
-          "down payment",
-          "approval",
-          "borrower",
-          "property",
-          "purchase",
-        ];
-
-        // Count the number of matching keywords to determine validity
-        let keywordMatches = 0;
-        let prequalFound = false;
-        let lenderFound = false;
-        let mortgageFound = false;
-
-        for (const keyword of prequalKeywords) {
-          if (fileContent.includes(keyword)) {
-            prequalFound = true;
-            keywordMatches++;
-          }
-        }
-
-        for (const keyword of lenderKeywords) {
-          if (fileContent.includes(keyword)) {
-            lenderFound = true;
-            keywordMatches++;
-          }
-        }
-
-        for (const keyword of mortgageKeywords) {
-          if (fileContent.includes(keyword)) {
-            mortgageFound = true;
-            keywordMatches++;
-          }
-        }
-
-        // Check for user name in the document
-        const userFullName =
-          `${userData.firstName || ""} ${userData.lastName || ""}`
-            .trim()
-            .toLowerCase();
-        const nameFound = userFullName && fileContent.includes(userFullName);
-
-        // For validation to pass, the document should:
-        // 1. Contain at least one prequalification term
-        // 2. Contain at least one lender term
-        // 3. Contain user's name
-        // 4. Have a reasonable number of relevant keywords (3+)
-
-        const isValid =
-          prequalFound &&
-          (lenderFound || mortgageFound) &&
-          nameFound &&
-          keywordMatches >= 3;
-
-        const mockData: PrequalificationData = {
-          documentType: prequalFound
-            ? "Pre-Approval Letter"
-            : "Unknown Document",
-          buyerName:
-            `${userData.firstName || ""} ${userData.lastName || ""}`.trim(),
-          firstName: userData.firstName || undefined,
-          lastName: userData.lastName || undefined,
-          lenderName: lenderFound ? "Detected Lender" : undefined,
-          loanAmount: mortgageFound ? "$500,000" : undefined,
-          loanType: mortgageFound ? "Conventional" : undefined,
-          approvalDate: new Date().toISOString().split("T")[0],
-          expirationDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-            .toISOString()
-            .split("T")[0],
-        };
-
-        const validationMessage = isValid
-          ? "Document validated successfully"
-          : `Document doesn't appear to be a valid prequalification letter. Missing ${!prequalFound ? "prequalification terms" : ""}${!lenderFound && !mortgageFound ? ", lender information" : ""}${!nameFound ? ", matching name" : ""}.`;
-
-        console.log(
-          `Mock validation result: ${isValid ? "VALID" : "INVALID"} - ${validationMessage}`,
-        );
-
-        return {
-          validated: Boolean(isValid),
-          data: mockData,
-          message: validationMessage,
-        };
-      } catch (error) {
-        console.error("Error performing basic document validation:", error);
-        return {
-          validated: false,
-          data: {},
-          message:
-            "Error analyzing document content. Please try again with a different file.",
-        };
-      }
-    }
-
-    console.log(`Processing file: ${filePath}`);
-
-    // Extract text using our utility function
-    try {
-      // Use our PDF utility that works with both PDF and non-PDF files
-      const fileContent = await extractTextFromPdf(filePath);
-      console.log(
-        `Text extraction successful, extracted ${fileContent.length} characters`,
-      );
-    } catch (extractError) {
-      console.error("Error extracting text from document:", extractError);
+      console.log("No OpenAI API key provided, returning no KYC match");
       return {
-        validated: false,
-        data: {},
-        message:
-          "Unable to read the document file. Please make sure it contains readable text and try again.",
+        isMatch: false,
+        confidence: 0,
+        details: {},
       };
     }
 
-    const fileBuffer = fs.readFileSync(filePath);
-    console.log(filePath);
-
-    // Extract text properly using pdf-parse
-    const { text: fileContent } = await pdfParse(fileBuffer);
-
-    console.log("FileContent: " + fileContent.substring(0, 30));
-
-    // If no text was extracted or file is empty
-    if (!fileContent || fileContent.trim().length === 0) {
-      console.log("No text content could be extracted from the document");
-      return {
-        validated: false,
-        data: {},
-        message:
-          "The document appears to be empty or contains no readable text. Please upload a valid pre-qualification letter.",
-      };
-    }
-
-    // Check if the extracted content is actually an error message from our extractor
-    if (
-      fileContent.startsWith("Unable to extract") ||
-      fileContent.startsWith("This document appears to be") ||
-      fileContent.includes("cannot be read as text")
-    ) {
-      console.log("Text extraction returned an error message");
-      return {
-        validated: false,
-        data: {},
-        message: fileContent,
-      };
-    }
-
-    // Take only the first 1000 characters of the document for analysis
-    // This helps with large documents and keeps within OpenAI limits
-    const contentPreview = fileContent.substring(0, 1000);
-    console.log(
-      "Using OpenAI to analyze and validate the prequalification document",
-    );
-
-    // Construct the buyer's full name
-    const buyerFullName =
-      `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
-
-    // Call OpenAI API to validate the document
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      model: "gpt-4o", // Using the latest model for better verification
       messages: [
         {
           role: "system",
           content:
-            "You are a financial document validator specializing in pre-qualification and pre-approval letters for mortgages and property purchases. Your task is to analyze document content and determine if it's a valid pre-qualification document.",
+            "You are a specialized identity verification system. Compare ID documents with a selfie to verify identity.",
         },
         {
           role: "user",
-          content: `Check if this document appears to be a valid pre-qualification or pre-approval letter for real estate purchases. The document should be for the buyer named "${buyerFullName}". 
-
-Document content (preview): 
-${contentPreview}
-
-Analyze this content and determine:
-1. Is this a pre-qualification or pre-approval document?
-2. Does it contain the name of the buyer (${buyerFullName})?
-3. Does it mention a lender, loan amount, or mortgage terms?
-
-Respond with JSON containing these fields:
-- validated: boolean (true if it appears to be a valid pre-qualification document for this buyer)
-- documentType: string (the type of document detected)
-- buyerName: string (the buyer name found in the document, if any)
-- lenderName: string (the lender name found in the document, if any)
-- loanAmount: string (the loan amount mentioned, if any)
-- approvalDate: string (the approval date, if found)
-- expirationDate: string (the expiration date, if found)
-- message: string (explanation of validation result, especially if validation failed)`,
+          content: [
+            {
+              type: "text",
+              text: `Verify if the person in the selfie matches the person on the ID. Also verify that the front and back images appear to be from the same ID.
+              
+              Return a JSON object with these fields:
+              - isMatch: boolean indicating if the selfie matches the ID
+              - confidence: number from 0-100 indicating confidence level
+              - details: object with reasons for your determination
+              `,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${idFrontImage}`,
+              },
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${idBackImage}`,
+              },
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${selfieImage}`,
+              },
+            },
+          ],
         },
       ],
       response_format: { type: "json_object" },
     });
 
-    // Parse the API response
-    const result = JSON.parse(response.choices[0].message.content || "{}");
-
-    // Convert to our expected format if needed
-    const validationData: PrequalificationData = {
-      documentType: result.documentType || "Pre-Qualification Document",
-      buyerName: result.buyerName || buyerFullName,
-      firstName: userData.firstName || undefined,
-      lastName: userData.lastName || undefined,
-      lenderName: result.lenderName,
-      loanAmount: result.loanAmount,
-      approvalDate: result.approvalDate,
-      expirationDate: result.expirationDate,
-    };
-
-    // Check if the name was found
-    const nameFound =
-      result.validated &&
-      result.buyerName &&
-      (buyerFullName.toLowerCase().includes(result.buyerName.toLowerCase()) ||
-        result.buyerName.toLowerCase().includes(buyerFullName.toLowerCase()));
-
-    // If the document is valid but the name doesn't match, override validation
-    if (result.validated && !nameFound) {
-      return {
-        validated: false,
-        data: validationData,
-        message: `The document does not contain your name (${buyerFullName}). Please ensure your name appears in the pre-qualification document.`,
-      };
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
     }
 
-    return {
-      validated: result.validated || false,
-      data: validationData,
-      message:
-        result.message ||
-        (result.validated
-          ? "Document validated successfully"
-          : "Document doesn't appear to be a valid pre-qualification letter."),
-    };
-  } catch (error) {
-    console.error("Error validating prequalification document:", error);
-    return {
-      validated: false,
-      data: {},
-      message:
-        "Error processing document. Please try again with a clearer image.",
-    };
-  }
-}
-
-// Verify KYC documents
-export async function verifyKYCDocuments(
-  userId: number,
-  idFrontUrl: string,
-  idBackUrl: string,
-  userData: {
-    firstName: string;
-    lastName: string;
-    dateOfBirth: string;
-    addressLine1: string;
-  },
-): Promise<{ verified: boolean; message: string }> {
-  // In a real implementation, this would:
-  // 1. Download the ID images
-  // 2. Use OpenAI Vision API to extract information
-  // 3. Compare with user-provided info
-  // 4. Return verification result
-
-  try {
-    // If there's no API key, simulate verification for development
-    if (
-      !process.env.OPENAI_API_KEY ||
-      process.env.OPENAI_API_KEY === "dummy_key_for_development"
-    ) {
-      console.log("Using mock verification (no API key)");
-      return { verified: true, message: "ID verified successfully" };
-    }
-
-    // In a real implementation, we would call OpenAI Vision API here
-    // This is a simplified example
-    const mockResponse = `
-      ID Information:
-      Name: ${userData.firstName} ${userData.lastName}
-      Date of Birth: ${userData.dateOfBirth}
-      Address: ${userData.addressLine1}
-    `;
-
-    // Check if the name matches
-    const nameMatches = true; // In real implementation, would compare extracted name with provided name
-
-    // Address checks
-    const addressMatches = true; // In real implementation, would compare extracted address with provided address
-
-    // DOB checks
-    const dobMatches = true; // In real implementation, would compare extracted DOB with provided DOB
-
-    return {
-      verified: nameMatches && addressMatches && dobMatches,
-      message:
-        nameMatches && addressMatches && dobMatches
-          ? "ID verified successfully"
-          : "Verification failed, information doesn't match provided details",
-    };
+    // Parse the JSON response
+    return JSON.parse(content);
   } catch (error) {
     console.error("Error verifying KYC documents:", error);
     return {
-      verified: false,
-      message:
-        "Error processing ID documents. Please try again with clearer images.",
+      isMatch: false,
+      confidence: 0,
+      details: {
+        error: error instanceof Error ? error.message : "Unknown verification error",
+      },
     };
   }
 }
 
-// Find matching agents for a property
+/**
+ * Find agents for property
+ */
 export async function findAgentsForProperty(
   property: Property,
+  allAgents: User[],
 ): Promise<User[]> {
-  try {
-    // Get all agents from database
-    const allAgents = await storage.getUsersByRole("agent");
+  // Filter for agents only
+  const agents = allAgents.filter((user) => user.role === "agent");
 
-    // If no agents, return empty array
-    if (!allAgents || allAgents.length === 0) {
-      return [];
-    }
-
-    // If there's no OpenAI API key, return random set of agents
-    if (
-      !process.env.OPENAI_API_KEY ||
-      process.env.OPENAI_API_KEY === "dummy_key_for_development"
-    ) {
-      console.log("Using random agent selection (no API key)");
-
-      // Return up to 5 random agents
-      if (allAgents.length <= 5) {
-        return allAgents;
-      }
-
-      // Shuffle the array and take first 5
-      const shuffled = [...allAgents].sort(() => 0.5 - Math.random());
-      return shuffled.slice(0, 5);
-    }
-
-    // Get details of the property
-    const propertyText = `
-      Property at ${property.address}, ${property.city}, ${property.state}
-      Type: ${property.propertyType || "Not specified"}
-      Price: $${property.price || "Not specified"}
-      Bedrooms: ${property.bedrooms || "Not specified"}
-      Bathrooms: ${property.bathrooms || "Not specified"}
-      Square footage: ${property.squareFeet || "Not specified"}
-    `;
-
-    // Analyze each agent and rate their match for this property
-    const rankedAgents = await rankAgentsByExpertise(property, allAgents);
-
-    // Return top 5 matching agents
-    return rankedAgents.slice(0, 5);
-  } catch (error) {
-    console.error("Error finding agents for property:", error);
-
-    // Return a random selection of agents in case of error
-    const agents = await storage.getUsersByRole("agent");
-    if (agents.length <= 5) {
-      return agents;
-    }
-
-    // Shuffle and return first 5
-    const shuffled = [...agents].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, 5);
+  // If we have no or just a few agents, return them all
+  if (agents.length <= 3) {
+    return agents;
   }
+
+  // Otherwise rank them by expertise
+  return rankAgentsByExpertise(property, agents);
 }
 
-// Helper function to rank agents by expertise
+/**
+ * Rank agents by expertise for a specific property
+ */
 async function rankAgentsByExpertise(
   property: Property,
   agents: User[],
 ): Promise<User[]> {
-  // If there's no OpenAI API key, return original array
-  if (
-    !process.env.OPENAI_API_KEY ||
-    process.env.OPENAI_API_KEY === "dummy_key_for_development"
-  ) {
-    return agents;
-  }
-
   try {
-    // Prepare property details
-    const propertyDetails = `
-      Property Details:
-      - Address: ${property.address}, ${property.city}, ${property.state} ${property.zip}
-      - Type: ${property.propertyType || "Not specified"}
-      - Price: $${property.price?.toLocaleString() || "Not specified"}
-      - Bedrooms: ${property.bedrooms || "Not specified"}
-      - Bathrooms: ${property.bathrooms || "Not specified"}
-      - Square Footage: ${property.squareFeet || "Not specified"}
+    // If no API key, return unranked list
+    if (
+      !process.env.OPENAI_API_KEY ||
+      process.env.OPENAI_API_KEY === "dummy_key_for_development"
+    ) {
+      console.log(
+        "No OpenAI API key provided, returning unranked agent list",
+      );
+      return agents;
+    }
+
+    // Create agent profiles for the prompt
+    const agentProfiles = agents.map(
+      (agent) => `
+      Agent ID: ${agent.id}
+      Name: ${agent.firstName} ${agent.lastName}
+      Experience: ${agent.agentYearsExperience || "Unknown"} years
+      Specialties: ${agent.agentSpecialties || "General real estate"}
+      Recent Sales: ${agent.agentRecentSales || 0}
+      Languages: ${agent.agentLanguages || "English"}
+      License: ${agent.agentLicenseNumber || "Unknown"}
+    `,
+    );
+
+    // Create property profile for the prompt
+    const propertyProfile = `
+      Address: ${property.address}
+      City: ${property.city || "Unknown"}
+      State: ${property.state || "Unknown"}
+      ZIP: ${property.zip || "Unknown"}
+      Property Type: ${property.propertyType || "Unknown"}
+      Price: ${property.price || "Unknown"}
+      Bedrooms: ${property.bedrooms || "Unknown"}
+      Bathrooms: ${property.bathrooms || "Unknown"}
+      Square Feet: ${property.squareFeet || "Unknown"}
+      Year Built: ${property.yearBuilt || "Unknown"}
     `;
 
-    // Create an array of all agents with match scores
-    // Instead of using any, we'll ignore the expertise property for now
-    const scoredAgents = agents.map((agent) => {
-      // In a real implementation, this would be actual agent info
-      return agent;
+    const prompt = `
+      Rank the following real estate agents by their suitability for representing a buyer interested in this property:
+      
+      Property Details:
+      ${propertyProfile}
+      
+      Available Agents:
+      ${agentProfiles.join("\n\n")}
+      
+      Return a ranked list of agent IDs in JSON format, with the most suitable agent first.
+      Include a brief reason for each agent's ranking.
+      Format as: { "rankedAgents": [{"id": 123, "reason": "explanation"}, {"id": 456, "reason": "explanation"}, ...] }
+    `;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Using the latest model for better ranking
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a specialized real estate agent matching system. Rank agents based on their suitability for specific properties.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
     });
 
-    // Since we can't properly assign expertise, just return the original array
-    return agents;
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    // Parse the JSON response
+    const result = JSON.parse(content);
+    
+    // Map the ranked agent IDs back to the full agent objects
+    const rankedAgents: User[] = [];
+    
+    for (const rankedAgent of result.rankedAgents) {
+      const agentId = rankedAgent.id;
+      const agent = agents.find(a => a.id === agentId);
+      
+      if (agent) {
+        rankedAgents.push(agent);
+      }
+    }
+    
+    // Add any agents that weren't ranked to the end of the list
+    const rankedIds = rankedAgents.map(a => a.id);
+    const unrankedAgents = agents.filter(a => !rankedIds.includes(a.id));
+    
+    return [...rankedAgents, ...unrankedAgents];
   } catch (error) {
     console.error("Error ranking agents:", error);
     return agents; // Return unranked list on error
   }
 }
 
-// Extract property data from URL
+// Extract property data from URL using multiple methods
 export async function extractPropertyFromUrl(
   url: string,
 ): Promise<PropertyAIData | null> {
+  if (!url) {
+    throw new Error("URL is required");
+  }
+
+  // Check for a valid URL format
+  if (!url.match(/^https?:\/\//i)) {
+    throw new Error(
+      "Invalid URL format. Please provide a complete URL starting with http:// or https://",
+    );
+  }
+
+  console.log(`Extracting property data from URL: ${url}`);
+
   try {
-    // If there's no API key, use mock data for development
+    // If there's no API key, return null (instead of mock data)
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
-      console.log("Using mock data for URL extraction (no API key)");
+      console.log("No OpenAI API key provided, returning null for URL extraction");
       return null;
     }
 
-    // Import the property scraper dynamically
-    // Use the new SerpAPI-based scraper for better results
-    const { scrapePropertyListing } = await import(
-      "./scrapers/property-scraper-with-serp"
-    );
-
-    // Log that we're starting the scraping process
-    console.log(`Extracting property data from URL: ${url}`);
-
-    try {
-      try {
-        console.log("--------Inside scraper");
-        // Try to use the property scraper first
-        const scrapedData = await scrapePropertyListing(url);
-
-        // Log success and return the data
-        console.log("Successfully extracted property data with scraper");
-
-        // If seller email wasn't found, we'll keep it as empty
-        if (!scrapedData.sellerEmail) {
-          console.log("No seller email found in scraped data");
-          // Don't use a hardcoded fallback, keep it empty/undefined
+    // Try multiple extraction methods in sequence
+    let extractionMethods = [
+      // Method 1: Web scraper with SerpAPI integration
+      async () => {
+        try {
+          console.log("Method 1: Using web scraper with SerpAPI");
+          // Import the property scraper dynamically
+          const { scrapePropertyListing } = await import(
+            "./scrapers/property-scraper-with-serp"
+          );
+          return await scrapePropertyListing(url);
+        } catch (error) {
+          console.error("Scraper method failed:", error);
+          throw error;
         }
-
-        return scrapedData;
-      } catch (scrapeError) {
-        console.error(
-          "Scraper failed, falling back to API-based extraction:",
-          scrapeError,
-        );
-
-        // If Chrome/Puppeteer is failing, fallback to a direct API-based approach
-        // Get listing details directly from OpenAI with the URL
-        console.log("Using direct API-based property extraction");
-
-        // Extract domain and possible identifier from URL
-        const urlObj = new URL(url);
-        const domain = urlObj.hostname;
-
-        // Try to get property details directly from the URL structure
-        let addressFromUrl = "";
-        let cityFromUrl = "";
-        let stateFromUrl = "";
-        let zipFromUrl = "";
-
-        // Extract information from URL parts for common real estate sites
-        if (
-          domain.includes("zillow.com") ||
-          domain.includes("realtor.com") ||
-          domain.includes("redfin.com")
-        ) {
-          const pathParts = urlObj.pathname.split("/");
-
-          for (const part of pathParts) {
-            // Look for possible address/location information in the URL
-            if (part.includes("-")) {
-              const segments = part.split("-");
-
-              // Check for street numbers
-              if (segments.length > 1 && /^\d+$/.test(segments[0])) {
-                // This might be an address: e.g., 123-Main-St
-                addressFromUrl = segments.join(" ").replace(/-/g, " ");
-              }
-
-              // Check for state codes
-              if (
-                segments.length > 0 &&
-                /^[A-Z]{2}$/.test(segments[segments.length - 1])
-              ) {
-                stateFromUrl = segments[segments.length - 1];
-
-                // The part before the state is likely the city
-                if (segments.length > 1) {
-                  cityFromUrl = segments[segments.length - 2].replace(
-                    /-/g,
-                    " ",
-                  );
+      },
+      
+      // Method 2: URL analysis with OpenAI
+      async () => {
+        try {
+          console.log("Method 2: Using URL analysis with OpenAI");
+          
+          // Extract domain and possible identifier from URL
+          const urlObj = new URL(url);
+          const domain = urlObj.hostname;
+          
+          // Try to get property details directly from the URL structure
+          let addressFromUrl = "";
+          let cityFromUrl = "";
+          let stateFromUrl = "";
+          let zipFromUrl = "";
+          
+          // Extract information from URL parts for common real estate sites
+          if (
+            domain.includes("zillow.com") ||
+            domain.includes("realtor.com") ||
+            domain.includes("redfin.com")
+          ) {
+            const pathParts = urlObj.pathname.split("/");
+            
+            for (const part of pathParts) {
+              // Look for possible address/location information in the URL
+              if (part.includes("-")) {
+                const segments = part.split("-");
+                
+                // Check for street numbers
+                if (segments.length > 1 && /^\d+$/.test(segments[0])) {
+                  // This might be an address: e.g., 123-Main-St
+                  addressFromUrl = segments.join(" ").replace(/-/g, " ");
                 }
-              }
-
-              // Check for ZIP codes
-              if (
-                segments.length > 0 &&
-                /^\d{5}$/.test(segments[segments.length - 1])
-              ) {
-                zipFromUrl = segments[segments.length - 1];
+                
+                // Check for state codes
+                if (
+                  segments.length > 0 &&
+                  /^[A-Z]{2}$/.test(segments[segments.length - 1])
+                ) {
+                  stateFromUrl = segments[segments.length - 1];
+                  
+                  // The part before the state is likely the city
+                  if (segments.length > 1) {
+                    cityFromUrl = segments[segments.length - 2].replace(
+                      /-/g,
+                      " ",
+                    );
+                  }
+                }
+                
+                // Check for ZIP codes
+                if (
+                  segments.length > 0 &&
+                  /^\d{5}$/.test(segments[segments.length - 1])
+                ) {
+                  zipFromUrl = segments[segments.length - 1];
+                }
               }
             }
           }
-        }
-
-        // Construct a prompt for GPT to extract as much information as possible from the URL
-        const prompt = `
-          I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
           
-          URL: ${url}
+          // Construct a prompt for GPT to extract information from the URL
+          const prompt = `
+            I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
+            
+            URL: ${url}
+            
+            Based on the URL format, I've already extracted some potential information:
+            ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
+            ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
+            ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
+            ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
+            
+            Analyze the URL structure to extract (with high confidence):
+            - Property address
+            - City, state, ZIP
+            - Property type (if discernible)
+            - Any price information
+            - Any bedroom/bathroom counts
+            - Any other property details that might be encoded in the URL
+            
+            If you can't determine certain fields with reasonable confidence, leave them as null.
+            
+            Format as JSON.
+          `;
           
-          Based on the URL format, I've already extracted some potential information:
-          ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
-          ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
-          ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
-          ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o", // Using the latest model for better extraction
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
+              },
+              { role: "user", content: prompt },
+            ],
+            response_format: { type: "json_object" },
+          });
           
-          Analyze the URL structure to extract (with high confidence):
-          - Property address
-          - City, state, ZIP
-          - Property type (if discernible)
-          - Any price information
-          - Any bedroom/bathroom counts
-          - Any other property details that might be encoded in the URL
-          
-          If you can't determine certain fields with reasonable confidence, leave them as null.
-          
-          Format as JSON.
-        `;
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-          messages: [
-            {
-              role: "system",
-              content:
-                "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
-            },
-            { role: "user", content: prompt },
-          ],
-          response_format: { type: "json_object" },
-        });
-
-        try {
           // Parse the API response
           const apiResult = JSON.parse(
             response.choices[0].message.content || "{}",
           );
-
+          
           // Ensure we have the minimum required data
           const propertyData: PropertyAIData = {
             address:
@@ -840,10 +748,9 @@ export async function extractPropertyFromUrl(
               apiResult.description ||
               "Property information extracted from URL",
             features: apiResult.features || [],
-            // Add listing agent information based on extracted data or fallbacks
             sellerName: apiResult.sellerName || apiResult.agentName || "",
             sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "", // Don't use hardcoded fallback
+            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
             sellerCompany:
               apiResult.sellerCompany || apiResult.agentCompany || "",
             sellerLicenseNo:
@@ -851,43 +758,198 @@ export async function extractPropertyFromUrl(
             propertyUrl: url,
             imageUrls: [],
           };
-
+          
           return propertyData;
-        } catch (parseError) {
-          console.error("Error parsing API response:", parseError);
-          throw parseError;
+        } catch (error) {
+          console.error("URL analysis method failed:", error);
+          throw error;
         }
       }
-    } catch (error) {
-      console.error("Error extracting from URL:", error);
-      throw error;
+    ];
+    
+    // Try each method in sequence until one succeeds
+    for (let i = 0; i < extractionMethods.length; i++) {
+      try {
+        console.log(`Trying extraction method ${i+1}...`);
+        const result = await extractionMethods[i]();
+        console.log(`Method ${i+1} succeeded!`);
+        return result;
+      } catch (methodError) {
+        console.error(`Method ${i+1} failed:`, methodError);
+        // Continue to the next method if this one failed
+        continue;
+      }
     }
+    
+    // If we get here, all methods failed
+    throw new Error("All property extraction methods failed");
+    
   } catch (error) {
     console.error("Error in property URL extraction:", error);
-
-    // Create a fallback property result with minimal data
+    
+    // Create a fallback property result with minimal data but no hardcoded fake data
     const fallbackResult: PropertyAIData = {
       address: "Address could not be extracted",
       city: "",
       state: "",
       zip: "",
       propertyType: "Unknown",
-      bedrooms: 0,
-      bathrooms: 0,
-      squareFeet: 0,
+      bedrooms: null,
+      bathrooms: null,
+      squareFeet: null,
       price: "",
-      yearBuilt: 0,
+      yearBuilt: null,
       description: "Property information could not be extracted",
       features: [],
       sellerName: "",
       sellerPhone: "",
-      sellerEmail: "", // Don't use hardcoded fallback email
+      sellerEmail: "",
       sellerCompany: "",
       sellerLicenseNo: "",
       propertyUrl: url,
       imageUrls: [],
     };
-
+    
     return fallbackResult;
+  }
+}
+
+// Export direct URL property extraction for standalone testing
+export async function apiExtractPropertyData(
+  url: string
+): Promise<PropertyAIData> {
+  try {
+    console.log("Using direct API-based property extraction");
+    
+    // Extract domain and possible identifier from URL
+    const urlObj = new URL(url);
+    const domain = urlObj.hostname;
+    
+    // Try to get property details directly from the URL structure
+    let addressFromUrl = "";
+    let cityFromUrl = "";
+    let stateFromUrl = "";
+    let zipFromUrl = "";
+    
+    // Extract information from URL parts for common real estate sites
+    if (
+      domain.includes("zillow.com") ||
+      domain.includes("realtor.com") ||
+      domain.includes("redfin.com")
+    ) {
+      const pathParts = urlObj.pathname.split("/");
+      
+      for (const part of pathParts) {
+        // Look for possible address/location information in the URL
+        if (part.includes("-")) {
+          const segments = part.split("-");
+          
+          // Check for street numbers
+          if (segments.length > 1 && /^\d+$/.test(segments[0])) {
+            // This might be an address: e.g., 123-Main-St
+            addressFromUrl = segments.join(" ").replace(/-/g, " ");
+          }
+          
+          // Check for state codes
+          if (
+            segments.length > 0 &&
+            /^[A-Z]{2}$/.test(segments[segments.length - 1])
+          ) {
+            stateFromUrl = segments[segments.length - 1];
+            
+            // The part before the state is likely the city
+            if (segments.length > 1) {
+              cityFromUrl = segments[segments.length - 2].replace(
+                /-/g,
+                " ",
+              );
+            }
+          }
+          
+          // Check for ZIP codes
+          if (
+            segments.length > 0 &&
+            /^\d{5}$/.test(segments[segments.length - 1])
+          ) {
+            zipFromUrl = segments[segments.length - 1];
+          }
+        }
+      }
+    }
+    
+    // Construct a prompt for GPT to extract information from the URL
+    const prompt = `
+      I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
+      
+      URL: ${url}
+      
+      Based on the URL format, I've already extracted some potential information:
+      ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
+      ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
+      ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
+      ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
+      
+      Analyze the URL structure to extract (with high confidence):
+      - Property address
+      - City, state, ZIP
+      - Property type (if discernible)
+      - Any price information
+      - Any bedroom/bathroom counts
+      - Any other property details that might be encoded in the URL
+      
+      If you can't determine certain fields with reasonable confidence, leave them as null.
+      
+      Format as JSON.
+    `;
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Using the latest model for better extraction
+      messages: [
+        {
+          role: "system",
+          content:
+            "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
+        },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+    });
+    
+    // Parse the API response
+    const apiResult = JSON.parse(
+      response.choices[0].message.content || "{}",
+    );
+    
+    // Ensure we have the minimum required data
+    const propertyData: PropertyAIData = {
+      address: apiResult.address || addressFromUrl || "Address unavailable",
+      city: apiResult.city || cityFromUrl || null,
+      state: apiResult.state || stateFromUrl || null,
+      zip: apiResult.zip || zipFromUrl || null,
+      propertyType: apiResult.propertyType || "Unknown",
+      bedrooms: apiResult.bedrooms || null,
+      bathrooms: apiResult.bathrooms || null,
+      squareFeet: apiResult.squareFeet || null,
+      price: apiResult.price || null,
+      yearBuilt: apiResult.yearBuilt || null,
+      description:
+        apiResult.description ||
+        "Property information extracted from URL",
+      features: apiResult.features || [],
+      sellerName: apiResult.sellerName || apiResult.agentName || "",
+      sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
+      sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
+      sellerCompany:
+        apiResult.sellerCompany || apiResult.agentCompany || "",
+      sellerLicenseNo:
+        apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
+      propertyUrl: url,
+      imageUrls: [],
+    };
+    
+    return propertyData;
+  } catch (error) {
+    console.error("API-based property extraction error:", error);
+    throw error;
   }
 }
