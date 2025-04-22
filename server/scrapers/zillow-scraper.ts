@@ -271,7 +271,10 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     
     // Clean up license number if present
     if (listingAgentLicenseNo) {
-      listingAgentLicenseNo = cleanLicenseNumber(listingAgentLicenseNo);
+      const cleanedLicense = cleanLicenseNumber(listingAgentLicenseNo);
+      if (cleanedLicense) {
+        listingAgentLicenseNo = cleanedLicense;
+      }
     }
     
     // Create the structured property data
@@ -429,10 +432,10 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     // Extract all links from the search results
     const links = await page.evaluate(() => {
       const results = Array.from(document.querySelectorAll('#search a'));
-      return results.map(link => {
+      return results.map((link: any) => {
         return {
-          href: link.href,
-          text: link.textContent
+          href: link.href || '',
+          text: link.textContent || ''
         };
       });
     });
@@ -452,8 +455,8 @@ export async function findZillowUrl(url: string): Promise<string | null> {
     
     console.log('No Zillow URL found in search results');
     return null;
-  } catch (error) {
-    console.error('Error finding Zillow URL:', error);
+  } catch (error: any) {
+    console.error('Error finding Zillow URL:', error.message || String(error));
     return null;
   }
 }
