@@ -196,9 +196,24 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
       }
       
       // Extract license number - Look for patterns like "DRE #01234567" or "License #ABC123"
-      const licenseMatch = listingAgentText.match(/(?:DRE\s*#?|License\s*#?|#)(\w+)/i);
-      if (licenseMatch && licenseMatch[1]) {
-        listingAgentLicenseNo = licenseMatch[1].trim();
+      // Try different patterns from most specific to least specific
+      
+      // Pattern 1: Explicit license markers like "DRE #01234567", "License #ABC123"
+      const explicitLicenseMatch = listingAgentText.match(/(?:DRE\s*#?|CalDRE\s*#?|License\s*#?|Lic\.\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)([A-Z0-9-]+)/i);
+      
+      // Pattern 2: License number in parentheses
+      const parenthesesLicenseMatch = listingAgentText.match(/\((?:.*?#?\s*)([0-9]{5,})\)/);
+      
+      // Pattern 3: Numbers that look like a license (usually 6+ digits)
+      const numericLicenseMatch = listingAgentText.match(/\b([0-9]{6,})\b/);
+      
+      // Use the first match found, in order of specificity
+      if (explicitLicenseMatch && explicitLicenseMatch[1]) {
+        listingAgentLicenseNo = explicitLicenseMatch[1].trim();
+      } else if (parenthesesLicenseMatch && parenthesesLicenseMatch[1]) {
+        listingAgentLicenseNo = parenthesesLicenseMatch[1].trim();
+      } else if (numericLicenseMatch && numericLicenseMatch[1]) {
+        listingAgentLicenseNo = numericLicenseMatch[1].trim();
       }
     }
     
@@ -465,13 +480,34 @@ export async function findZillowUrl(url: string): Promise<string | null> {
 }
 
 /**
- * Helper function to strip license prefixes
+ * Helper function to strip license prefixes and standardize license numbers
  * @param licenseNo License number with possible prefix
  * @returns Clean license number without prefix
  */
 function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
   if (!licenseNo) return licenseNo;
   
-  // Remove any prefix like "DRE", "DRE #", "CalDRE", etc. and keep only the numbers and letters
-  return licenseNo.replace(/^(DRE\s*#?|CalDRE\s*#?|Lic\.|License|BRE\s*#?)\s*/i, "").trim();
+  // First, remove any prefix like "DRE", "DRE #", "CalDRE", etc.
+  const prefixesPattern = /^(DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
+  let cleaned = licenseNo.replace(prefixesPattern, "").trim();
+  
+  // Handle format where license number might be wrapped in parentheses
+  // e.g., "John Doe (License #01234567)"
+  const parenthesesMatch = cleaned.match(/\(.*?(\d{5,})\)?$/);
+  if (parenthesesMatch && parenthesesMatch[1]) {
+    cleaned = parenthesesMatch[1];
+  }
+  
+  // If there's a comma followed by a pattern that looks like a license number, extract it
+  // e.g., "John Doe, #01234567"
+  const commaMatch = cleaned.match(/,\s*(?:#?)(\d{5,})\b/);
+  if (commaMatch && commaMatch[1]) {
+    cleaned = commaMatch[1];
+  }
+  
+  // Clean up any remaining non-alphanumeric characters
+  // But preserve letters that might be part of license format in some states
+  cleaned = cleaned.replace(/[^\w-]/g, "");
+  
+  return cleaned;
 }
