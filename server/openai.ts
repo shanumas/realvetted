@@ -1,43 +1,11 @@
 import OpenAI from "openai";
-import { PDFData } from 'pdf-parse';
-import { Property, User } from "@shared/types";
-import { infoLog, errorLog } from "./logging";
 import pdfParse from "pdf-parse";
+import { PropertyAIData, PropertyScraperResult, Property, User } from "@shared/types";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // This will take API key from environment variable
 });
-
-/**
- * Extract data from property listings
- */
-export interface PropertyAIData {
-  address: string;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-  propertyType?: string;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  squareFeet?: number | null;
-  price?: string | null;
-  yearBuilt?: number | null;
-  description?: string;
-  features?: string[];
-  sellerName?: string;
-  sellerPhone?: string;
-  sellerEmail?: string;
-  sellerCompany?: string;
-  sellerLicenseNo?: string;
-  propertyUrl?: string;
-  imageUrls?: string[];
-  listingAgentName?: string;
-  listingAgentPhone?: string;
-  listingAgentEmail?: string;
-  listingAgentCompany?: string;
-  listingAgentLicenseNo?: string;
-}
 
 /**
  * Extract data from ID documents
@@ -601,189 +569,164 @@ export async function extractPropertyFromUrl(
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
-    // If there's no API key, return null (instead of mock data)
-    if (
-      !process.env.OPENAI_API_KEY ||
-      process.env.OPENAI_API_KEY === "dummy_key_for_development"
-    ) {
-      console.log("No OpenAI API key provided, returning null for URL extraction");
-      return null;
+    // Check for required API keys
+    if (!process.env.OPENAI_API_KEY) {
+      console.log("OpenAI API key is missing. Cannot extract property data.");
+      throw new Error("OpenAI API key is required for property data extraction");
+    }
+    
+    if (!process.env.SERPAPI_KEY) {
+      console.log("SerpAPI key is missing. Cannot extract property data.");
+      throw new Error("SerpAPI key is required for property data extraction");
     }
 
-    // Try multiple extraction methods in sequence
-    let extractionMethods = [
-      // Method 1: Web scraper with SerpAPI integration
-      async () => {
-        try {
-          console.log("Method 1: Using web scraper with SerpAPI");
-          // Import the property scraper dynamically
-          const { scrapePropertyListing } = await import(
-            "./scrapers/property-scraper-with-serp"
-          );
-          return await scrapePropertyListing(url);
-        } catch (error) {
-          console.error("Scraper method failed:", error);
-          throw error;
-        }
-      },
+    // Primary method: Use our new SerpAPI-based extraction method
+    console.log("Using SerpAPI and OpenAI for property extraction");
+    try {
+      const { extractPropertyWithSerpApi } = await import(
+        "./scrapers/property-serpapi-scraper"
+      );
+      return await extractPropertyWithSerpApi(url);
+    } catch (error) {
+      console.error("SerpAPI extraction failed:", error);
       
-      // Method 2: URL analysis with OpenAI
-      async () => {
-        try {
-          console.log("Method 2: Using URL analysis with OpenAI");
-          
-          // Extract domain and possible identifier from URL
-          const urlObj = new URL(url);
-          const domain = urlObj.hostname;
-          
-          // Try to get property details directly from the URL structure
-          let addressFromUrl = "";
-          let cityFromUrl = "";
-          let stateFromUrl = "";
-          let zipFromUrl = "";
-          
-          // Extract information from URL parts for common real estate sites
-          if (
-            domain.includes("zillow.com") ||
-            domain.includes("realtor.com") ||
-            domain.includes("redfin.com")
-          ) {
-            const pathParts = urlObj.pathname.split("/");
+      // Fallback method: URL analysis with OpenAI
+      console.log("Falling back to URL analysis");
+      
+      // Extract domain and possible identifier from URL
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname;
+      
+      // Try to get property details directly from the URL structure
+      let addressFromUrl = "";
+      let cityFromUrl = "";
+      let stateFromUrl = "";
+      let zipFromUrl = "";
+      
+      // Extract information from URL parts for common real estate sites
+      if (
+        domain.includes("zillow.com") ||
+        domain.includes("realtor.com") ||
+        domain.includes("redfin.com")
+      ) {
+        const pathParts = urlObj.pathname.split("/");
+        
+        for (const part of pathParts) {
+          // Look for possible address/location information in the URL
+          if (part.includes("-")) {
+            const segments = part.split("-");
             
-            for (const part of pathParts) {
-              // Look for possible address/location information in the URL
-              if (part.includes("-")) {
-                const segments = part.split("-");
-                
-                // Check for street numbers
-                if (segments.length > 1 && /^\d+$/.test(segments[0])) {
-                  // This might be an address: e.g., 123-Main-St
-                  addressFromUrl = segments.join(" ").replace(/-/g, " ");
-                }
-                
-                // Check for state codes
-                if (
-                  segments.length > 0 &&
-                  /^[A-Z]{2}$/.test(segments[segments.length - 1])
-                ) {
-                  stateFromUrl = segments[segments.length - 1];
-                  
-                  // The part before the state is likely the city
-                  if (segments.length > 1) {
-                    cityFromUrl = segments[segments.length - 2].replace(
-                      /-/g,
-                      " ",
-                    );
-                  }
-                }
-                
-                // Check for ZIP codes
-                if (
-                  segments.length > 0 &&
-                  /^\d{5}$/.test(segments[segments.length - 1])
-                ) {
-                  zipFromUrl = segments[segments.length - 1];
-                }
+            // Check for street numbers
+            if (segments.length > 1 && /^\d+$/.test(segments[0])) {
+              // This might be an address: e.g., 123-Main-St
+              addressFromUrl = segments.join(" ").replace(/-/g, " ");
+            }
+            
+            // Check for state codes
+            if (
+              segments.length > 0 &&
+              /^[A-Z]{2}$/.test(segments[segments.length - 1])
+            ) {
+              stateFromUrl = segments[segments.length - 1];
+              
+              // The part before the state is likely the city
+              if (segments.length > 1) {
+                cityFromUrl = segments[segments.length - 2].replace(
+                  /-/g,
+                  " ",
+                );
               }
             }
+            
+            // Check for ZIP codes
+            if (
+              segments.length > 0 &&
+              /^\d{5}$/.test(segments[segments.length - 1])
+            ) {
+              zipFromUrl = segments[segments.length - 1];
+            }
           }
-          
-          // Construct a prompt for GPT to extract information from the URL
-          const prompt = `
-            I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
-            
-            URL: ${url}
-            
-            Based on the URL format, I've already extracted some potential information:
-            ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
-            ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
-            ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
-            ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
-            
-            Analyze the URL structure to extract (with high confidence):
-            - Property address
-            - City, state, ZIP
-            - Property type (if discernible)
-            - Any price information
-            - Any bedroom/bathroom counts
-            - Any other property details that might be encoded in the URL
-            
-            If you can't determine certain fields with reasonable confidence, leave them as null.
-            
-            Format as JSON.
-          `;
-          
-          const response = await openai.chat.completions.create({
-            model: "gpt-4o", // Using the latest model for better extraction
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
-              },
-              { role: "user", content: prompt },
-            ],
-            response_format: { type: "json_object" },
-          });
-          
-          // Parse the API response
-          const apiResult = JSON.parse(
-            response.choices[0].message.content || "{}",
-          );
-          
-          // Ensure we have the minimum required data
-          const propertyData: PropertyAIData = {
-            address:
-              apiResult.address || addressFromUrl || "Address unavailable",
-            city: apiResult.city || cityFromUrl || null,
-            state: apiResult.state || stateFromUrl || null,
-            zip: apiResult.zip || zipFromUrl || null,
-            propertyType: apiResult.propertyType || "Unknown",
-            bedrooms: apiResult.bedrooms || null,
-            bathrooms: apiResult.bathrooms || null,
-            squareFeet: apiResult.squareFeet || null,
-            price: apiResult.price || null,
-            yearBuilt: apiResult.yearBuilt || null,
-            description:
-              apiResult.description ||
-              "Property information extracted from URL",
-            features: apiResult.features || [],
-            sellerName: apiResult.sellerName || apiResult.agentName || "",
-            sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-            sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
-            sellerCompany:
-              apiResult.sellerCompany || apiResult.agentCompany || "",
-            sellerLicenseNo:
-              apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
-            propertyUrl: url,
-            imageUrls: [],
-          };
-          
-          return propertyData;
-        } catch (error) {
-          console.error("URL analysis method failed:", error);
-          throw error;
         }
       }
-    ];
-    
-    // Try each method in sequence until one succeeds
-    for (let i = 0; i < extractionMethods.length; i++) {
+      
+      // Construct a prompt for GPT to extract information from the URL
+      const prompt = `
+        I have a real estate listing URL. Please extract as much property information as possible from just the URL structure.
+        
+        URL: ${url}
+        
+        Based on the URL format, I've already extracted some potential information:
+        ${addressFromUrl ? `Possible address: ${addressFromUrl}` : ""}
+        ${cityFromUrl ? `Possible city: ${cityFromUrl}` : ""}
+        ${stateFromUrl ? `Possible state: ${stateFromUrl}` : ""}
+        ${zipFromUrl ? `Possible ZIP: ${zipFromUrl}` : ""}
+        
+        Analyze the URL structure to extract (with high confidence):
+        - Property address
+        - City, state, ZIP
+        - Property type (if discernible)
+        - Any price information
+        - Any bedroom/bathroom counts
+        - Any other property details that might be encoded in the URL
+        
+        If you can't determine certain fields with reasonable confidence, leave them as null.
+        
+        Format as JSON.
+      `;
+      
       try {
-        console.log(`Trying extraction method ${i+1}...`);
-        const result = await extractionMethods[i]();
-        console.log(`Method ${i+1} succeeded!`);
-        return result;
-      } catch (methodError) {
-        console.error(`Method ${i+1} failed:`, methodError);
-        // Continue to the next method if this one failed
-        continue;
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o", // Using the latest model for better extraction
+          messages: [
+            {
+              role: "system",
+              content:
+                "You extract real estate property information from URLs. Be precise and only include information you can reasonably determine from the URL structure. For uncertain fields, use null values.",
+            },
+            { role: "user", content: prompt },
+          ],
+          response_format: { type: "json_object" },
+        });
+        
+        // Parse the API response
+        const apiResult = JSON.parse(
+          response.choices[0].message.content || "{}",
+        );
+        
+        // Ensure we have the minimum required data
+        const propertyData: PropertyAIData = {
+          address:
+            apiResult.address || addressFromUrl || "Address unavailable",
+          city: apiResult.city || cityFromUrl || null,
+          state: apiResult.state || stateFromUrl || null,
+          zip: apiResult.zip || zipFromUrl || null,
+          propertyType: apiResult.propertyType || "Unknown",
+          bedrooms: apiResult.bedrooms || null,
+          bathrooms: apiResult.bathrooms || null,
+          squareFeet: apiResult.squareFeet || null,
+          price: apiResult.price || null,
+          yearBuilt: apiResult.yearBuilt || null,
+          description:
+            apiResult.description ||
+            "Property information extracted from URL",
+          features: apiResult.features || [],
+          sellerName: apiResult.sellerName || apiResult.agentName || "",
+          sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
+          sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
+          sellerCompany:
+            apiResult.sellerCompany || apiResult.agentCompany || "",
+          sellerLicenseNo:
+            apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
+          propertyUrl: url,
+          imageUrls: [],
+        };
+        
+        return propertyData;
+      } catch (urlAnalysisError) {
+        console.error("URL analysis method failed:", urlAnalysisError);
+        throw urlAnalysisError;
       }
     }
-    
-    // If we get here, all methods failed
-    throw new Error("All property extraction methods failed");
-    
   } catch (error) {
     console.error("Error in property URL extraction:", error);
     
