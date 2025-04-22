@@ -251,126 +251,369 @@ const EMPTY_PROPERTY: PropertyAIData = {
   listedby: "",
 };
 
-/* ---------- launch Chrome with minimal flags ---------- */
+/* ---------- launch Chrome with enhanced stealth mode ---------- */
 async function launchBrowser(): Promise<Browser> {
   return puppeteer.launch({
-    headless: true,
+    headless: true, // Use headless mode for replit environment
     executablePath: "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
       "--disable-gpu",
-      "--disable-features=IsolateOrigins,site-per-process", // Disable site isolation
       "--disable-web-security", // Disable same-origin policy
-      "--disable-features=site-per-process",
-      "--disable-extensions",
+      "--disable-features=IsolateOrigins",
+      "--disable-automation", // Hide automation flags
+      "--disable-blink-features=AutomationControlled", // Critical for avoiding detection
       "--window-size=1920,1080",
+      "--start-maximized", // Start with a maximized window to look like a real user
+      "--disable-extensions", // Disable extensions to avoid detection
+      "--hide-scrollbars", // Hide scrollbars to appear more human
+      "--mute-audio", // Mute audio to avoid unexpected sounds
+      `--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${Math.floor(Math.random() * 5) + 120}.0.0.0 Safari/537.36`,
     ],
+    ignoreDefaultArgs: ["--enable-automation"], // Avoid automation flags
+    defaultViewport: null, // Use window size instead of viewport
   });
 }
 
-/* ---------- standard page preparations with enhanced anti-bot bypassing ---------- */
+/* ---------- Advanced stealth page prep with evasion techniques ---------- */
 async function prepPage(page: Page) {
-  // Set a more realistic user agent with consistent browser version
-  await page.setUserAgent(
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  );
+  // Randomize Chrome version to appear as different browsers
+  const chromeVersion = Math.floor(Math.random() * 5) + 120;
+  const userAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion}.0.0.0 Safari/537.36`;
   
-  // Set a higher resolution viewport that looks like a real monitor
-  await page.setViewport({ width: 1920, height: 1080 });
+  await page.setUserAgent(userAgent);
   
-  // Set more realistic headers
+  // Set a realistic viewport and device scale factor
+  await page.setViewport({ 
+    width: 1920, 
+    height: 1080,
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isLandscape: true,
+    isMobile: false
+  });
+  
+  // Set cookies to appear as a returning visitor
+  await page.setCookie({
+    name: 'returning_visitor',
+    value: 'true',
+    domain: '.zillow.com',
+    expires: Math.floor(Date.now() / 1000) + 86400 * 30, // 30 days
+    httpOnly: false,
+    secure: true,
+    sameSite: 'None'
+  });
+  
+  // Set headers that make the request appear more realistic
   await page.setExtraHTTPHeaders({
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
     'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'max-age=0',
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-Site': 'cross-site',
     'Sec-Fetch-User': '?1',
-    'Sec-CH-UA': '"Google Chrome";v="124", "Chromium";v="124", "Not-A.Brand";v="99"',
+    'Sec-CH-UA': `"Google Chrome";v="${chromeVersion}", "Chromium";v="${chromeVersion}", "Not-A.Brand";v="99"`,
     'Sec-CH-UA-Mobile': '?0',
     'Sec-CH-UA-Platform': '"Windows"'
   });
   
-  // Emulate more browser-like features and behavior
+  // Inject scripts to modify the browser environment and evade detection
   await page.evaluateOnNewDocument(() => {
-    // Add fake web driver properties to prevent detection
+    // ----- 1. Make navigator properties consistent with our user agent -----
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
     Object.defineProperty(navigator, 'language', { get: () => 'en-US' });
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en', 'es'] });
     
-    // Override the plugins property
+    // ----- 2. Create convincing plugins array -----
+    const plugins = [
+      {
+        name: 'Chrome PDF Plugin',
+        filename: 'internal-pdf-viewer',
+        description: 'Portable Document Format',
+        mimeTypes: [{ type: 'application/pdf', suffixes: 'pdf' }]
+      },
+      {
+        name: 'Chrome PDF Viewer',
+        filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
+        description: '',
+        mimeTypes: [{ type: 'application/pdf', suffixes: 'pdf' }]
+      },
+      {
+        name: 'Native Client',
+        filename: 'internal-nacl-plugin',
+        description: '',
+        mimeTypes: [
+          { type: 'application/x-nacl', suffixes: 'nacl' },
+          { type: 'application/x-pnacl', suffixes: 'pnacl' }
+        ]
+      }
+    ];
+    
+    // Define plugins property to return our fake plugins
     Object.defineProperty(navigator, 'plugins', {
       get: () => {
-        return [1, 2, 3, 4, 5].map(() => ({
-          name: `Default Plugin ${Math.floor(Math.random() * 10)}`,
-          filename: `default_plugin_${Math.floor(Math.random() * 100)}.dll`,
-          description: 'This is a default plugin',
-          version: `${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`
-        }));
+        const pluginArray = plugins.map(plugin => {
+          const mimeTypes = plugin.mimeTypes.map(mt => {
+            return { type: mt.type, suffixes: mt.suffixes, description: '' };
+          });
+          
+          return {
+            name: plugin.name,
+            filename: plugin.filename,
+            description: plugin.description,
+            length: mimeTypes.length,
+            item: (index: number) => mimeTypes[index],
+            namedItem: (name: string) => mimeTypes.find(mt => mt.type === name)
+          };
+        });
+        
+        // Make the array iterable
+        pluginArray.item = (index: number) => pluginArray[index];
+        pluginArray.namedItem = (name: string) => pluginArray.find(p => p.name === name);
+        pluginArray.refresh = () => {};
+        
+        return Object.defineProperty(pluginArray, 'length', { value: pluginArray.length });
       }
     });
     
-    // Add a fake notification API
-    Object.defineProperty(window, 'Notification', {
-      get: () => ({
+    // ----- 3. Remove automation-specific attributes -----
+    
+    // Spoof screen dimensions to match viewport
+    Object.defineProperty(window.screen, 'width', { get: () => 1920 });
+    Object.defineProperty(window.screen, 'height', { get: () => 1080 });
+    Object.defineProperty(window.screen, 'availWidth', { get: () => 1920 });
+    Object.defineProperty(window.screen, 'availHeight', { get: () => 1040 });
+    Object.defineProperty(window.screen, 'colorDepth', { get: () => 24 });
+    Object.defineProperty(window.screen, 'pixelDepth', { get: () => 24 });
+    
+    // ----- 4. Mock user interaction functions -----
+    const originalQuerySelector = document.querySelector;
+    document.querySelector = function(...args) {
+      // Add a slight delay to querySelector to appear more human
+      const start = Date.now();
+      while (Date.now() - start < 5) {} // Small delay
+      return originalQuerySelector.apply(this, args);
+    };
+    
+    // ----- 5. Fake WebGL to match real browsers -----
+    const getParameter = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(parameter) {
+      // Spoof renderer info
+      if (parameter === 37445) {
+        return 'Google Inc. (NVIDIA)';
+      }
+      if (parameter === 37446) {
+        return 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1080 Direct3D11 vs_5_0 ps_5_0)';
+      }
+      
+      return getParameter.apply(this, [parameter]);
+    };
+    
+    // ----- 6. Add generic browser features -----
+    
+    // Add notification API
+    if (!('Notification' in window)) {
+      window.Notification = {
         permission: 'default',
         requestPermission: async () => 'default'
-      })
-    });
+      };
+    }
+    
+    // ----- 7. Hide automation flags -----
+    // Remove flag used by CloudFlare and others
+    delete (window as any)._phantom;
+    delete (window as any).__nightmare;
+    delete (window as any).callPhantom;
+    
+    // Add regular Chrome functions
+    window.chrome = {
+      app: {
+        isInstalled: false,
+        InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+        RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
+      },
+      runtime: {
+        OnInstalledReason: {
+          CHROME_UPDATE: 'chrome_update',
+          INSTALL: 'install',
+          SHARED_MODULE_UPDATE: 'shared_module_update',
+          UPDATE: 'update'
+        },
+        OnRestartRequiredReason: {
+          APP_UPDATE: 'app_update',
+          OS_UPDATE: 'os_update',
+          PERIODIC: 'periodic'
+        },
+        PlatformArch: {
+          ARM: 'arm',
+          ARM64: 'arm64',
+          MIPS: 'mips',
+          MIPS64: 'mips64',
+          X86_32: 'x86-32',
+          X86_64: 'x86-64'
+        },
+        PlatformNaclArch: {
+          ARM: 'arm',
+          MIPS: 'mips',
+          MIPS64: 'mips64',
+          X86_32: 'x86-32',
+          X86_64: 'x86-64'
+        },
+        PlatformOs: {
+          ANDROID: 'android',
+          CROS: 'cros',
+          LINUX: 'linux',
+          MAC: 'mac',
+          OPENBSD: 'openbsd',
+          WIN: 'win'
+        },
+        RequestUpdateCheckStatus: {
+          NO_UPDATE: 'no_update',
+          THROTTLED: 'throttled',
+          UPDATE_AVAILABLE: 'update_available'
+        }
+      }
+    };
+    
+    // Mock permissions API used by newer sites
+    if (!('permissions' in navigator)) {
+      (navigator as any).permissions = {
+        query: async () => ({ state: 'prompt', onchange: null })
+      };
+    }
   });
 }
 
-/* ---------- human-like scrolling and interaction ---------- */
+/* ---------- ultra-realistic human-like scrolling and interaction ---------- */
 async function autoScroll(page: Page) {
   // First, wait a bit like a human would after loading the page
-  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1500));
+  await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 2000));
   
-  // Move mouse randomly to simulate human behavior
+  // Initial mouse movement to a random position
   await page.mouse.move(
-    100 + Math.random() * 600, 
-    100 + Math.random() * 200
+    200 + Math.random() * 400, 
+    100 + Math.random() * 150
   );
   
-  // Perform natural, randomized scrolling
+  // Simulate clicking on something to get focus (common human behavior)
+  if (Math.random() > 0.5) {
+    await page.mouse.click(
+      250 + Math.random() * 300,
+      150 + Math.random() * 100
+    );
+    
+    // Small delay after clicking
+    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500));
+  }
+  
+  // Perform advanced, highly-variable human-like scrolling with occasional stops
   await page.evaluate(async () => {
     await new Promise<void>((resolve) => {
       let totalHeight = 0;
-      const distance = 100 + Math.floor(Math.random() * 300); // Variable scroll distance
+      let scrollingPaused = false;
+      const viewportHeight = window.innerHeight;
+      const totalPageHeight = document.body.scrollHeight;
+      
+      // Don't scroll all the way to the bottom - humans rarely do that
+      const targetScrollPercentage = 0.6 + Math.random() * 0.3; // Between 60% and 90%
+      const targetHeight = totalPageHeight * targetScrollPercentage;
       
       const scrollDown = () => {
-        window.scrollBy(0, distance);
-        totalHeight += distance;
+        // Humans scroll in variable chunks with occasional longer jumps
+        let jump = 0;
         
-        // Add some randomness to scrolling behavior
-        const maxHeight = document.body.scrollHeight - window.innerHeight;
+        // Occasionally make larger jumps (like using mousewheel aggressively)
+        if (Math.random() < 0.15) {
+          jump = 350 + Math.floor(Math.random() * 250); // Larger jump
+        } else {
+          jump = 80 + Math.floor(Math.random() * 120); // Normal scroll
+        }
         
-        if (totalHeight >= maxHeight) {
-          // Reached bottom, resolve after a small delay
-          setTimeout(resolve, 500 + Math.random() * 1000);
+        // Sometimes scroll back up a bit (very human behavior)
+        if (Math.random() < 0.08 && totalHeight > viewportHeight) {
+          window.scrollBy(0, -Math.floor(Math.random() * 100));
+          
+          // Pause briefly after scrolling up
+          setTimeout(() => {
+            window.scrollBy(0, jump);
+            totalHeight += jump;
+            continueScrolling();
+          }, 400 + Math.random() * 500);
           return;
         }
         
-        // Random pauses between scrolls to mimic human behavior
+        window.scrollBy(0, jump);
+        totalHeight += jump;
+        
+        // Occasionally pause scrolling to simulate reading (very human behavior)
+        if (Math.random() < 0.2 && !scrollingPaused) {
+          scrollingPaused = true;
+          
+          // Longer pause to simulate reading content
+          setTimeout(() => {
+            scrollingPaused = false;
+            continueScrolling();
+          }, 1000 + Math.random() * 4000);
+          return;
+        }
+        
+        continueScrolling();
+      };
+      
+      const continueScrolling = () => {
+        if (scrollingPaused) return;
+        
+        if (totalHeight >= targetHeight || totalHeight >= document.body.scrollHeight - window.innerHeight) {
+          // Reached target scroll depth, resolve after a reading delay
+          setTimeout(resolve, 1000 + Math.random() * 3000);
+          return;
+        }
+        
+        // Variable timing between scrolls to mimic human reading and scrolling patterns
         setTimeout(scrollDown, 100 + Math.random() * 400);
       };
       
-      scrollDown();
+      // Start scrolling after a small initial delay
+      setTimeout(scrollDown, 200 + Math.random() * 300);
     });
   });
   
-  // Random mouse movements after scrolling
+  // Wiggle mouse a bit at current location (humans fidget)
+  const currentPosition = await page.evaluate(() => {
+    return { 
+      x: window.scrollX + window.innerWidth / 2, 
+      y: window.scrollY + 300
+    };
+  });
+  
+  // Small random mouse movements around current position
+  for (let i = 0; i < 3; i++) {
+    if (Math.random() > 0.3) {
+      await page.mouse.move(
+        currentPosition.x + (Math.random() * 40 - 20),
+        currentPosition.y + (Math.random() * 40 - 20),
+        { steps: 5 } // Move in steps for more human-like motion
+      );
+      
+      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 300));
+    }
+  }
+  
+  // Final mouse movement to a random position on the visible page
   await page.mouse.move(
-    300 + Math.random() * 400, 
-    300 + Math.random() * 400
+    300 + Math.random() * 600, 
+    200 + Math.random() * 400,
+    { steps: 10 } // More steps for smoother, more human-like motion
   );
   
   // Wait a bit more before continuing
-  await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+  await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
 }
 
 /* ---------- quick regex helpers ---------- */
