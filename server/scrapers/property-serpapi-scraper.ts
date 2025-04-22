@@ -1,220 +1,237 @@
-import axios from "axios";
-import OpenAI from "openai";
-import { PropertyAIData } from "@shared/types";
+/**
+ * Property data scraper using SerpAPI to avoid detection
+ * 
+ * This uses SerpAPI to search for property details, bypassing anti-scraping measures
+ * on real estate websites like Zillow, Redfin, etc.
+ */
 
-// Initialize the OpenAI client
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+import axios from 'axios';
+import { PropertyAIData } from '@shared/types';
+import { cleanLicenseNumber } from './zillow-scraper';
+
+// Check if SERPAPI_KEY is available
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
 
 /**
- * Extract property details using SerpAPI and OpenAI
- * 
- * This function uses SerpAPI to fetch search results about a property URL,
- * then uses OpenAI to extract structured property data from the search results.
- * It then performs another SerpAPI search to find the listing agent's email.
- * 
- * @param url The URL of the property listing
+ * Extract property data using SerpAPI
+ * @param url Property URL or address to extract data for
  * @returns Structured property data
  */
 export async function extractPropertyWithSerpApi(url: string): Promise<PropertyAIData> {
-  try {
-    console.log("Extracting property details using SerpAPI for:", url);
-    
-    // Step 1: Use SerpAPI to search for information about the property URL
-    const searchResults = await searchPropertyUrl(url);
-    
-    // Step 2: Use OpenAI to extract structured data from the search results
-    const extractedData = await extractDataWithOpenAI(searchResults, url);
-    
-    // Step 3: Search for agent email if we have agent name and company
-    if (extractedData.listingAgentName && extractedData.listingAgentCompany) {
-      const agentEmail = await findAgentEmail(
-        extractedData.listingAgentName,
-        extractedData.listingAgentCompany
-      );
+  if (!SERPAPI_KEY) {
+    throw new Error('SERPAPI_KEY environment variable is not set');
+  }
+
+  console.log(`Extracting property data from ${url} using SerpAPI`);
+  
+  // Determine if the input is a URL or an address
+  const isUrl = url.startsWith('http');
+  
+  let searchQuery: string;
+  
+  if (isUrl) {
+    // If it's a URL, we need to extract what to search for
+    try {
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname;
       
-      if (agentEmail) {
-        extractedData.listingAgentEmail = agentEmail;
+      // Extract path components that might have property information
+      const pathParts = urlObj.pathname.split('/').filter(Boolean);
+      
+      if (domain.includes('zillow.com')) {
+        // For Zillow, we extract the address from the URL
+        const addressPart = pathParts.find(part => part.includes('-') && (part.includes('CA-') || part.includes('NY-') || part.includes('FL-')));
+        
+        if (addressPart) {
+          // Convert hyphens to spaces for better search
+          searchQuery = addressPart.replace(/-/g, ' ') + ' property details';
+        } else {
+          searchQuery = url; // Just use the full URL if we can't extract
+        }
+      } else if (domain.includes('redfin.com')) {
+        // For Redfin URLs
+        const addressParts = pathParts.filter(part => !part.includes('home') && !part.match(/^\d+$/));
+        searchQuery = addressParts.join(' ') + ' property details';
+      } else {
+        // Generic case - use cleaned up path for search
+        searchQuery = pathParts.join(' ') + ' real estate listing';
+      }
+    } catch (error) {
+      // If URL parsing fails, use the URL as is
+      searchQuery = url;
+    }
+  } else {
+    // If it's an address, use it directly
+    searchQuery = url + ' property details';
+  }
+  
+  try {
+    // Make SerpAPI request to get property information
+    const response = await axios.get('https://serpapi.com/search', {
+      params: {
+        api_key: SERPAPI_KEY,
+        q: searchQuery,
+        engine: 'google',
+        gl: 'us',
+        hl: 'en',
+        location: 'United States'
+      }
+    });
+    
+    const data = response.data;
+    
+    // Initialize with default values
+    const propertyData: PropertyAIData = {
+      address: "Address unavailable",
+      city: "",
+      state: "",
+      zip: "",
+      propertyType: "",
+      bedrooms: "",
+      bathrooms: "",
+      squareFeet: "",
+      price: "",
+      yearBuilt: "",
+      description: "No description available",
+      features: [],
+      listedby: "",
+      listingAgentName: "",
+      listingAgentPhone: "",
+      listingAgentCompany: "",
+      listingAgentLicenseNo: "",
+      listingAgentEmail: "",
+      propertyUrl: url,
+      imageUrls: [],
+      sellerName: "",
+      sellerPhone: "",
+      sellerCompany: "",
+      sellerLicenseNo: "",
+      sellerEmail: ""
+    };
+    
+    // Process SerpAPI results to extract property details
+    if (data.organic_results && data.organic_results.length > 0) {
+      // Look for real estate listings first
+      const realEstateResults = data.organic_results.filter((result: any) => {
+        const domain = new URL(result.link).hostname;
+        return domain.includes('zillow.com') || 
+               domain.includes('redfin.com') || 
+               domain.includes('trulia.com') || 
+               domain.includes('realtor.com') ||
+               domain.includes('homes.com');
+      });
+      
+      // Use either real estate results or all results
+      const relevantResults = realEstateResults.length > 0 ? realEstateResults : data.organic_results;
+      
+      if (relevantResults.length > 0) {
+        const mainResult = relevantResults[0];
+        
+        // Extract address and basic info
+        if (mainResult.title) {
+          // Address is often in the title
+          const titleParts = mainResult.title.split(' - ');
+          if (titleParts.length > 0) {
+            propertyData.address = titleParts[0].trim();
+            
+            // Extract address components if possible
+            const addressParts = propertyData.address.split(',');
+            if (addressParts.length >= 3) {
+              // Format might be "123 Main St, City, State ZIP"
+              propertyData.city = addressParts[addressParts.length - 2].trim();
+              
+              // State and ZIP often come together
+              const stateZipPart = addressParts[addressParts.length - 1].trim();
+              const stateZipMatch = stateZipPart.match(/([A-Z]{2})\s+(\d{5})/);
+              
+              if (stateZipMatch) {
+                propertyData.state = stateZipMatch[1];
+                propertyData.zip = stateZipMatch[2];
+              }
+            }
+          }
+        }
+        
+        // Extract price, beds, baths from snippet or description
+        if (mainResult.snippet) {
+          const priceMatch = mainResult.snippet.match(/\$([0-9,]+)/);
+          if (priceMatch) {
+            propertyData.price = priceMatch[0];
+          }
+          
+          const bedsMatch = mainResult.snippet.match(/(\d+)\s*bed/i);
+          if (bedsMatch) {
+            propertyData.bedrooms = bedsMatch[1];
+          }
+          
+          const bathsMatch = mainResult.snippet.match(/(\d+(?:\.\d+)?)\s*bath/i);
+          if (bathsMatch) {
+            propertyData.bathrooms = bathsMatch[1];
+          }
+          
+          const sqftMatch = mainResult.snippet.match(/(\d+(?:,\d+)?)\s*sq\s*ft/i);
+          if (sqftMatch) {
+            propertyData.squareFeet = sqftMatch[1].replace(',', '');
+          }
+          
+          propertyData.description = mainResult.snippet;
+        }
+        
+        // Update property URL if we found a better link
+        if (mainResult.link && (mainResult.link.includes('zillow.com') || 
+                                mainResult.link.includes('redfin.com') ||
+                                mainResult.link.includes('realtor.com'))) {
+          propertyData.propertyUrl = mainResult.link;
+        }
+      }
+      
+      // Try to extract agent information from knowledge graph if available
+      if (data.knowledge_graph) {
+        const kg = data.knowledge_graph;
+        
+        // Check for listing agent
+        if (kg.listing_agent || kg.agent || kg.real_estate_agent) {
+          const agentInfo = kg.listing_agent || kg.agent || kg.real_estate_agent;
+          
+          if (typeof agentInfo === 'string') {
+            // Simple case - just the name
+            propertyData.listingAgentName = agentInfo;
+          } else if (typeof agentInfo === 'object') {
+            // Object with more details
+            propertyData.listingAgentName = agentInfo.name || '';
+            propertyData.listingAgentPhone = agentInfo.phone || '';
+            
+            // License might be in a few different formats
+            const license = agentInfo.license || agentInfo.license_number || '';
+            if (license) {
+              propertyData.listingAgentLicenseNo = cleanLicenseNumber(license) || license;
+            }
+            
+            // Company or brokerage
+            propertyData.listingAgentCompany = agentInfo.company || agentInfo.brokerage || '';
+          }
+        }
+        
+        // Property details
+        if (kg.property_type) {
+          propertyData.propertyType = kg.property_type;
+        }
+        
+        if (kg.year_built) {
+          propertyData.yearBuilt = kg.year_built.toString();
+        }
+        
+        // Features often come as a list
+        if (kg.features && Array.isArray(kg.features)) {
+          propertyData.features = kg.features;
+        }
       }
     }
     
-    return extractedData;
-  } catch (error) {
-    console.error("Property extraction with SerpAPI failed:", error);
-    throw new Error("Failed to extract property data from URL");
-  }
-}
-
-/**
- * Search for property information using SerpAPI
- * 
- * @param propertyUrl The URL of the property listing
- * @returns The search results from SerpAPI
- */
-async function searchPropertyUrl(propertyUrl: string): Promise<any> {
-  try {
-    // Format the search query to include the URL
-    // Using "site:" operator helps find the exact page
-    const searchQuery = `${propertyUrl} real estate property listing details`;
-    
-    // Make the SerpAPI request
-    const response = await axios.get("https://serpapi.com/search.json", {
-      params: {
-        engine: "google",
-        q: searchQuery,
-        api_key: process.env.SERPAPI_KEY,
-        num: 10, // Get more results for better coverage
-      }
-    });
-    
-    // Return the full search results
-    return response.data;
-  } catch (error) {
-    console.error("SerpAPI property search failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Extract structured property data from search results using OpenAI
- * 
- * @param searchResults The search results from SerpAPI
- * @param originalUrl The original property URL
- * @returns Structured property data
- */
-async function extractDataWithOpenAI(searchResults: any, originalUrl: string): Promise<PropertyAIData> {
-  try {
-    // Prepare the prompt with the search results
-    const organicResults = searchResults.organic_results || [];
-    const snippets = organicResults.map((r: any) => r.snippet || "").join("\n\n");
-    const title = searchResults.search_metadata?.title || "";
-    const description = organicResults[0]?.snippet || "";
-    
-    // Additional context from knowledge panels or answer boxes if available
-    const knowledgePanel = searchResults.knowledge_graph || {};
-    const answerBox = searchResults.answer_box || {};
-    
-    // Construct the full context
-    const context = `
-URL: ${originalUrl}
-Page Title: ${title}
-Description: ${description}
-
-Knowledge Panel Data:
-${JSON.stringify(knowledgePanel, null, 2)}
-
-Answer Box:
-${JSON.stringify(answerBox, null, 2)}
-
-Search Results:
-${snippets}
-`;
-
-    // Extract structured data using OpenAI
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: `You are a real estate data extraction expert. Extract structured property listing data from the provided information. 
-Be as detailed as possible, but do not make up information that is not present in the data.
-If a data point is not available, use null or empty string.
-
-Extract the following fields:
-- address: Full property address
-- city: City name
-- state: State or province
-- zip: ZIP/Postal code
-- propertyType: Type of property (e.g., Single Family, Condo, etc.)
-- bedrooms: Number of bedrooms
-- bathrooms: Number of bathrooms
-- squareFeet: Square footage
-- price: Price as a string
-- yearBuilt: Year the property was built
-- description: Property description
-- features: Array of property features
-- listingAgentName: Name of listing agent
-- listingAgentPhone: Phone number of listing agent
-- listingAgentCompany: Real estate company
-- listingAgentLicenseNo: License number if available
-
-Return only valid JSON.`
-        },
-        {
-          role: "user",
-          content: context
-        }
-      ],
-      response_format: { type: "json_object" }
-    });
-
-    // Parse the extracted data
-    const extractedData = JSON.parse(response.choices[0].message.content || "{}");
-    
-    // Create the structured property data
-    const propertyData: PropertyAIData = {
-      address: extractedData.address || "Address unavailable",
-      city: extractedData.city || null,
-      state: extractedData.state || null,
-      zip: extractedData.zip || null,
-      propertyType: extractedData.propertyType || null,
-      bedrooms: extractedData.bedrooms || null,
-      bathrooms: extractedData.bathrooms || null,
-      squareFeet: extractedData.squareFeet || null,
-      price: extractedData.price || null,
-      yearBuilt: extractedData.yearBuilt || null,
-      description: extractedData.description || "No description available",
-      features: extractedData.features || [],
-      listingAgentName: extractedData.listingAgentName || "",
-      listingAgentPhone: extractedData.listingAgentPhone || "",
-      listingAgentCompany: extractedData.listingAgentCompany || "",
-      listingAgentLicenseNo: extractedData.listingAgentLicenseNo || "",
-      listingAgentEmail: "", // Will be populated later if found
-      propertyUrl: originalUrl,
-      imageUrls: [], // Images would need to be extracted separately
-    };
-    
     return propertyData;
+    
   } catch (error) {
-    console.error("OpenAI extraction failed:", error);
-    throw error;
-  }
-}
-
-/**
- * Find an agent's email using SerpAPI
- * 
- * @param agentName The name of the real estate agent
- * @param agentCompany The name of the real estate company
- * @returns The agent's email address if found, otherwise empty string
- */
-async function findAgentEmail(agentName: string, agentCompany: string): Promise<string> {
-  try {
-    // Craft a specific search query to find the agent's email
-    const searchQuery = `${agentName} ${agentCompany} real estate agent email contact`;
-    
-    // Make the SerpAPI request
-    const response = await axios.get("https://serpapi.com/search.json", {
-      params: {
-        engine: "google",
-        q: searchQuery,
-        api_key: process.env.SERPAPI_KEY,
-        num: 5, // Limit to top results
-      }
-    });
-    
-    // Extract the relevant information from the search results
-    const organicResults = response.data.organic_results || [];
-    const potentialEmailSources = organicResults.map((r: any) => r.snippet || "").join(" ");
-    
-    // Use a regex pattern to find email addresses in the text
-    const emailPattern = /[\w.+-]+@[\w.-]+\.\w+/g;
-    const emailMatches = potentialEmailSources.match(emailPattern) || [];
-    
-    // Return the first found email, or empty string if none found
-    return emailMatches.length > 0 ? emailMatches[0] : "";
-  } catch (error) {
-    console.error("Agent email search failed:", error);
-    return ""; // Return empty string on error
+    console.error('SerpAPI extraction error:', error);
+    throw new Error(`Failed to extract property data using SerpAPI: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

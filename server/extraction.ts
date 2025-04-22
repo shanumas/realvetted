@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 import { extractZillowPropertyData, findZillowUrl } from "./scrapers/zillow-scraper";
+import { extractPropertyWithSerpApi } from "./scrapers/property-serpapi-scraper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
@@ -10,10 +11,11 @@ const openai = new OpenAI({
 /**
  * Extract property data from a URL
  * 
- * This function first checks if the URL is a Zillow URL.
- * If it is, it uses the Zillow-specific scraper with anti-scraping measures.
- * If it's not, it tries to find a corresponding Zillow URL and then scrapes that.
- * If no Zillow URL can be found, it falls back to URL structure analysis.
+ * This function uses multiple strategies to extract property data:
+ * 1. First tries SerpAPI if the key is available (avoids anti-scraping measures)
+ * 2. If SerpAPI fails or isn't available, tries a direct Zillow scraper if it's a Zillow URL
+ * 3. If not a Zillow URL, tries to find a corresponding Zillow URL and scrape that
+ * 4. As a last resort, falls back to analyzing the URL structure with OpenAI
  * 
  * @param url The URL of the property listing
  * @returns The extracted property data
@@ -31,13 +33,27 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
   console.log(`Extracting property data from URL: ${url}`);
 
   try {
-    // Check for required API keys
+    // First try using SerpAPI if the key is available
+    // This bypasses anti-scraping measures on real estate sites
+    if (process.env.SERPAPI_KEY) {
+      try {
+        console.log("Attempting extraction with SerpAPI to bypass anti-scraping...");
+        return await extractPropertyWithSerpApi(url);
+      } catch (error) {
+        console.error("SerpAPI extraction failed:", error);
+        console.log("Falling back to direct scraping methods...");
+      }
+    } else {
+      console.log("SerpAPI key not available. Using direct extraction methods.");
+    }
+    
+    // Check for required API keys for fallback methods
     if (!process.env.OPENAI_API_KEY) {
-      console.log("OpenAI API key is missing. Cannot extract property data.");
-      throw new Error("OpenAI API key is required for property data extraction");
+      console.log("OpenAI API key is missing. Cannot use fallback extraction methods.");
+      throw new Error("OpenAI API key is required for property data extraction when SerpAPI is unavailable");
     }
 
-    // First, check if it's a Zillow URL or find a corresponding Zillow URL
+    // Next, check if it's a Zillow URL or find a corresponding Zillow URL
     let zillowUrl = url;
     
     if (!url.includes('zillow.com')) {
