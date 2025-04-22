@@ -1862,6 +1862,142 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     },
   );
+  
+  // Web-based test endpoint for property extraction
+  app.get('/api/test/property-extractor', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Property Extraction Tester</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 1000px; margin: 0 auto; }
+          h1 { color: #2c3e50; }
+          .form-group { margin-bottom: 15px; }
+          label { display: block; margin-bottom: 5px; font-weight: bold; }
+          input[type="url"] { width: 100%; padding: 8px; font-size: 16px; }
+          button { background: #3498db; color: white; border: none; padding: 10px 15px; cursor: pointer; font-size: 16px; }
+          button:hover { background: #2980b9; }
+          #results { margin-top: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 5px; }
+          .property-data { margin-top: 15px; }
+          .property-section { margin-bottom: 15px; }
+          .property-section h3 { margin-bottom: 5px; color: #2c3e50; }
+          .property-field { margin-bottom: 5px; }
+          .property-field strong { margin-right: 10px; min-width: 120px; display: inline-block; }
+        </style>
+      </head>
+      <body>
+        <h1>Property Extraction Tester</h1>
+        <div class="form-group">
+          <label for="urlInput">Enter Property URL:</label>
+          <input type="url" id="urlInput" placeholder="https://www.zillow.com/homedetails/..." required>
+        </div>
+        <button onclick="testExtraction()">Extract Property Data</button>
+        
+        <div id="results" style="display: none;">
+          <h2>Extraction Results</h2>
+          <div id="loader" style="display: none;">Loading...</div>
+          <div id="errorMessage" style="color: red; display: none;"></div>
+          <div id="propertyData"></div>
+        </div>
+        
+        <script>
+          async function testExtraction() {
+            const url = document.getElementById('urlInput').value;
+            if (!url) {
+              alert('Please enter a property URL');
+              return;
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            const loaderDiv = document.getElementById('loader');
+            const errorDiv = document.getElementById('errorMessage');
+            const propertyDataDiv = document.getElementById('propertyData');
+            
+            resultsDiv.style.display = 'block';
+            loaderDiv.style.display = 'block';
+            errorDiv.style.display = 'none';
+            propertyDataDiv.innerHTML = '';
+            
+            try {
+              const response = await fetch('/api/test/extract-property-from-url', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url })
+              });
+              
+              if (!response.ok) {
+                throw new Error('Failed to extract property data');
+              }
+              
+              const data = await response.json();
+              displayPropertyData(data);
+            } catch (error) {
+              errorDiv.textContent = error.message;
+              errorDiv.style.display = 'block';
+            } finally {
+              loaderDiv.style.display = 'none';
+            }
+          }
+          
+          function displayPropertyData(data) {
+            const propertyDataDiv = document.getElementById('propertyData');
+            
+            const html = \`
+              <div class="property-data">
+                <div class="property-section">
+                  <h3>Basic Information</h3>
+                  <div class="property-field"><strong>Address:</strong> \${data.address || 'Not available'}</div>
+                  <div class="property-field"><strong>City:</strong> \${data.city || 'Not available'}</div>
+                  <div class="property-field"><strong>State:</strong> \${data.state || 'Not available'}</div>
+                  <div class="property-field"><strong>ZIP:</strong> \${data.zip || 'Not available'}</div>
+                  <div class="property-field"><strong>Property URL:</strong> <a href="\${data.propertyUrl}" target="_blank">\${data.propertyUrl}</a></div>
+                </div>
+                
+                <div class="property-section">
+                  <h3>Property Details</h3>
+                  <div class="property-field"><strong>Property Type:</strong> \${data.propertyType || 'Not available'}</div>
+                  <div class="property-field"><strong>Bedrooms:</strong> \${data.bedrooms || 'Not available'}</div>
+                  <div class="property-field"><strong>Bathrooms:</strong> \${data.bathrooms || 'Not available'}</div>
+                  <div class="property-field"><strong>Square Feet:</strong> \${data.squareFeet || 'Not available'}</div>
+                  <div class="property-field"><strong>Price:</strong> \${data.price || 'Not available'}</div>
+                  <div class="property-field"><strong>Year Built:</strong> \${data.yearBuilt || 'Not available'}</div>
+                </div>
+                
+                <div class="property-section">
+                  <h3>Agent Information</h3>
+                  <div class="property-field"><strong>Listing Agent:</strong> \${data.listingAgentName || 'Not available'}</div>
+                  <div class="property-field"><strong>Agent Phone:</strong> \${data.listingAgentPhone || 'Not available'}</div>
+                  <div class="property-field"><strong>Agent Company:</strong> \${data.listingAgentCompany || 'Not available'}</div>
+                  <div class="property-field"><strong>Agent License #:</strong> \${data.listingAgentLicenseNo || 'Not available'}</div>
+                  <div class="property-field"><strong>Original Listing Text:</strong> \${data.listedby || 'Not available'}</div>
+                </div>
+                
+                <div class="property-section">
+                  <h3>Description</h3>
+                  <div class="property-field">\${data.description || 'No description available'}</div>
+                </div>
+                
+                <div class="property-section">
+                  <h3>Features</h3>
+                  <div class="property-field">
+                    \${Array.isArray(data.features) && data.features.length > 0 
+                      ? '<ul>' + data.features.map(feature => \`<li>\${feature}</li>\`).join('') + '</ul>'
+                      : 'No features available'}
+                  </div>
+                </div>
+              </div>
+            \`;
+            
+            propertyDataDiv.innerHTML = html;
+          }
+        </script>
+      </body>
+      </html>
+    `);
+  });
 
   // Extract data from ID documents using OpenAI Vision
   app.post("/api/ai/extract-id-data", isAuthenticated, async (req, res) => {
