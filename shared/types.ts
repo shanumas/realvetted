@@ -6,12 +6,12 @@ export interface PropertyAIData {
   city?: string;
   state?: string;
   zip?: string;
-  price?: string;
-  bedrooms?: string;
-  bathrooms?: string;
-  squareFeet?: string;
+  price?: number | string | null;
+  bedrooms?: number | string | null;
+  bathrooms?: number | string | null;
+  squareFeet?: number | string | null;
   propertyType?: string;
-  yearBuilt?: string;
+  yearBuilt?: number | string | null;
   // Original property source information
   propertyUrl?: string; // Property listing page URL that was extracted from
   sourceUrl?: string; // Original URL entered by the user

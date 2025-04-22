@@ -1,5 +1,5 @@
 // Test script for the property extraction functionality
-import { extractPropertyFromUrl, apiExtractPropertyData } from './server/openai';
+import { extractPropertyFromUrl } from './server/extraction';
 
 // Test URLs
 const urls = [
@@ -10,25 +10,27 @@ const urls = [
 
 // Configure API key (will use environment variable)
 async function testExtraction() {
-  console.log('Testing property extraction from URLs...');
+  console.log('Testing property extraction from URLs with type normalization...');
   
   for (const url of urls) {
     console.log(`\n------ Testing URL: ${url} ------`);
     
     try {
-      console.log('Method 1: Using the multi-layered extraction approach:');
-      const result1 = await extractPropertyFromUrl(url);
-      console.log('Result:', JSON.stringify(result1, null, 2));
+      console.log('Using the multi-layered extraction approach with data normalization:');
+      const result = await extractPropertyFromUrl(url);
+      
+      // Check the types of numeric fields
+      console.log('\nField Types:');
+      console.log(`bedrooms: ${typeof result.bedrooms}`);
+      console.log(`bathrooms: ${typeof result.bathrooms}`);
+      console.log(`squareFeet: ${typeof result.squareFeet}`);
+      console.log(`price: ${typeof result.price}`);
+      console.log(`yearBuilt: ${typeof result.yearBuilt}`);
+      
+      console.log('\nComplete Result:');
+      console.log(JSON.stringify(result, null, 2));
     } catch (error) {
-      console.error('Error in multi-layered extraction:', error.message);
-    }
-    
-    try {
-      console.log('\nMethod 2: Using OpenAI-only extraction:');
-      const result2 = await apiExtractPropertyData(url);
-      console.log('Result:', JSON.stringify(result2, null, 2));
-    } catch (error) {
-      console.error('Error in OpenAI-only extraction:', error.message);
+      console.error('Error in extraction:', error.message);
     }
     
     console.log('\n------ End Test ------');
