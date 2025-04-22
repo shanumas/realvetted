@@ -225,7 +225,90 @@ Return only the JSON.`,
       response.choices[0].message.content || "{}",
     );
 
-    // Create the structured property data
+    // Process raw data before creating the structured property data
+    let listedby = extractedData.listedby || "";
+    let agentName = extractedData.listingAgentName || "";
+    
+    // If we don't have a listedby field but we have agent name, use that for listedby
+    if (!listedby && agentName) {
+      listedby = agentName;
+      
+      // If we have agent company, add it to listedby
+      if (extractedData.listingAgentCompany) {
+        listedby += ` with ${extractedData.listingAgentCompany}`;
+      }
+      
+      // If we have agent phone, add it to listedby
+      if (extractedData.listingAgentPhone) {
+        listedby += ` ${extractedData.listingAgentPhone}`;
+      }
+    } 
+    // If we have listedby but no agent name, try to extract agent name from listedby
+    else if (listedby && !agentName) {
+      // Try to extract name from listedby - common patterns:
+      // "Listed by: John Smith" or "Listed by John Smith" or "Contact John Smith"
+      const nameMatch = listedby.match(/(?:Listed by:?\s*|Contact:?\s*|Agent:?\s*)([A-Z][a-z]+ [A-Z][a-z]+)/i);
+      if (nameMatch && nameMatch[1]) {
+        agentName = nameMatch[1];
+      } else {
+        // Fallback: just take first two words that look like a name (start with capital)
+        const words = listedby.split(/\s+/);
+        const nameWords = words.filter(word => /^[A-Z][a-z]+$/.test(word));
+        if (nameWords.length >= 2) {
+          agentName = `${nameWords[0]} ${nameWords[1]}`;
+        }
+      }
+    }
+    
+    // If we have description text but no agent information, try to extract from description
+    if ((!listedby || !agentName) && extractedData.description) {
+      const desc = extractedData.description;
+      
+      // Look for common agent patterns in description
+      const agentPatterns = [
+        /(?:Listed by|Contact|Agent|REALTOR):?\s*([A-Z][a-z]+ [A-Z][a-z]+)/i,
+        /([A-Z][a-z]+ [A-Z][a-z]+)\s+(?:is the listing agent|is the agent|is the REALTOR)/i,
+        /(?:call|contact|reach)\s+([A-Z][a-z]+ [A-Z][a-z]+)\s+(?:at|on)\s+(\d{3}[-\.\s]??\d{3}[-\.\s]??\d{4})/i
+      ];
+      
+      for (const pattern of agentPatterns) {
+        const match = desc.match(pattern);
+        if (match && match[1]) {
+          // Found a potential agent name
+          agentName = agentName || match[1];
+          
+          // If we got a phone number too, capture it
+          if (match[2] && !extractedData.listingAgentPhone) {
+            extractedData.listingAgentPhone = match[2];
+          }
+          
+          // Update listedby if empty
+          if (!listedby) {
+            listedby = match[0];
+          }
+          
+          break;
+        }
+      }
+      
+      // Look for real estate company names if we don't have one
+      if (!extractedData.listingAgentCompany) {
+        const companyPatterns = [
+          /([A-Z][A-Za-z\s]+(?:Realty|Properties|Homes|Real Estate|Group|Associates))/,
+          /(?:with|at|from)\s+([A-Z][A-Za-z\s]+(?:Realty|Properties|Homes|Real Estate|Group|Associates))/
+        ];
+        
+        for (const pattern of companyPatterns) {
+          const match = desc.match(pattern);
+          if (match && match[1]) {
+            extractedData.listingAgentCompany = match[1].trim();
+            break;
+          }
+        }
+      }
+    }
+    
+    // Create the structured property data with our enhanced agent information
     const propertyData: PropertyAIData = {
       address: extractedData.address || "Address unavailable",
       city: extractedData.city || "",
@@ -239,8 +322,8 @@ Return only the JSON.`,
       yearBuilt: extractedData.yearBuilt || "",
       description: extractedData.description || "No description available",
       features: extractedData.features || [],
-      listedby: extractedData.listedby || "",
-      listingAgentName: extractedData.listingAgentName || "",
+      listedby: listedby,
+      listingAgentName: agentName,
       listingAgentPhone: extractedData.listingAgentPhone || "",
       listingAgentCompany: extractedData.listingAgentCompany || "",
       listingAgentLicenseNo: extractedData.listingAgentLicenseNo || "",
@@ -359,7 +442,7 @@ async function findAgentEmail(listedby: string | ""): Promise<string> {
   try {
     console.log("Finding agent email using SerpAPI for:", listedby);
     // Craft a specific search query to find the agent's email
-    const searchQuery = `${listedby} "real estate agent" "email" contact"}`;
+    const searchQuery = `${listedby} "real estate agent" "email" contact`;
 
     // Make the SerpAPI request
     const response = await axios.get("https://serpapi.com/search.json", {
