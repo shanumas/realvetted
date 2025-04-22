@@ -1,5 +1,7 @@
 {pkgs}: {
   deps = [
+    pkgs.fontconfig
+    pkgs.nspr
     pkgs.nss
     pkgs.gtk3
     pkgs.cups

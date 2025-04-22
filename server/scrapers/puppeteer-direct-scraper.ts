@@ -8,7 +8,7 @@
  *      and scrapes the first e‑mail address it finds
  */
 
-import puppeteer, { Browser, Page } from "puppeteer";
+import puppeteer, { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
 
@@ -141,6 +141,7 @@ const EMPTY_PROPERTY: PropertyAIData = {
 async function launchBrowser(): Promise<Browser> {
   return puppeteer.launch({
     headless: "new",
+    executablePath: "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium",
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
