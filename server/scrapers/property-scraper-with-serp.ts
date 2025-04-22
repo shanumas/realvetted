@@ -1,201 +1,93 @@
 import puppeteer from "puppeteer";
 import axios from "axios";
-import * as cheerio from "cheerio";
-import { PropertyAIData } from "@shared/types";
+import OpenAI from "openai";
+import { PropertyAIData, PropertyScraperResult } from "@shared/types";
+// if the host already has chrome / chromium
+import { executablePath } from "puppeteer"; // v21+
+
+const OPENAI = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+const GOOGLE = process.env.SERPAPI_KEY!; // for the e‑mail lookup
 
 export async function scrapePropertyListing(
   url: string,
 ): Promise<PropertyAIData> {
-  console.log("Fetching listing page HTML...");
-
-  const SERPAPI_KEY = process.env.SERPAPI_KEY || "dummy_key_for_development";
-
-  // Check if we have a valid SerpAPI key
-  if (!SERPAPI_KEY || SERPAPI_KEY === "dummy_key_for_development") {
-    console.log("No SerpAPI key provided, skipping SerpAPI lookup");
-    throw new Error("SerpAPI key is required for property scraping");
-  }
-
-  // Check if the URL is a valid real estate listing URL
-  let targetUrl = url;
-  
-  // List of supported real estate domains
-  const supportedDomains = ["realtor.com", "zillow.com", "redfin.com", "trulia.com"];
-  const domainMatch = supportedDomains.find(domain => url.includes(domain));
-  
-  if (!domainMatch) {
-    console.log("Not a supported real estate URL. Searching for real estate listings...");
-    try {
-      // Perform a Google search to find real estate listings for this property
-      const serpRes = await axios.get("https://serpapi.com/search.json", {
-        params: {
-          engine: "google",
-          q: `${url} real estate listing`,
-          api_key: SERPAPI_KEY,
-          num: 5,
-        },
-      });
-
-      // Try to find any supported real estate listing
-      for (const domain of supportedDomains) {
-        const matchingResult = serpRes.data.organic_results.find((r: { link: string }) =>
-          r.link.includes(domain)
-        );
-        
-        if (matchingResult) {
-          targetUrl = matchingResult.link;
-          console.log(`Found ${domain} URL:`, targetUrl);
-          break;
-        }
-      }
-      
-      if (targetUrl === url) {
-        throw new Error("No supported real estate listing found.");
-      }
-    } catch (error) {
-      console.error("Error during SerpAPI call:", error);
-      throw new Error("Failed to fetch data from SerpAPI.");
-    }
-  } else {
-    console.log(`${domainMatch} URL detected:`, targetUrl);
-  }
-
-  const headers = { "User-Agent": "Mozilla/5.0" };
-
-  // Attempt to use direct HTTP request first, as it's more reliable in Replit environment
-  let pageContent = "";
-  try {
-    // Use axios to fetch the page with appropriate headers to avoid bot detection
-    const response = await axios.get(targetUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Upgrade-Insecure-Requests': '1'
-      },
-      timeout: 30000
-    });
-    
-    pageContent = response.data;
-    console.log("Successfully fetched property page using direct HTTP request");
-  } catch (httpError) {
-    console.error("Error during direct HTTP request:", httpError);
-    
-    // Try with a different user agent as fallback
-    console.log("Trying with alternate user agent...");
-    try {
-      const response = await axios.get(targetUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.google.com/',
-          'Cache-Control': 'max-age=0',
-          'Connection': 'keep-alive'
-        },
-        timeout: 30000,
-        maxRedirects: 10
-      });
-      
-      pageContent = response.data;
-      console.log("Successfully fetched property page with alternate user agent");
-    } catch (alternateError) {
-      console.error("Error with alternate user agent:", alternateError);
-      
-      // If both HTTP approaches fail, try Puppeteer as final fallback
-      console.log("Falling back to Puppeteer for fetching property page...");
-      try {
-        // Using older Puppeteer version configuration options
-        const browser = await puppeteer.launch({
-          headless: true,
-          args: [
-            "--no-sandbox", 
-            "--disable-setuid-sandbox",
-            "--disable-dev-shm-usage",
-            "--single-process",
-            "--no-zygote"
-          ]
-        });
-
-        const page = await browser.newPage();
-        await page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-        
-        // Add extra options to evade detection
-        await page.setExtraHTTPHeaders({
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.google.com/',
-        });
-        
-        // Navigate to the URL with increased timeout
-        await page.goto(targetUrl, {
-          waitUntil: "domcontentloaded",
-          timeout: 60000,
-        });
-
-        // Get the page content
-        pageContent = await page.content();
-        await browser.close();
-        
-        console.log("Successfully fetched property page using Puppeteer final fallback");
-      } catch (puppeteerError) {
-        console.error("Error during Puppeteer fallback request:", puppeteerError);
-        throw new Error("Failed to fetch the property page using all available methods.");
-      }
-    }
-  }
-
-  // Parse the HTML using Cheerio
-  const $r = cheerio.load(pageContent);
-
-  // Extract property data from the full page
-  const propertyData = {
-    address: $r('h1[data-testid="address"]').text().trim(),
-    price: $r('span[data-testid="price"]').text().trim(),
-    bedrooms: $r('li[data-label="property-meta-beds"]').text().trim(),
-    bathrooms: $r('li[data-label="property-meta-baths"]').text().trim(),
-    sqft: $r('li[data-label="property-meta-sqft"]').text().trim(),
-    yearBuilt: $r('li[data-label="property-meta-yearbuilt"]').text().trim(),
-    imageUrls: $r('img[data-testid="hero-image"]')
-      .map((i, el) => $r(el).attr("src"))
-      .get(),
-  };
-
-  const agentData = {
-    listingAgentName: $r('a[data-testid="listing-agent-name"]').text().trim(),
-    listingAgentPhone: $r('a[data-testid="listing-agent-phone"]').text().trim(),
-    listingAgentCompany: $r(".listing-agent-brokerage").text().trim(),
-    listingAgentLicenseNo: $r(".listing-agent-license").text().trim(),
-    listingAgentEmail: "",
-  };
-
-  // Retrieve listing agent's email using SerpAPI
-  console.log(
-    "Email search query:",
-    `${agentData.listingAgentName} ${agentData.listingAgentCompany} email`,
-  );
-  const emailSearchRes = await axios.get("https://serpapi.com/search.json", {
-    params: {
-      engine: "google",
-      q: `${agentData.listingAgentName} ${agentData.listingAgentCompany} email`,
-      api_key: SERPAPI_KEY,
-      num: 3,
-    },
+  await puppeteer.launch({ headless: true, executablePath: executablePath() });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-  if (emailSearchRes.data.organic_results[0]?.snippet) {
-    const match = emailSearchRes.data.organic_results[0].snippet.match(
-      /[\w.+-]+@[\w.-]+\.\w+/,
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/122.0 Safari/537.36",
     );
-    agentData.listingAgentEmail = match ? match[0] : "";
-    console.log("Extracted Email:", agentData.listingAgentEmail);
-  }
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    await page.waitForSelector("body", { timeout: 5_000 });
 
-  // Combine and return all data
-  return {
-    ...propertyData,
-    ...agentData,
-    propertyUrl: targetUrl,
-  };
+    /* 1 ▸ raw HTML (trim to ~12 k to stay under token cap) */
+    const html = (await page.content()).slice(0, 12_000);
+
+    /* 2 ▸ let GPT‑4o‑mini extract the structure */
+    const {
+      choices: [c],
+    } = await OPENAI.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an expert HTML parser. Extract and return ONLY JSON with:\n" +
+            "address, price, beds, baths, sqft, yearBuilt,\n" +
+            "agentName, agentPhone, agentCompany, agentLicense.",
+        },
+        { role: "user", content: html },
+      ],
+    });
+    const ai = JSON.parse(c.message.content);
+
+    /* 3 ▸ one Google query (SerpAPI) to pick an e‑mail address */
+    let email = "";
+    if (ai.agentName && ai.agentCompany) {
+      const g = await axios.get("https://serpapi.com/search.json", {
+        params: {
+          engine: "google",
+          q: `${ai.agentName} ${ai.agentCompany} email`,
+          api_key: GOOGLE,
+          num: 3,
+        },
+      });
+      const snippet =
+        g.data.organic_results?.[0]?.snippet ||
+        g.data.answer_box?.snippet ||
+        "";
+      email = snippet.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? "";
+    }
+
+    /* 4 ▸ final object (fill gaps if GPT missed fields) */
+    const result: PropertyScraperResult = {
+      address: ai.address ?? "Address information unavailable",
+      price: ai.price ?? "",
+      beds: ai.beds ?? "",
+      baths: ai.baths ?? "",
+      sqft: ai.sqft ?? "",
+      yearBuilt: ai.yearBuilt ?? "",
+      imageUrls: [], // Puppeteer ⇒ no images
+      listingAgentName: ai.agentName ?? "",
+      listingAgentPhone: ai.agentPhone ?? "",
+      listingAgentCompany: ai.agentCompany ?? "",
+      listingAgentLicenseNo: ai.agentLicense ?? "",
+      listingAgentEmail: email,
+      propertyUrl: url,
+    };
+
+    return result as PropertyAIData;
+  } catch (err) {
+    console.error("Listing‑scrape error:", err);
+    throw err;
+  } finally {
+    await browser.close();
+  }
 }
