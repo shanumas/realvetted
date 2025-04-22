@@ -512,77 +512,25 @@ async function autoScroll(page: Page) {
     await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 500));
   }
   
-  // Perform advanced, highly-variable human-like scrolling with occasional stops
-  await page.evaluate(async () => {
-    await new Promise<void>((resolve) => {
-      let totalHeight = 0;
-      let scrollingPaused = false;
-      const viewportHeight = window.innerHeight;
-      const totalPageHeight = document.body.scrollHeight;
-      
-      // Don't scroll all the way to the bottom - humans rarely do that
-      const targetScrollPercentage = 0.6 + Math.random() * 0.3; // Between 60% and 90%
-      const targetHeight = totalPageHeight * targetScrollPercentage;
-      
-      const scrollDown = () => {
-        // Humans scroll in variable chunks with occasional longer jumps
-        let jump = 0;
-        
-        // Occasionally make larger jumps (like using mousewheel aggressively)
-        if (Math.random() < 0.15) {
-          jump = 350 + Math.floor(Math.random() * 250); // Larger jump
-        } else {
-          jump = 80 + Math.floor(Math.random() * 120); // Normal scroll
-        }
-        
-        // Sometimes scroll back up a bit (very human behavior)
-        if (Math.random() < 0.08 && totalHeight > viewportHeight) {
-          window.scrollBy(0, -Math.floor(Math.random() * 100));
-          
-          // Pause briefly after scrolling up
-          setTimeout(() => {
-            window.scrollBy(0, jump);
-            totalHeight += jump;
-            continueScrolling();
-          }, 400 + Math.random() * 500);
-          return;
-        }
-        
-        window.scrollBy(0, jump);
-        totalHeight += jump;
-        
-        // Occasionally pause scrolling to simulate reading (very human behavior)
-        if (Math.random() < 0.2 && !scrollingPaused) {
-          scrollingPaused = true;
-          
-          // Longer pause to simulate reading content
-          setTimeout(() => {
-            scrollingPaused = false;
-            continueScrolling();
-          }, 1000 + Math.random() * 4000);
-          return;
-        }
-        
-        continueScrolling();
-      };
-      
-      const continueScrolling = () => {
-        if (scrollingPaused) return;
-        
-        if (totalHeight >= targetHeight || totalHeight >= document.body.scrollHeight - window.innerHeight) {
-          // Reached target scroll depth, resolve after a reading delay
-          setTimeout(resolve, 1000 + Math.random() * 3000);
-          return;
-        }
-        
-        // Variable timing between scrolls to mimic human reading and scrolling patterns
-        setTimeout(scrollDown, 100 + Math.random() * 400);
-      };
-      
-      // Start scrolling after a small initial delay
-      setTimeout(scrollDown, 200 + Math.random() * 300);
+  // Simplified scrolling to avoid JavaScript evaluation issues
+  // Scroll down a few times with random pauses to simulate human behavior
+  for (let i = 0; i < 5; i++) {
+    // Scroll down by a random amount
+    await page.evaluate(() => {
+      window.scrollBy(0, 400 + Math.floor(Math.random() * 300));
     });
+    
+    // Random pause between scrolls
+    await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+  }
+  
+  // Scroll back up a bit to appear more human-like
+  await page.evaluate(() => {
+    window.scrollBy(0, -100 - Math.floor(Math.random() * 100));
   });
+  
+  // Final pause to simulate reading the content
+  await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1500));
   
   // Wiggle mouse a bit at current location (humans fidget)
   const currentPosition = await page.evaluate(() => {
