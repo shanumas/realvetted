@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
-import { extractPropertyWithDirectScraping } from "./scrapers/direct-html-scraper";
+import { extractZillowPropertyData, findZillowUrl } from "./scrapers/zillow-scraper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
@@ -10,8 +10,10 @@ const openai = new OpenAI({
 /**
  * Extract property data from a URL
  * 
- * This function first tries to use direct HTML scraping + OpenAI to extract property data.
- * If that fails, it falls back to using just OpenAI to analyze the URL structure.
+ * This function first checks if the URL is a Zillow URL.
+ * If it is, it uses the Zillow-specific scraper with anti-scraping measures.
+ * If it's not, it tries to find a corresponding Zillow URL and then scrapes that.
+ * If no Zillow URL can be found, it falls back to URL structure analysis.
  * 
  * @param url The URL of the property listing
  * @returns The extracted property data
@@ -35,12 +37,28 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       throw new Error("OpenAI API key is required for property data extraction");
     }
 
-    // Primary method: Use direct HTML scraping
+    // First, check if it's a Zillow URL or find a corresponding Zillow URL
+    let zillowUrl = url;
+    
+    if (!url.includes('zillow.com')) {
+      console.log("Not a Zillow URL. Searching for corresponding Zillow listing...");
+      const foundUrl = await findZillowUrl(url);
+      
+      if (foundUrl) {
+        console.log(`Found Zillow URL: ${foundUrl}`);
+        zillowUrl = foundUrl;
+      } else {
+        console.log("No Zillow URL found. Falling back to URL analysis.");
+        return await extractFromUrlStructure(url);
+      }
+    }
+    
+    // Use specialized Zillow scraper
     try {
-      console.log("Using direct HTML scraping with Puppeteer and OpenAI for property extraction");
-      return await extractPropertyWithDirectScraping(url);
+      console.log(`Using specialized Zillow scraper with anti-scraping measures for URL: ${zillowUrl}`);
+      return await extractZillowPropertyData(zillowUrl);
     } catch (error) {
-      console.error("Direct HTML scraping failed:", error);
+      console.error("Zillow scraping failed:", error);
       
       // Fallback method: URL analysis with OpenAI
       console.log("Falling back to URL analysis");
@@ -75,6 +93,7 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       sellerCompany: "",
       sellerLicenseNo: "",
       sellerEmail: "",
+      listedby: ""
     };
     
     return fallbackResult;

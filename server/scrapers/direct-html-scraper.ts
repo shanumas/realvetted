@@ -1,5 +1,5 @@
-import puppeteer from 'puppeteer';
-import * as cheerio from 'cheerio';
+import puppeteer from "puppeteer";
+import * as cheerio from "cheerio";
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 
@@ -8,137 +8,174 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /**
  * Extract property data directly from the listing URL using Puppeteer and Cheerio
- * 
+ *
  * This function opens a headless browser, navigates to the property listing URL,
  * extracts the HTML content, and uses OpenAI to parse the relevant property information.
- * 
+ *
  * @param url The URL of the property listing
  * @returns Structured property data
  */
-export async function extractPropertyWithDirectScraping(url: string): Promise<PropertyAIData> {
+export async function extractPropertyWithDirectScraping(
+  url: string,
+): Promise<PropertyAIData> {
   console.log(`Direct scraping of property data from URL: ${url}`);
-  
+
   let browser;
   try {
     // Launch a headless browser
     browser = await puppeteer.launch({
-      headless: 'new',
+      headless: "new",
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu'
-      ]
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+      ],
     });
-    
+
     // Open a new page
     const page = await browser.newPage();
-    
+
     // Set user agent to avoid detection
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+    );
+
     // Navigate to the URL
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+
     // Wait for the content to load
-    await page.waitForSelector('body', { timeout: 5000 });
-    
+    await page.waitForSelector("body", { timeout: 5000 });
+
     // Extract the HTML content
     const htmlContent = await page.content();
-    
+
+    console.log("htmlContent 0 :" + htmlContent);
+
     // Parse the HTML with cheerio
     const $ = cheerio.load(htmlContent);
-    
+
     // Extract basic metadata like title and description
-    const title = $('title').text() || '';
-    const metaDescription = $('meta[name="description"]').attr('content') || '';
-    
+    const title = $("title").text() || "";
+    const metaDescription = $('meta[name="description"]').attr("content") || "";
+
     // Simplify HTML for the AI to process by keeping only relevant parts
-    let simplifiedHtml = '';
-    
+    let simplifiedHtml = "";
+
     // Try to extract relevant sections
-    const mainContent = $('main').html() || $('div[id*="main"]').html() || $('div[class*="main"]').html();
+    const mainContent =
+      $("main").html() ||
+      $('div[id*="main"]').html() ||
+      $('div[class*="main"]').html();
     if (mainContent) {
       simplifiedHtml += mainContent;
     }
-    
+
     // Also grab anything that might contain agent or property information
-    const propertyDetailSection = $('div[id*="property"], div[class*="property"], section[id*="property"], section[class*="property"]').html() || '';
-    const agentSection = $('div[id*="agent"], div[class*="agent"], section[id*="agent"], section[class*="agent"]').html() || '';
-    
+    const propertyDetailSection =
+      $(
+        'div[id*="property"], div[class*="property"], section[id*="property"], section[class*="property"]',
+      ).html() || "";
+    const agentSection =
+      $(
+        'div[id*="agent"], div[class*="agent"], section[id*="agent"], section[class*="agent"]',
+      ).html() || "";
+
     if (propertyDetailSection) {
       simplifiedHtml += propertyDetailSection;
     }
-    
+
+    console.log("simplifiedHtml  :" + simplifiedHtml);
+
     if (agentSection) {
       simplifiedHtml += agentSection;
     }
-    
+
     // If we couldn't find any specific sections, use the whole body (limited)
     if (!simplifiedHtml) {
-      simplifiedHtml = $('body').html()?.substring(0, 50000) || '';
+      simplifiedHtml = $("body").html()?.substring(0, 50000) || "";
     }
-    
+
     // Close the browser
     await browser.close();
-    
+
     // Extract structured data using OpenAI
-    const extractedData = await extractDataWithOpenAI(title, metaDescription, simplifiedHtml, url);
-    
+    const extractedData = await extractDataWithOpenAI(
+      title,
+      metaDescription,
+      simplifiedHtml,
+      url,
+    );
+
     // Process agent license number
     if (extractedData.listingAgentLicenseNo) {
-      extractedData.listingAgentLicenseNo = cleanLicenseNumber(extractedData.listingAgentLicenseNo);
+      extractedData.listingAgentLicenseNo = cleanLicenseNumber(
+        extractedData.listingAgentLicenseNo,
+      );
     }
-    
+
     if (extractedData.sellerLicenseNo) {
-      extractedData.sellerLicenseNo = cleanLicenseNumber(extractedData.sellerLicenseNo);
+      extractedData.sellerLicenseNo = cleanLicenseNumber(
+        extractedData.sellerLicenseNo,
+      );
     }
-    
+
     // Process numeric fields
-    if (typeof extractedData.price === 'string' && extractedData.price) {
+    if (typeof extractedData.price === "string" && extractedData.price) {
       // Remove non-numeric characters and convert to number
-      const priceNum = extractedData.price.replace(/[^0-9]/g, '');
+      const priceNum = extractedData.price.replace(/[^0-9]/g, "");
       if (priceNum) {
         extractedData.price = parseInt(priceNum, 10) || "";
       }
     }
-    
-    if (typeof extractedData.bedrooms === 'string' && extractedData.bedrooms) {
-      const bedroomsNum = extractedData.bedrooms.replace(/[^0-9.]/g, '');
+
+    if (typeof extractedData.bedrooms === "string" && extractedData.bedrooms) {
+      const bedroomsNum = extractedData.bedrooms.replace(/[^0-9.]/g, "");
       if (bedroomsNum) {
         extractedData.bedrooms = bedroomsNum;
       }
     }
-    
-    if (typeof extractedData.bathrooms === 'string' && extractedData.bathrooms) {
-      const bathroomsNum = extractedData.bathrooms.replace(/[^0-9.]/g, '');
+
+    if (
+      typeof extractedData.bathrooms === "string" &&
+      extractedData.bathrooms
+    ) {
+      const bathroomsNum = extractedData.bathrooms.replace(/[^0-9.]/g, "");
       if (bathroomsNum) {
         extractedData.bathrooms = bathroomsNum;
       }
     }
-    
-    if (typeof extractedData.squareFeet === 'string' && extractedData.squareFeet) {
-      const sqftNum = extractedData.squareFeet.replace(/[^0-9]/g, '');
+
+    if (
+      typeof extractedData.squareFeet === "string" &&
+      extractedData.squareFeet
+    ) {
+      const sqftNum = extractedData.squareFeet.replace(/[^0-9]/g, "");
       if (sqftNum) {
         extractedData.squareFeet = sqftNum;
       }
     }
-    
-    if (typeof extractedData.yearBuilt === 'string' && extractedData.yearBuilt) {
-      const yearNum = extractedData.yearBuilt.replace(/[^0-9]/g, '');
+
+    if (
+      typeof extractedData.yearBuilt === "string" &&
+      extractedData.yearBuilt
+    ) {
+      const yearNum = extractedData.yearBuilt.replace(/[^0-9]/g, "");
       if (yearNum) {
         extractedData.yearBuilt = yearNum;
       }
     }
-    
+
     return extractedData;
   } catch (error) {
     console.error("Direct HTML scraping failed:", error);
     if (browser) {
       await browser.close();
     }
-    throw new Error("Failed to extract property data from direct HTML scraping");
+    throw new Error(
+      "Failed to extract property data from direct HTML scraping",
+    );
   }
 }
 
@@ -219,7 +256,7 @@ Return nothing else.
 
     // Parse the extracted data
     const extractedData = JSON.parse(
-      response.choices[0].message.content || "{}"
+      response.choices[0].message.content || "{}",
     );
 
     // Process raw data before creating the structured property data
@@ -245,14 +282,16 @@ Return nothing else.
       // Try to extract name from listedby - common patterns:
       // "Listed by: John Smith" or "Listed by John Smith" or "Contact John Smith"
       const nameMatch = listedby.match(
-        /(?:Listed by:?\s*|Contact:?\s*|Agent:?\s*)([A-Z][a-z]+ [A-Z][a-z]+)/i
+        /(?:Listed by:?\s*|Contact:?\s*|Agent:?\s*)([A-Z][a-z]+ [A-Z][a-z]+)/i,
       );
       if (nameMatch && nameMatch[1]) {
         agentName = nameMatch[1];
       } else {
         // Fallback: just take first two words that look like a name (start with capital)
         const words = listedby.split(/\s+/);
-        const nameWords = words.filter((word: string) => /^[A-Z][a-z]+$/.test(word));
+        const nameWords = words.filter((word: string) =>
+          /^[A-Z][a-z]+$/.test(word),
+        );
         if (nameWords.length >= 2) {
           agentName = `${nameWords[0]} ${nameWords[1]}`;
         }
@@ -348,9 +387,13 @@ Return nothing else.
  * @param licenseNo License number with possible prefix
  * @returns Clean license number without prefix
  */
-function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
+function cleanLicenseNumber(
+  licenseNo: string | null | undefined,
+): string | null | undefined {
   if (!licenseNo) return licenseNo;
-  
+
   // Remove any prefix like "DRE", "DRE #", "CalDRE", etc. and keep only the numbers
-  return licenseNo.replace(/^(DRE\s*#?|CalDRE\s*#?|Lic\.|License|BRE\s*#?)\s*/i, "").trim();
+  return licenseNo
+    .replace(/^(DRE\s*#?|CalDRE\s*#?|Lic\.|License|BRE\s*#?)\s*/i, "")
+    .trim();
 }
