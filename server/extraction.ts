@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
-import { extractPropertyWithSerpApi } from "./scrapers/new-property-scraper";
+import { extractPropertyWithDirectScraping } from "./scrapers/direct-html-scraper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
@@ -10,7 +10,7 @@ const openai = new OpenAI({
 /**
  * Extract property data from a URL
  * 
- * This function first tries to use SerpAPI + OpenAI to extract property data.
+ * This function first tries to use direct HTML scraping + OpenAI to extract property data.
  * If that fails, it falls back to using just OpenAI to analyze the URL structure.
  * 
  * @param url The URL of the property listing
@@ -34,18 +34,13 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       console.log("OpenAI API key is missing. Cannot extract property data.");
       throw new Error("OpenAI API key is required for property data extraction");
     }
-    
-    if (!process.env.SERPAPI_KEY) {
-      console.log("SerpAPI key is missing. Cannot extract property data.");
-      throw new Error("SerpAPI key is required for property data extraction");
-    }
 
-    // Primary method: Use SerpAPI-based extraction method
+    // Primary method: Use direct HTML scraping
     try {
-      console.log("Using SerpAPI and OpenAI for property extraction");
-      return await extractPropertyWithSerpApi(url);
+      console.log("Using direct HTML scraping with Puppeteer and OpenAI for property extraction");
+      return await extractPropertyWithDirectScraping(url);
     } catch (error) {
-      console.error("SerpAPI extraction failed:", error);
+      console.error("Direct HTML scraping failed:", error);
       
       // Fallback method: URL analysis with OpenAI
       console.log("Falling back to URL analysis");
@@ -75,6 +70,11 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       listingAgentLicenseNo: "",
       propertyUrl: url,
       imageUrls: [],
+      sellerName: "",
+      sellerPhone: "",
+      sellerCompany: "",
+      sellerLicenseNo: "",
+      sellerEmail: "",
     };
     
     return fallbackResult;
@@ -210,6 +210,11 @@ async function extractFromUrlStructure(url: string): Promise<PropertyAIData> {
       listingAgentLicenseNo: apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
       propertyUrl: url,
       imageUrls: [],
+      sellerName: apiResult.sellerName || apiResult.agentName || "",
+      sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
+      sellerCompany: apiResult.sellerCompany || apiResult.agentCompany || "",
+      sellerLicenseNo: apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
+      sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
     };
     
     return propertyData;

@@ -132,6 +132,9 @@ async function extractDataWithOpenAI(
     const knowledgePanel = searchResults.knowledge_graph || {};
     const answerBox = searchResults.answer_box || {};
 
+    console.log(JSON.stringify(searchResults));
+    console.log(description);
+
     // Construct the full context
     const context = `
 URL: ${originalUrl}
