@@ -6,42 +6,58 @@ import { PropertyAIData } from "@shared/types";
 export async function scrapePropertyListing(
   url: string,
 ): Promise<PropertyAIData> {
-  console.log("Fetching listing page HTML...0");
+  console.log("Fetching listing page HTML...");
 
   const SERPAPI_KEY = process.env.SERPAPI_KEY || "dummy_key_for_development";
 
-  // Check if the URL is a valid Realtor.com URL
-  let realtorUrl = url;
-  if (!realtorUrl.includes("realtor.com")) {
-    console.log("Not a Realtor.com URL. Searching for Realtor.com listing...");
+  // Check if we have a valid SerpAPI key
+  if (!SERPAPI_KEY || SERPAPI_KEY === "dummy_key_for_development") {
+    console.log("No SerpAPI key provided, skipping SerpAPI lookup");
+    throw new Error("SerpAPI key is required for property scraping");
+  }
+
+  // Check if the URL is a valid real estate listing URL
+  let targetUrl = url;
+  
+  // List of supported real estate domains
+  const supportedDomains = ["realtor.com", "zillow.com", "redfin.com", "trulia.com"];
+  const domainMatch = supportedDomains.find(domain => url.includes(domain));
+  
+  if (!domainMatch) {
+    console.log("Not a supported real estate URL. Searching for real estate listings...");
     try {
-      // Perform a Google search to find the Realtor.com URL
+      // Perform a Google search to find real estate listings for this property
       const serpRes = await axios.get("https://serpapi.com/search.json", {
         params: {
           engine: "google",
-          q: `${url}`,
+          q: `${url} real estate listing`,
           api_key: SERPAPI_KEY,
           num: 5,
         },
       });
 
-      // Log the full response to inspect the structure
-      console.log(serpRes.data);
-
-      realtorUrl = serpRes.data.organic_results.find((r: { link: string }) =>
-        r.link.includes("realtor.com"),
-      )?.link;
-
-      if (!realtorUrl) {
-        throw new Error("No Realtor.com listing found.");
+      // Try to find any supported real estate listing
+      for (const domain of supportedDomains) {
+        const matchingResult = serpRes.data.organic_results.find((r: { link: string }) =>
+          r.link.includes(domain)
+        );
+        
+        if (matchingResult) {
+          targetUrl = matchingResult.link;
+          console.log(`Found ${domain} URL:`, targetUrl);
+          break;
+        }
       }
-      console.log("Found Realtor URL:", realtorUrl);
+      
+      if (targetUrl === url) {
+        throw new Error("No supported real estate listing found.");
+      }
     } catch (error) {
       console.error("Error during SerpAPI call:", error);
       throw new Error("Failed to fetch data from SerpAPI.");
     }
   } else {
-    console.log("Realtor.com URL detected:", realtorUrl);
+    console.log(`${domainMatch} URL detected:`, targetUrl);
   }
 
   const headers = { "User-Agent": "Mozilla/5.0" };
@@ -50,7 +66,7 @@ export async function scrapePropertyListing(
   let pageContent = "";
   try {
     // Use axios to fetch the page with appropriate headers to avoid bot detection
-    const response = await axios.get(realtorUrl, {
+    const response = await axios.get(targetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -70,7 +86,7 @@ export async function scrapePropertyListing(
     // Try with a different user agent as fallback
     console.log("Trying with alternate user agent...");
     try {
-      const response = await axios.get(realtorUrl, {
+      const response = await axios.get(targetUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Safari/605.1.15',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -113,7 +129,7 @@ export async function scrapePropertyListing(
         });
         
         // Navigate to the URL with increased timeout
-        await page.goto(realtorUrl, {
+        await page.goto(targetUrl, {
           waitUntil: "domcontentloaded",
           timeout: 60000,
         });
@@ -180,6 +196,6 @@ export async function scrapePropertyListing(
   return {
     ...propertyData,
     ...agentData,
-    propertyUrl: realtorUrl,
+    propertyUrl: targetUrl,
   };
 }

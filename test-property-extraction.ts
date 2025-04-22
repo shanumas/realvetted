@@ -1,5 +1,5 @@
 // Test script for the property extraction functionality
-import { extractPropertyFromUrl, apiExtractPropertyData } from './server/openai.js';
+import { extractPropertyFromUrl, apiExtractPropertyData } from './server/openai';
 
 // Test URLs
 const urls = [
