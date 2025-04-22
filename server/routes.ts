@@ -750,12 +750,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Helper function to strip license prefixes
+  // Helper function to standardize license numbers from various formats
   function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
     if (!licenseNo) return licenseNo;
     
-    // Remove any prefix like "DRE", "DRE #", "CalDRE", etc. and keep only the numbers
-    return licenseNo.replace(/^(DRE\s*#?|CalDRE\s*#?|Lic\.|License|BRE\s*#?)\s*/i, "").trim();
+    // Look for patterns with colon that typically separate descriptive text from license numbers
+    // Examples: "CALBRE: 01234567", "License: 01234567", "DRE: 01234567"
+    const colonMatch = licenseNo.match(/(?::|#)\s*([A-Z0-9][\w.-]{4,})\b/i);
+    if (colonMatch && colonMatch[1]) {
+      return colonMatch[1];
+    }
+    
+    // First, remove any prefix like "DRE", "DRE #", "CalDRE", etc.
+    const prefixesPattern = /^(?:DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
+    let cleaned = licenseNo.replace(prefixesPattern, "").trim();
+    
+    // Look for State format with letter and period (e.g., S.0123456 for Nevada)
+    const stateFormatInText = licenseNo.match(/\b([A-Z]\.\d{5,})\b/i);
+    if (stateFormatInText && stateFormatInText[1]) {
+      return stateFormatInText[1].replace('.', '');
+    }
+    
+    // Handle format where license number might be wrapped in parentheses
+    // e.g., "John Doe (License #01234567)" or "Jane Smith (S.0123456)"
+    const parenthesesMatch = cleaned.match(/\((?:[^\)]*?)(?:(?:([A-Z])\.(\d{5,}))|(?:(?:[^\d]*)(\d{5,})))(?:[^\d]*?)\)?/i);
+    if (parenthesesMatch) {
+      // Check for state code format (S.0123456)
+      if (parenthesesMatch[1] && parenthesesMatch[2]) {
+        return parenthesesMatch[1] + parenthesesMatch[2]; // Combine letter and number
+      } 
+      // Standard numeric format
+      else if (parenthesesMatch[3]) {
+        return parenthesesMatch[3];
+      }
+    }
+    
+    // If there's a comma followed by a pattern that looks like a license number, extract it
+    // e.g., "John Doe, #01234567"
+    const commaMatch = cleaned.match(/,\s*(?:#?\s*)([A-Z]?[\d]{5,})\b/i);
+    if (commaMatch && commaMatch[1]) {
+      return commaMatch[1];
+    }
+    
+    // Plain license number without any text 
+    // Avoid matching when there's extra non-numeric text
+    const justNumber = /^\s*#?\s*(\d{5,}(?:-\w+)?)\s*(?:\(Active\))?$/i;
+    const numberMatch = cleaned.match(justNumber);
+    if (numberMatch && numberMatch[1]) {
+      return numberMatch[1];
+    }
+    
+    // Last resort for complex cases - find the first number sequence that could be a license
+    const anyNumberMatch = licenseNo.match(/\b([A-Z]?\d{5,}(?:-\w+)?)\b/i);
+    if (anyNumberMatch && anyNumberMatch[1]) {
+      return anyNumberMatch[1];
+    }
+    
+    // If no good pattern match, just remove non-alphanumeric chars (defensive fallback)
+    cleaned = cleaned.replace(/[^A-Z0-9.-]/gi, "");
+    
+    // If the cleaned result is too long (likely it contains other text), 
+    // find something that looks like a license number in it
+    if (cleaned.length > 10) {
+      const candidateMatch = cleaned.match(/([A-Z]?\d{5,}(?:-\w+)?)/i);
+      if (candidateMatch && candidateMatch[1]) {
+        return candidateMatch[1];
+      }
+    }
+    
+    return cleaned;
   }
 
   // Property routes
@@ -1752,6 +1815,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Use web search to find information about the property URL
         // This avoids direct scraping and potential blocking from real estate websites
+        const propertyData = await extractPropertyFromUrl(url);
+
+        res.json(propertyData);
+      } catch (error) {
+        console.error("Property URL extraction error:", error);
+        res.status(500).json({
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to extract property data from URL",
+        });
+      }
+    }
+  );
+  
+  // Temporary test endpoint for extracting property details without authentication
+  app.post(
+    "/api/test/extract-property-from-url",
+    async (req, res) => {
+      try {
+        const { url } = req.body;
+
+        if (!url || typeof url !== "string") {
+          return res.status(400).json({
+            success: false,
+            error: "Property URL is required",
+          });
+        }
+
+        console.log(`Test endpoint: Extracting property from URL: ${url}`);
+        // Use the extraction function directly
         const propertyData = await extractPropertyFromUrl(url);
 
         res.json(propertyData);

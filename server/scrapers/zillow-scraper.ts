@@ -21,7 +21,7 @@ export async function extractZillowPropertyData(zillowUrl: string): Promise<Prop
     // Enhanced browser configuration to avoid detection
     browser = await puppeteer.launch({
       headless: "new",
-      executablePath: process.env.CHROME_BIN || '/nix/store/4axlc1snam3a6x0bj9q55jvr7n7n17a5-chromium-114.0.5735.198/bin/chromium',
+      executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -480,34 +480,76 @@ export async function findZillowUrl(url: string): Promise<string | null> {
 }
 
 /**
- * Helper function to strip license prefixes and standardize license numbers
+ * Helper function to strip license prefixes and standardize license numbers from various formats
  * @param licenseNo License number with possible prefix
  * @returns Clean license number without prefix
  */
 function cleanLicenseNumber(licenseNo: string | null | undefined): string | null | undefined {
   if (!licenseNo) return licenseNo;
   
+  // Look for patterns with colon that typically separate descriptive text from license numbers
+  // Examples: "CALBRE: 01234567", "License: 01234567", "DRE: 01234567"
+  const colonMatch = licenseNo.match(/(?::|#)\s*([A-Z0-9][\w.-]{4,})\b/i);
+  if (colonMatch && colonMatch[1]) {
+    return colonMatch[1];
+  }
+  
   // First, remove any prefix like "DRE", "DRE #", "CalDRE", etc.
-  const prefixesPattern = /^(DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
+  const prefixesPattern = /^(?:DRE\s*#?|CalDRE\s*#?|Lic\.\s*|License\s*#?|BRE\s*#?|CA\s*#?|CalBRE\s*#?|#)\s*/i;
   let cleaned = licenseNo.replace(prefixesPattern, "").trim();
   
+  // Look for State format with letter and period (e.g., S.0123456 for Nevada)
+  const stateFormatInText = licenseNo.match(/\b([A-Z]\.\d{5,})\b/i);
+  if (stateFormatInText && stateFormatInText[1]) {
+    return stateFormatInText[1].replace('.', '');
+  }
+  
   // Handle format where license number might be wrapped in parentheses
-  // e.g., "John Doe (License #01234567)"
-  const parenthesesMatch = cleaned.match(/\(.*?(\d{5,})\)?$/);
-  if (parenthesesMatch && parenthesesMatch[1]) {
-    cleaned = parenthesesMatch[1];
+  // e.g., "John Doe (License #01234567)" or "Jane Smith (S.0123456)"
+  const parenthesesMatch = cleaned.match(/\((?:[^\)]*?)(?:(?:([A-Z])\.(\d{5,}))|(?:(?:[^\d]*)(\d{5,})))(?:[^\d]*?)\)?/i);
+  if (parenthesesMatch) {
+    // Check for state code format (S.0123456)
+    if (parenthesesMatch[1] && parenthesesMatch[2]) {
+      return parenthesesMatch[1] + parenthesesMatch[2]; // Combine letter and number
+    } 
+    // Standard numeric format
+    else if (parenthesesMatch[3]) {
+      return parenthesesMatch[3];
+    }
   }
   
   // If there's a comma followed by a pattern that looks like a license number, extract it
   // e.g., "John Doe, #01234567"
-  const commaMatch = cleaned.match(/,\s*(?:#?)(\d{5,})\b/);
+  const commaMatch = cleaned.match(/,\s*(?:#?\s*)([A-Z]?[\d]{5,})\b/i);
   if (commaMatch && commaMatch[1]) {
-    cleaned = commaMatch[1];
+    return commaMatch[1];
   }
   
-  // Clean up any remaining non-alphanumeric characters
-  // But preserve letters that might be part of license format in some states
-  cleaned = cleaned.replace(/[^\w-]/g, "");
+  // Plain license number without any text 
+  // Avoid matching when there's extra non-numeric text
+  const justNumber = /^\s*#?\s*(\d{5,}(?:-\w+)?)\s*(?:\(Active\))?$/i;
+  const numberMatch = cleaned.match(justNumber);
+  if (numberMatch && numberMatch[1]) {
+    return numberMatch[1];
+  }
+  
+  // Last resort for complex cases - find the first number sequence that could be a license
+  const anyNumberMatch = licenseNo.match(/\b([A-Z]?\d{5,}(?:-\w+)?)\b/i);
+  if (anyNumberMatch && anyNumberMatch[1]) {
+    return anyNumberMatch[1];
+  }
+  
+  // If no good pattern match, just remove non-alphanumeric chars (defensive fallback)
+  cleaned = cleaned.replace(/[^A-Z0-9.-]/gi, "");
+  
+  // If the cleaned result is too long (likely it contains other text), 
+  // find something that looks like a license number in it
+  if (cleaned.length > 10) {
+    const candidateMatch = cleaned.match(/([A-Z]?\d{5,}(?:-\w+)?)/i);
+    if (candidateMatch && candidateMatch[1]) {
+      return candidateMatch[1];
+    }
+  }
   
   return cleaned;
 }
