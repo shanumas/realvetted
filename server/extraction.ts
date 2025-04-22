@@ -3,6 +3,53 @@ import { PropertyAIData } from "@shared/types";
 import { extractPropertyWithPuppeteer } from "./scrapers/puppeteer-direct-scraper";
 import { getRealtorUrlFromAnyRealEstateUrl, processPropertyWithSerpApi } from "./scrapers/serpapi-extractor";
 
+/**
+ * Normalize property data to ensure numeric fields are properly converted to numbers
+ * This is crucial for database compatibility
+ *
+ * @param propertyData The raw property data
+ * @returns The normalized property data with proper types
+ */
+function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
+  const normalizedData = { ...propertyData };
+  
+  // Convert numeric fields from strings to numbers if needed
+  const numericFields = ['bedrooms', 'bathrooms', 'squareFeet', 'yearBuilt', 'price'];
+  
+  numericFields.forEach(field => {
+    // Only convert if the field exists and is a string
+    if (normalizedData[field] !== undefined && normalizedData[field] !== null) {
+      if (typeof normalizedData[field] === 'string') {
+        // Extract only numeric characters (and decimal point for price)
+        let value = normalizedData[field] as string;
+        
+        // Remove non-numeric characters (except decimal point for numbers that might have decimals)
+        if (field === 'price' || field === 'squareFeet') {
+          // For price and square feet, keep decimal points but remove currency symbols, commas, etc.
+          value = value.replace(/[^0-9.]/g, '');
+        } else {
+          // For other fields like bedrooms, just keep integers
+          value = value.replace(/[^0-9]/g, '');
+        }
+        
+        // Convert to number if there's a value, otherwise use null
+        if (value) {
+          normalizedData[field] = Number(value);
+        } else {
+          normalizedData[field] = null;
+        }
+      }
+    } else {
+      // Set to null if undefined or empty string
+      if (normalizedData[field] === "" || normalizedData[field] === undefined) {
+        normalizedData[field] = null;
+      }
+    }
+  });
+  
+  return normalizedData;
+}
+
 // Initialize OpenAI API client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -64,7 +111,10 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
           
           try {
             // Try to extract from Realtor.com URL
-            const propertyData = await extractPropertyWithPuppeteer(realtorUrl);
+            let propertyData = await extractPropertyWithPuppeteer(realtorUrl);
+            
+            // Normalize the data to ensure numeric fields are properly converted
+            propertyData = normalizePropertyData(propertyData);
             
             // Set extraction metadata
             extractionMethod = "serpapi+direct";
@@ -94,7 +144,10 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
     // Step 2: Try direct extraction with Puppeteer (either on original URL or if SerpAPI failed)
     console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
     try {
-      const propertyData = await extractPropertyWithPuppeteer(url);
+      let propertyData = await extractPropertyWithPuppeteer(url);
+      
+      // Normalize the data to ensure numeric fields are properly converted
+      propertyData = normalizePropertyData(propertyData);
       
       // Add metadata to the result
       return {
@@ -108,7 +161,10 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       
       // Step 3: Fallback to URL analysis with OpenAI if scraping fails
       console.log("Falling back to URL analysis");
-      const urlAnalysisData = await extractFromUrlStructure(url);
+      let urlAnalysisData = await extractFromUrlStructure(url);
+      
+      // Normalize the data to ensure numeric fields are properly converted
+      urlAnalysisData = normalizePropertyData(urlAnalysisData);
       
       // Add metadata to the result
       return {
@@ -128,11 +184,11 @@ export async function extractPropertyFromUrl(url: string): Promise<PropertyAIDat
       state: "",
       zip: "",
       propertyType: "Unknown",
-      bedrooms: "",
-      bathrooms: "",
-      squareFeet: "",
-      price: "",
-      yearBuilt: "",
+      bedrooms: null,
+      bathrooms: null,
+      squareFeet: null,
+      price: null,
+      yearBuilt: null,
       description: "Property information could not be extracted",
       features: [],
       listingAgentName: "",
