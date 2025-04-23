@@ -20,7 +20,10 @@ export function AgentCard({ agent, onSelectAgent, selected = false, disabled = f
   };
 
   return (
-    <Card className={`overflow-hidden transition-all ${selected ? 'border-primary border-2' : ''}`}>
+    <Card 
+      className={`overflow-hidden transition-all ${selected ? 'border-primary border-2' : ''} ${!disabled && onSelectAgent ? 'cursor-pointer hover:shadow-md' : ''}`}
+      onClick={!disabled && onSelectAgent ? handleSelectAgent : undefined}
+    >
       <CardHeader className="pb-4">
         <div className="flex justify-between items-start">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -58,7 +61,10 @@ export function AgentCard({ agent, onSelectAgent, selected = false, disabled = f
       <CardFooter>
         {onSelectAgent && (
           <Button 
-            onClick={handleSelectAgent} 
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent the card's onClick from firing
+              handleSelectAgent();
+            }} 
             className="w-full"
             variant={selected ? "default" : "outline"}
             disabled={disabled}
