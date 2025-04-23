@@ -8,17 +8,21 @@
  *      and scrapes the first e‑mail address it finds
  */
 
-import puppeteer, { Browser, Page } from "puppeteer-core";
+import { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
 import _ from "lodash";
 import randomUseragent from "random-useragent";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
   url: string,
 ): Promise<PropertyAIData> {
-  const browser = await launchBrowser();
+  const puppeteer = require("puppeteer-extra");
+  puppeteer.use(require("puppeteer-extra-plugin-stealth")());
+  const browser = await puppeteer.launch({ headless: true });
   try {
     /* --------------------------------------------------
      *  1)  scrape listing page with anti-detection measures
@@ -35,7 +39,7 @@ export async function extractPropertyWithPuppeteer(
     ];
     const UA = UAs[Math.floor(Math.random() * UAs.length)];
 
-    await listingPage.setUserAgent(randomUseragent.getRandom()); // each run → fresh, realistic desktop UA
+    await listingPage.setUserAgent("Mozilla/5.0 ...");
 
     // Navigate to the URL
     await listingPage.goto(url, {
