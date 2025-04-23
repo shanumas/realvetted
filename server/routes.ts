@@ -1930,7 +1930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
-  // Extract property details from a URL using web search (non-scraping approach)
+  // Extract property details from a URL using a hybrid client-server approach
   app.post(
     "/api/ai/extract-property-from-url",
     isAuthenticated,
@@ -1947,24 +1947,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // If client has already extracted data from Realtor.com, use that instead
-        // This avoids server-side scraping which gets blocked by Realtor.com
-        if (clientExtracted && url.includes("realtor.com")) {
-          console.log("Using client-side extracted data for Realtor.com URL");
+        // If client has already extracted data, use that as a starting point
+        // This is our preferred approach - client-side extraction avoids IP blocking
+        if (clientExtracted) {
+          console.log(`Using client-side extracted data with method: ${clientExtracted._extractionMethod || 'unknown'}`);
           
-          // Add server timestamp and source info
-          const resultWithMeta = {
-            ...clientExtracted,
-            _extractionTimestamp: new Date().toISOString(),
-            _extractionSource: url,
-            _extractionMethod: "client-side-scraping"
-          };
+          // If this is direct client extraction from Realtor.com, trust it completely
+          if (clientExtracted._extractionMethod === 'client-side-direct' || 
+              (url.includes("realtor.com") && clientExtracted._extractionMethod === 'client-side-via-realtor')) {
+            // Add server timestamp and source info
+            const resultWithMeta = {
+              ...clientExtracted,
+              _extractionTimestamp: new Date().toISOString(),
+              _extractionSource: url,
+              _extractionMethod: clientExtracted._extractionMethod || "client-side-scraping"
+            };
+            return res.json(resultWithMeta);
+          }
           
-          return res.json(resultWithMeta);
+          // If it's URL-based extraction or has partial data, try to augment with server data
+          // But respect the client-extracted data as much as possible
+          if (clientExtracted._extractionMethod === 'url-analysis') {
+            console.log('Augmenting URL-based client extraction with server data');
+            try {
+              // Use enhanced extraction with SerpAPI integration
+              const serverData = await extractPropertyFromUrl(url);
+              
+              // Merge, prioritizing server data but keeping client data as fallback
+              const mergedData = {
+                ...clientExtracted,     // Start with client-extracted data as base
+                ...serverData,          // Override with server data where available
+                // Keep original client extraction method info
+                _extractionSource: url,
+                _extractionTimestamp: new Date().toISOString(),
+                _extractionMethod: 'hybrid-client-server',
+                _clientMethod: clientExtracted._extractionMethod,
+                _serverMethod: 'serpapi-enhanced'
+              };
+              
+              return res.json(mergedData);
+            } catch (serverError) {
+              console.error('Server augmentation failed, using client-only data:', serverError);
+              // Return client data if server extraction fails
+              return res.json({
+                ...clientExtracted,
+                _extractionTimestamp: new Date().toISOString(),
+                _extractionSource: url
+              });
+            }
+          }
         }
-
-        // Otherwise use server-side extraction
-        console.log(`Server-side extraction for URL: ${url}`);
+        
+        // Fallback to server-side extraction if no client data available
+        console.log(`Falling back to server-side extraction for URL: ${url}`);
         
         // Use enhanced extraction flow with SerpAPI integration
         // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
@@ -1975,7 +2010,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const resultWithMeta = {
           ...propertyData,
           _extractionTimestamp: new Date().toISOString(),
-          _extractionSource: url
+          _extractionSource: url,
+          _extractionMethod: 'server-side'
         };
 
         res.json(resultWithMeta);
