@@ -948,38 +948,9 @@ export default function BuyerPropertyDetail() {
                             <Button
                               className="w-full flex items-center justify-center"
                               onClick={() => setIsViewingModalOpen(true)}
-                              disabled={
-                                !buyerAgreements?.some(
-                                  (a) => a.type === "global_brbc",
-                                )
-                              }
                             >
                               <Eye className="mr-2 h-5 w-5" /> Request Tour
                             </Button>
-                            {!buyerAgreements?.some(
-                              (a) => a.type === "global_brbc",
-                            ) && (
-                              <div className="text-sm text-center text-amber-600 mt-2">
-                                <p className="mb-1">
-                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
-                                  Please sign the Buyer Representation Agreement
-                                  to request viewings.
-                                </p>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="text-amber-700 p-0 h-auto font-medium underline"
-                                  onClick={() =>
-                                    window.open(
-                                      "/api/docs/brsr.pdf?fillable=true&prefill=buyer",
-                                      "_blank",
-                                    )
-                                  }
-                                >
-                                  Sign Representation Agreement
-                                </Button>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1283,54 +1254,6 @@ export default function BuyerPropertyDetail() {
             // We'll detect which scenario occurred in useEffect by checking for agreements
             setIsDisclosureFormOpen(false);
           }}
-        />
-      )}
-
-      {/* Buyer Representation Agreement Dialog */}
-      {selectedAgentId && (
-        <BuyerRepresentationAgreement
-          agentId={selectedAgentId}
-          isOpen={isBrbcModalOpen}
-          onClose={() => {
-            setIsBrbcModalOpen(false);
-            // After closing the BRBC modal, refresh agreements
-            queryClient.invalidateQueries({
-              queryKey: ["/api/buyer/agreements"],
-            });
-
-            // If we have a pending viewing request, retry it
-            if (viewingRequestData) {
-              // Check if the user has now signed a global BRBC
-              apiRequest("GET", `/api/global-brbc/${selectedAgentId}`)
-                .then((res) => res.json())
-                .then((data) => {
-                  if (
-                    data.success &&
-                    data.exists &&
-                    data.agreement.status === "signed_by_buyer"
-                  ) {
-                    console.log(
-                      "Global BRBC now signed, retrying viewing request",
-                    );
-                    // The global BRBC has been signed, retry the viewing request
-                    requestViewingMutation.mutate({
-                      date: viewingRequestData.date,
-                      time: viewingRequestData.time,
-                      endTime: viewingRequestData.endTime,
-                      notes: viewingRequestData.notes,
-                      override: true, // Allow override since we have permission now
-                    });
-
-                    // Clear the stored data
-                    setViewingRequestData(null);
-                  }
-                })
-                .catch((err) => {
-                  console.error("Error checking for updated global BRBC:", err);
-                });
-            }
-          }}
-          isGlobal={true}
         />
       )}
 
