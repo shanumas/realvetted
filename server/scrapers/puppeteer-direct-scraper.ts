@@ -20,8 +20,7 @@ import StealthPlugin from "puppeteer-extra-plugin-stealth";
 export async function extractPropertyWithPuppeteer(
   url: string,
 ): Promise<PropertyAIData> {
-  const puppeteer = require("puppeteer-extra");
-  puppeteer.use(require("puppeteer-extra-plugin-stealth")());
+  puppeteer.use(StealthPlugin());
   const browser = await puppeteer.launch({ headless: true });
   try {
     /* --------------------------------------------------
@@ -30,7 +29,7 @@ export async function extractPropertyWithPuppeteer(
     const listingPage = await browser.newPage();
 
     // Prepare the page with anti-bot measures
-    await prepPage(listingPage);
+    //await prepPage(listingPage);
 
     const UAs = [
       "Mozilla/5.0 … Chrome/125.0.0.0 Safari/537.36",
@@ -39,16 +38,17 @@ export async function extractPropertyWithPuppeteer(
     ];
     const UA = UAs[Math.floor(Math.random() * UAs.length)];
 
-    await listingPage.setUserAgent("Mozilla/5.0 ...");
+    await listingPage.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
+    );
 
     // Navigate to the URL
-    await listingPage.goto(url, {
+    await listingPage.goto("https://www.realtor.com/...", {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
     });
 
     // Wait for the content to load
-    await listingPage.waitForSelector("body", { timeout: 5000 });
+    //await listingPage.waitForSelector("body", { timeout: 5000 });
 
     // Extract the HTML content
     const html = await listingPage.content();
