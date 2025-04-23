@@ -148,6 +148,16 @@ export default function AgentPropertyDetail() {
                         </div>
                       )}
                     </div>
+                  ) : property.propertyUrl ? (
+                    <div className="h-96 rounded-lg overflow-hidden border border-gray-200">
+                      <iframe 
+                        src={property.propertyUrl}
+                        title="Original property listing"
+                        className="w-full h-full"
+                        sandbox="allow-same-origin allow-scripts allow-popups"
+                        loading="lazy"
+                      ></iframe>
+                    </div>
                   ) : (
                     <div className="bg-gray-200 h-64 rounded-lg overflow-hidden">
                       <div className="w-full h-full flex items-center justify-center text-gray-400">
