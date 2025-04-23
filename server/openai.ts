@@ -141,13 +141,15 @@ export async function findAgentsForProperty(
   // Filter for agents only
   const agents = allAgents.filter((user) => user.role === "agent");
 
-  // If we have no or just a few agents, return them all
+  return agents;
+
+  /*   // If we have no or just a few agents, return them all
   if (agents.length <= 3) {
     return agents;
   }
 
   // Otherwise rank them by expertise
-  return rankAgentsByExpertise(property, agents);
+  return rankAgentsByExpertise(property, agents); */
 }
 
 /**

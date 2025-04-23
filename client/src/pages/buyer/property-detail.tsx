@@ -77,22 +77,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 export default function BuyerPropertyDetail() {
   const [, params] = useRoute("/buyer/property/:id");
   const propertyId = params?.id ? parseInt(params.id) : 0;
-  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState<string>("viewings");
-  const [currentImageIndex, setCurrentImageIndex] = useState<number>(0);
   const [isAgentDialogOpen, setIsAgentDialogOpen] = useState<boolean>(false);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [isViewingModalOpen, setIsViewingModalOpen] = useState<boolean>(false);
@@ -724,99 +713,6 @@ export default function BuyerPropertyDetail() {
                   </div>
                 </div>
 
-                {/* Property Images */}
-                <div className="px-4 py-5 sm:px-6">
-                  {property.imageUrls && property.imageUrls.length > 0 ? (
-                    <div className="relative">
-                      {/* Image Carousel */}
-                      <div className="relative overflow-x-hidden">
-                        <div
-                          className="flex transition-transform duration-300 ease-in-out"
-                          style={{
-                            transform: `translateX(-${currentImageIndex * 100}%)`,
-                            width: `${property.imageUrls.length * 100}%`,
-                          }}
-                        >
-                          {property.imageUrls.map((url, index) => (
-                            <div key={index} className="w-full flex-shrink-0">
-                              <div className="h-64 mx-auto rounded-lg overflow-hidden">
-                                <img
-                                  src={url}
-                                  alt={`Property image ${index + 1}`}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    // If image fails to load, show placeholder
-                                    const target = e.target as HTMLImageElement;
-                                    target.src =
-                                      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>';
-                                    target.onerror = null; // Prevent infinite error loop
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Navigation Arrows */}
-                      {property.imageUrls.length > 1 && (
-                        <>
-                          <button
-                            className="absolute left-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-r-md hover:bg-black/70 transition-colors"
-                            onClick={() =>
-                              setCurrentImageIndex((prev) =>
-                                prev > 0
-                                  ? prev - 1
-                                  : property.imageUrls!.length - 1,
-                              )
-                            }
-                            aria-label="Previous image"
-                          >
-                            <ChevronLeft className="h-6 w-6" />
-                          </button>
-                          <button
-                            className="absolute right-0 top-1/2 transform -translate-y-1/2 bg-black/50 text-white p-2 rounded-l-md hover:bg-black/70 transition-colors"
-                            onClick={() =>
-                              setCurrentImageIndex((prev) =>
-                                prev < property.imageUrls!.length - 1
-                                  ? prev + 1
-                                  : 0,
-                              )
-                            }
-                            aria-label="Next image"
-                          >
-                            <ChevronRight className="h-6 w-6" />
-                          </button>
-                        </>
-                      )}
-
-                      {/* Image Indicators */}
-                      {property.imageUrls.length > 1 && (
-                        <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-2">
-                          {property.imageUrls.map((_, index) => (
-                            <button
-                              key={index}
-                              className={`h-2 w-2 rounded-full transition-colors ${
-                                currentImageIndex === index
-                                  ? "bg-white"
-                                  : "bg-white/50"
-                              }`}
-                              onClick={() => setCurrentImageIndex(index)}
-                              aria-label={`Go to image ${index + 1}`}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-200 h-64 rounded-lg overflow-hidden">
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <Home className="h-16 w-16" />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
                 {/* Property Details */}
                 <div className="border-t border-gray-200">
                   <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
@@ -831,6 +727,30 @@ export default function BuyerPropertyDetail() {
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         {property.address}
+                      </dd>
+                    </div>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Home className="mr-2 h-4 w-4" /> Beds
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.bedrooms}
+                      </dd>
+                    </div>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Home className="mr-2 h-4 w-4" /> Bath
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.bathrooms}
+                      </dd>
+                    </div>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Home className="mr-2 h-4 w-4" /> Price
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.price}
                       </dd>
                     </div>
                     {property.propertyUrl && (
@@ -853,88 +773,70 @@ export default function BuyerPropertyDetail() {
                   </dl>
 
                   {/* Listing Agent Information */}
-                  {(property.listingAgentName ||
-                    property.listingAgentEmail ||
-                    property.sellerEmail ||
-                    property.listingAgentPhone ||
-                    property.sellerPhone ||
-                    property.listingAgentCompany ||
-                    property.sellerCompany ||
-                    property.listingAgentLicenseNo ||
-                    property.sellerLicenseNo) && (
-                    <>
-                      <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
-                          Listing Agent Information
-                        </h3>
-                      </div>
-                      <dl>
-                        {(property.listingAgentName || property.sellerName) && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Building className="mr-2 h-4 w-4" /> Agent name
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.listingAgentName || property.sellerName}
-                            </dd>
-                          </div>
-                        )}
 
-                        {/* Display agent email */}
-                        {(property.listingAgentEmail || property.sellerEmail) && (
-                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Mail className="mr-2 h-4 w-4" /> Email
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a
-                                href={`mailto:${property.listingAgentEmail || property.sellerEmail}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {property.listingAgentEmail || property.sellerEmail}
-                              </a>
-                            </dd>
-                          </div>
-                        )}
+                  <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Listing Agent Information
+                    </h3>
+                  </div>
+                  <dl>
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Building className="mr-2 h-4 w-4" /> Agent name
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.listingAgentName}
+                      </dd>
+                    </div>
 
-                        {(property.listingAgentPhone || property.sellerPhone) && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Phone className="mr-2 h-4 w-4" /> Phone
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              <a
-                                href={`tel:${property.listingAgentPhone || property.sellerPhone}`}
-                                className="text-blue-600 hover:underline"
-                              >
-                                {property.listingAgentPhone || property.sellerPhone}
-                              </a>
-                            </dd>
-                          </div>
-                        )}
-                        {(property.listingAgentCompany || property.sellerCompany) && (
-                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Briefcase className="mr-2 h-4 w-4" /> Company
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.listingAgentCompany || property.sellerCompany}
-                            </dd>
-                          </div>
-                        )}
-                        {(property.listingAgentLicenseNo || property.sellerLicenseNo) && (
-                          <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                            <dt className="text-sm font-medium text-gray-500 flex items-center">
-                              <Award className="mr-2 h-4 w-4" /> License #
-                            </dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.listingAgentLicenseNo || property.sellerLicenseNo}
-                            </dd>
-                          </div>
-                        )}
-                      </dl>
-                    </>
-                  )}
+                    {/* Display agent email */}
+
+                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Mail className="mr-2 h-4 w-4" /> Email
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        <a
+                          href={`mailto:${property.listingAgentEmail || property.sellerEmail}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {property.listingAgentEmail}
+                        </a>
+                      </dd>
+                    </div>
+
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Phone className="mr-2 h-4 w-4" /> Phone
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        <a
+                          href={`tel:${property.listingAgentPhone || property.sellerPhone}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {property.listingAgentPhone}
+                        </a>
+                      </dd>
+                    </div>
+
+                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Briefcase className="mr-2 h-4 w-4" /> Company
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.listingAgentCompany}
+                      </dd>
+                    </div>
+
+                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <dt className="text-sm font-medium text-gray-500 flex items-center">
+                        <Award className="mr-2 h-4 w-4" /> License #
+                      </dt>
+                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                        {property.listingAgentLicenseNo}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
               </CardContent>
             </Card>
