@@ -54,6 +54,7 @@ import {
   Eye,
   Calendar as CalendarIcon,
   AlertTriangle,
+  Mail,
 } from "lucide-react";
 import { PropertyActivityLog } from "@/components/property-activity-log";
 import { AgentCard } from "@/components/agent-card";
@@ -852,10 +853,14 @@ export default function BuyerPropertyDetail() {
                   </dl>
 
                   {/* Listing Agent Information */}
-                  {(property.sellerName ||
+                  {(property.listingAgentName ||
+                    property.listingAgentEmail ||
                     property.sellerEmail ||
+                    property.listingAgentPhone ||
                     property.sellerPhone ||
+                    property.listingAgentCompany ||
                     property.sellerCompany ||
+                    property.listingAgentLicenseNo ||
                     property.sellerLicenseNo) && (
                     <>
                       <div className="px-4 py-5 sm:px-6 border-t border-b border-gray-200 mt-6">
@@ -864,49 +869,66 @@ export default function BuyerPropertyDetail() {
                         </h3>
                       </div>
                       <dl>
-                        {property.sellerName && (
+                        {(property.listingAgentName || property.sellerName) && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Building className="mr-2 h-4 w-4" /> Agent name
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerName}
+                              {property.listingAgentName || property.sellerName}
                             </dd>
                           </div>
                         )}
 
-                        {property.sellerPhone && (
+                        {/* Display agent email */}
+                        {(property.listingAgentEmail || property.sellerEmail) && (
+                          <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt className="text-sm font-medium text-gray-500 flex items-center">
+                              <Mail className="mr-2 h-4 w-4" /> Email
+                            </dt>
+                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                              <a
+                                href={`mailto:${property.listingAgentEmail || property.sellerEmail}`}
+                                className="text-blue-600 hover:underline"
+                              >
+                                {property.listingAgentEmail || property.sellerEmail}
+                              </a>
+                            </dd>
+                          </div>
+                        )}
+
+                        {(property.listingAgentPhone || property.sellerPhone) && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Phone className="mr-2 h-4 w-4" /> Phone
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                               <a
-                                href={`tel:${property.sellerPhone}`}
+                                href={`tel:${property.listingAgentPhone || property.sellerPhone}`}
                                 className="text-blue-600 hover:underline"
                               >
-                                {property.sellerPhone}
+                                {property.listingAgentPhone || property.sellerPhone}
                               </a>
                             </dd>
                           </div>
                         )}
-                        {property.sellerCompany && (
+                        {(property.listingAgentCompany || property.sellerCompany) && (
                           <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Briefcase className="mr-2 h-4 w-4" /> Company
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerCompany}
+                              {property.listingAgentCompany || property.sellerCompany}
                             </dd>
                           </div>
                         )}
-                        {property.sellerLicenseNo && (
+                        {(property.listingAgentLicenseNo || property.sellerLicenseNo) && (
                           <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                             <dt className="text-sm font-medium text-gray-500 flex items-center">
                               <Award className="mr-2 h-4 w-4" /> License #
                             </dt>
                             <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                              {property.sellerLicenseNo}
+                              {property.listingAgentLicenseNo || property.sellerLicenseNo}
                             </dd>
                           </div>
                         )}
