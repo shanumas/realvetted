@@ -1,7 +1,7 @@
 /**
  * SerpAPI-based property extractor for real estate listings
  *
- * This module uses SerpAPI to search for a property on Realtor.com
+ * This module uses SerpAPI to search for a property on compass.com
  * based on a property URL from any real estate site
  */
 
@@ -12,16 +12,16 @@ import { PropertyAIData } from "@shared/types";
 const SERPAPI_KEY = process.env.SERPAPI_KEY;
 
 /**
- * Extract a Realtor.com URL for a property based on any real estate URL
+ * Extract a compass.com URL for a property based on any real estate URL
  *
  * @param originalUrl The original property URL (from Zillow, Redfin, etc.)
- * @returns The corresponding Realtor.com URL, or null if not found
+ * @returns The corresponding compass.com URL, or null if not found
  */
 export async function getRealtorUrlFromAnyRealEstateUrl(
   originalUrl: string,
-): Promise<string | null> {
+): Promise<{ link: string; description: string } | null> {
   try {
-    console.log(`Using SerpAPI to find Realtor.com URL for: ${originalUrl}`);
+    console.log(`Using SerpAPI to find compass.com URL for: ${originalUrl}`);
 
     // Extract address information from the original URL
     const addressInfo = extractAddressFromUrl(originalUrl);
@@ -33,9 +33,9 @@ export async function getRealtorUrlFromAnyRealEstateUrl(
 
     // Create a search query for the property
     const { streetAddress, city, state, zip } = addressInfo;
-    const searchQuery = `${streetAddress} ${city} ${state} ${zip} site:realtor.com`;
+    const searchQuery = `${streetAddress} ${city} ${state} ${zip} site:compass.com`;
 
-    // Use SerpAPI to search for the property on Realtor.com
+    // Use SerpAPI to search for the property on compass.com
     const result = await getJson({
       engine: "google",
       q: searchQuery,
@@ -46,17 +46,18 @@ export async function getRealtorUrlFromAnyRealEstateUrl(
     // Extract the URL from the search results
     const organicResults = result.organic_results || [];
 
-    // Find the first result from realtor.com that contains "/realestateandhomes-detail/"
+    // Find the first result from compass.com that contains "/realestateandhomes-detail/"
     const realtorResult = organicResults.find((result: any) => {
       const link = result.link || "";
-      return link.includes("realtor.com");
+      return link.includes("compass.com");
     });
 
     if (realtorResult && realtorResult.link) {
-      console.log(`Found Realtor.com URL: ${realtorResult.link}`);
-      return realtorResult.link;
+      console.log(`Found compass.com URL: ${JSON.stringify(realtorResult)}`);
+      console.log(`Found compass.com URL: ${realtorResult.link}`);
+      return { link: realtorResult.link, description: realtorResult.snippet };
     } else {
-      console.log("No matching Realtor.com URL found in search results");
+      console.log("No matching compass.com URL found in search results");
       return null;
     }
   } catch (error) {
@@ -77,26 +78,25 @@ export async function processPropertyWithSerpApi(
   extractFunction: (url: string) => Promise<PropertyAIData>,
 ): Promise<PropertyAIData | null> {
   try {
-    // First try to get a Realtor.com URL for the property
-    const realtorUrl = await getRealtorUrlFromAnyRealEstateUrl(url);
+    // First try to get a compass.com URL for the property
+    const proeprtyDetails = await getRealtorUrlFromAnyRealEstateUrl(url);
 
-    if (realtorUrl) {
-      // If we found a Realtor.com URL, extract data from it
+    if (proeprtyDetails?.link) {
+      // If we found a compass.com URL, extract data from it
       console.log(
-        `Extracting property data from Realtor.com URL: ${realtorUrl}`,
+        `Extracting property data from compass.com URL: ${proeprtyDetails?.link}`,
       );
-      const propertyData = await extractFunction(realtorUrl);
+      const propertyData = await extractFunction(proeprtyDetails?.link);
 
       // Add the original URL to the property data
       return {
         ...propertyData,
         propertyUrl: url, // Keep the original URL as the source
-        _realtorUrl: realtorUrl, // Add the Realtor.com URL as metadata
       };
     } else {
-      // If we couldn't find a Realtor.com URL, try direct extraction with the original URL
+      // If we couldn't find a compass.com URL, try direct extraction with the original URL
       console.log(
-        `No Realtor.com URL found, falling back to direct extraction from: ${url}`,
+        `No compass.com URL found, falling back to direct extraction from: ${url}`,
       );
       return await extractFunction(url);
     }
@@ -173,8 +173,8 @@ function extractAddressFromUrl(
           return { streetAddress, city, state, zip };
         }
       }
-    } else if (url.includes("realtor.com")) {
-      // Example: https://www.realtor.com/realestateandhomes-detail/123-Main-St_San-Francisco_CA_94111_M12345-67890
+    } else if (url.includes("compass.com")) {
+      // Example: https://www.compass.com/realestateandhomes-detail/123-Main-St_San-Francisco_CA_94111_M12345-67890
       const addressMatch = path.match(/\/realestateandhomes-detail\/([^\/]+)/);
       if (addressMatch && addressMatch[1]) {
         const parts = addressMatch[1].split("_");

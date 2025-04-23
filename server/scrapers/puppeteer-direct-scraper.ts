@@ -12,31 +12,30 @@ import { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
 import _ from "lodash";
-import randomUseragent from "random-useragent";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import OpenAI from "openai";
+import axios from "axios";
 
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
-  url: string,
+  originalUrl: string,
+  url: string, //compass.com URL
+  description: string,
 ): Promise<PropertyAIData> {
   puppeteer.use(StealthPlugin());
   const browser = await launchBrowser(); // Use the launchBrowser function instead
   try {
+    /*     url =
+      "https://www.compass.com/listing/1257-fulton-street-san-francisco-ca-94117/1775115899818324705/"; */
+    console.log("🌐 Extracting property data from URL:", url);
     /* --------------------------------------------------
      *  1)  scrape listing page with anti-detection measures
      * -------------------------------------------------- */
     const listingPage = await browser.newPage();
 
     // Prepare the page with anti-bot measures
-    //await prepPage(listingPage);
-
-    const UAs = [
-      "Mozilla/5.0 … Chrome/125.0.0.0 Safari/537.36",
-      "Mozilla/5.0 … Edg/125.0.0.0",
-      "Mozilla/5.0 … Firefox/125.0",
-    ];
-    const UA = UAs[Math.floor(Math.random() * UAs.length)];
+    await prepPage(listingPage);
 
     await listingPage.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
@@ -48,131 +47,47 @@ export async function extractPropertyWithPuppeteer(
     });
 
     // Wait for the content to load
-    //await listingPage.waitForSelector("body", { timeout: 5000 });
+    await listingPage.waitForSelector("body", { timeout: 10000 });
+
+    // Wait a bit longer for dynamic content to load
+    await new Promise((resolve) => setTimeout(resolve, 3000));
 
     // Extract the HTML content
     const html = await listingPage.content();
     const $ = cheerio.load(html);
-    const bodyH = $("body").html()?.trim() ?? ""; // markup inside <body>
 
-    console.log("2");
+    // 1. Get full <main> tag content
+    const mainHtml = $("main").html() ?? "";
 
-    /* --------------------------------------------------
-     *  2)  parse core fields with extended selectors
-     * -------------------------------------------------- */
-    let addressText = "";
+    // 2. Load only the <main> content into cheerio
+    const _$ = cheerio.load(mainHtml);
 
-    // Try multiple address selectors for different sites
-    const addressSelectors = [
-      '[data-testid*="address"]',
-      "h1",
-      ".address",
-      '[data-testid="home-details-summary-headline"]',
-      ".property-header h1",
-      ".property-address",
-      ".listing-details-address",
-    ];
+    // 3. Extract span with data-tn="courtesy-of-text"
+    const courtesyText = _$(
+      "#courtesy-of-text, span[data-tn='courtesy-of-text']",
+    )
+      .text()
+      .trim();
 
-    for (const selector of addressSelectors) {
-      const element = $(selector).first();
-      if (element.length > 0) {
-        addressText = element.text().trim();
-        if (addressText) break;
-      }
-    }
+    console.log("courtesyText" + courtesyText);
 
-    console.log("3:" + bodyH);
-
-    const data: PropertyAIData = {
-      address: addressText || "Address unavailable",
-      city: "",
-      state: "",
-      zip: "",
-      price: extractNumber(html, /\$[\d,]+\b/),
-      bedrooms: extractNumber(html, /(\d+)\s*bed/i, true),
-      bathrooms: extractNumber(html, /(\d+(\.\d+)?)\s*bath/i, true),
-      squareFeet: extractNumber(html, /(\d[,.\d]*)\s*sq\s*ft/i),
-      propertyType: guessType(html),
-      yearBuilt: extractNumber(html, /built\s*in\s*(\d{4})/i, true),
-      description: $('meta[name="description"]').attr("content") || "",
-      features: grabFeatures($),
-      imageUrls: grabImages($),
-      propertyUrl: url,
-      /* placeholders below */
-      listingAgentName: "",
-      listingAgentPhone: "",
-      listingAgentEmail: "",
-      listingAgentCompany: "",
-      listingAgentLicenseNo: "",
-      sellerName: "",
-      sellerPhone: "",
-      sellerCompany: "",
-      sellerLicenseNo: "",
-      sellerEmail: "",
-      listedby: "",
-    };
-
-    // Parse address for city, state, zip if not found individually
-    if (data.address !== "Address unavailable") {
-      const addressParts = data.address.split(",").map((part) => part.trim());
-      if (addressParts.length >= 3) {
-        // Typical format: "123 Main St, City, State ZIP"
-        const lastPart = addressParts[addressParts.length - 1];
-        const stateZipMatch = lastPart.match(/([A-Z]{2})\s+(\d{5})/);
-
-        if (stateZipMatch) {
-          data.state = stateZipMatch[1];
-          data.zip = stateZipMatch[2];
-        }
-
-        // City is typically the second to last part
-        if (addressParts.length >= 2) {
-          data.city = addressParts[addressParts.length - 2];
-        }
-      }
-    }
-
-    /* --------------------------------------------------
-     *  3)  pull agent name & phone using multiple selectors
-     * -------------------------------------------------- */
-    const agentSelectors = [
-      '[class*="listing-agent"]',
-      '[data-testid*="ListingAgent"]',
-      ':contains("Listed by")',
-      ".agent-info",
-      ".listing-agent-information",
-      '[data-testid*="agent"]',
-    ];
-
-    let agentBlock = "";
-    for (const selector of agentSelectors) {
-      const element = $(selector).first();
-      if (element.length > 0) {
-        agentBlock = element.text();
-        if (agentBlock) break;
-      }
-    }
-
-    const agentNameMatch = agentBlock.match(
-      /listed by[:\s]*([A-Z][A-Za-z.\s']+)/i,
+    const data: PropertyAIData = await extractAgentDataWithGPT(
+      description + " , " + courtesyText,
     );
-    if (agentNameMatch) {
-      data.listingAgentName = agentNameMatch[1].trim();
-      data.listedby = `Listed by: ${data.listingAgentName}`;
+    console.log("Complete data " + JSON.stringify(data));
+    data.propertyUrl = originalUrl;
+
+    if (courtesyText) {
+      const email = await findAgentEmail(courtesyText);
+      if (email) {
+        data.listingAgentEmail = email;
+      } else {
+        data.listingAgentEmail =
+          process.env.LISTING_AGENT_FALLBACK ?? "shanumas@gmail.com";
+      }
     }
 
-    const phoneMatch = agentBlock.match(/(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/);
-    if (phoneMatch) data.listingAgentPhone = phoneMatch[1];
-
-    /* --------------------------------------------------
-     *  4)  look up agent e‑mail (Google → first site)
-     * -------------------------------------------------- */
-    if (data.listingAgentName) {
-      data.listingAgentEmail = await findAgentEmail(
-        browser,
-        data.listingAgentName,
-      );
-    }
+    console.log("Complete data " + JSON.stringify(data));
 
     return data;
   } catch (err) {
@@ -183,36 +98,77 @@ export async function extractPropertyWithPuppeteer(
   }
 }
 
+export async function extractAgentDataWithGPT(
+  description: string,
+): Promise<PropertyAIData> {
+  const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+
+  const prompt = `
+You are a real estate data extractor. Extract the listing agent details from this HTML content inside a <main> tag.
+
+Extract the following fields as JSON:
+- address
+- price
+- bedrooms
+- bathrooms
+- listingAgentName
+- listingAgentPhone
+- listingAgentLicenseNo
+- listingAgentCompany
+
+If a field is missing, return it as an empty string.
+
+HTML:
+"""${description}"""
+`;
+
+  const res = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.2,
+  });
+
+  const jsonStart = res.choices[0].message.content?.indexOf("{") ?? -1;
+  const jsonString = res.choices[0].message.content?.slice(jsonStart);
+
+  console.log("Return string from openai: " + jsonString);
+
+  try {
+    const match = jsonString?.match(/{[\s\S]+}/);
+    const clean = match ? match[0] : "{}";
+    const parsedData = JSON.parse(clean);
+    console.log("Parsed data: " + parsedData);
+    return parsedData;
+  } catch {
+    return {
+      address: "",
+      price: "",
+      bedrooms: "",
+      bathrooms: "",
+      listingAgentName: "",
+      listingAgentPhone: "",
+    };
+  }
+}
+
 /* ==================================================
  *             ── helpers below ──
  * ================================================== */
 
 const EMPTY_PROPERTY: PropertyAIData = {
   address: "Address unavailable",
-  city: "",
-  state: "",
-  zip: "",
-  propertyType: "",
   bedrooms: "",
   bathrooms: "",
-  squareFeet: "",
   price: "",
-  yearBuilt: "",
   description: "",
-  features: [],
   listingAgentName: "",
   listingAgentPhone: "",
   listingAgentEmail: "",
   listingAgentCompany: "",
   listingAgentLicenseNo: "",
   propertyUrl: "",
-  imageUrls: [],
-  sellerName: "",
-  sellerPhone: "",
-  sellerCompany: "",
-  sellerLicenseNo: "",
-  sellerEmail: "",
-  listedby: "",
 };
 
 /* ---------- launch Chrome with enhanced stealth mode ---------- */
@@ -470,154 +426,35 @@ async function prepPage(page: Page) {
   });
 }
 
-/* ---------- ultra-realistic human-like scrolling and interaction ---------- */
-async function autoScroll(page: Page) {
-  // First, wait a bit like a human would after loading the page
-  await new Promise((resolve) =>
-    setTimeout(resolve, 1500 + Math.random() * 2000),
-  );
-
-  // Initial mouse movement to a random position
-  await page.mouse.move(200 + Math.random() * 400, 100 + Math.random() * 150);
-
-  // Simulate clicking on something to get focus (common human behavior)
-  if (Math.random() > 0.5) {
-    await page.mouse.click(
-      250 + Math.random() * 300,
-      150 + Math.random() * 100,
-    );
-
-    // Small delay after clicking
-    await new Promise((resolve) =>
-      setTimeout(resolve, 300 + Math.random() * 500),
-    );
-  }
-
-  // Simplified scrolling to avoid JavaScript evaluation issues
-  // Scroll down a few times with random pauses to simulate human behavior
-  for (let i = 0; i < 5; i++) {
-    // Scroll down by a random amount
-    await page.evaluate(() => {
-      window.scrollBy(0, 400 + Math.floor(Math.random() * 300));
-    });
-
-    // Random pause between scrolls
-    await new Promise((resolve) =>
-      setTimeout(resolve, 800 + Math.random() * 1200),
-    );
-  }
-
-  // Scroll back up a bit to appear more human-like
-  await page.evaluate(() => {
-    window.scrollBy(0, -100 - Math.floor(Math.random() * 100));
-  });
-
-  // Final pause to simulate reading the content
-  await new Promise((resolve) =>
-    setTimeout(resolve, 1000 + Math.random() * 1500),
-  );
-
-  // Wiggle mouse a bit at current location (humans fidget)
-  const currentPosition = await page.evaluate(() => {
-    return {
-      x: window.scrollX + window.innerWidth / 2,
-      y: window.scrollY + 300,
-    };
-  });
-
-  // Small random mouse movements around current position
-  for (let i = 0; i < 3; i++) {
-    if (Math.random() > 0.3) {
-      await page.mouse.move(
-        currentPosition.x + (Math.random() * 40 - 20),
-        currentPosition.y + (Math.random() * 40 - 20),
-        { steps: 5 }, // Move in steps for more human-like motion
-      );
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 100 + Math.random() * 300),
-      );
-    }
-  }
-
-  // Final mouse movement to a random position on the visible page
-  await page.mouse.move(
-    300 + Math.random() * 600,
-    200 + Math.random() * 400,
-    { steps: 10 }, // More steps for smoother, more human-like motion
-  );
-
-  // Wait a bit more before continuing
-  await new Promise((resolve) =>
-    setTimeout(resolve, 800 + Math.random() * 1200),
-  );
-}
-
-/* ---------- quick regex helpers ---------- */
-function extractNumber(html: string, re: RegExp, plain = false): string {
-  const m = html.match(re);
-  if (!m) return "";
-  return plain ? (m[1] ?? "") : (m[0] ?? "").replace(/[^\d.]/g, "");
-}
-
-function guessType(html: string): string {
-  const types = [
-    "Single Family",
-    "Condo",
-    "Townhouse",
-    "Multi‑Family",
-    "Apartment",
-    "Mobile",
-    "Land",
-  ];
-  return types.find((t) => html.includes(t)) || "";
-}
-
-/* ---------- gather bullet‑list features if present ---------- */
-function grabFeatures($: cheerio.CheerioAPI): string[] {
-  const list: string[] = [];
-  $("ul li").each((_, el) => {
-    const txt = $(el).text().trim();
-    if (txt && list.length < 50) list.push(txt);
-  });
-  return Array.from(new Set(list));
-}
-
-/* ---------- small helper to collect primary images ---------- */
-function grabImages($: cheerio.CheerioAPI): string[] {
-  const imgs: string[] = [];
-  $('img[src*="https://"], img[data-src*="https://"]').each((_, el) => {
-    const src = $(el).attr("src") || $(el).attr("data-src") || "";
-    if (src && imgs.length < 10) imgs.push(src);
-  });
-  return imgs;
-}
-
-/* ---------- Google → first result → first email ---------- */
-async function findAgentEmail(browser: Browser, name: string): Promise<string> {
-  const page = await browser.newPage();
+export async function findAgentEmail(realtorDetails: string): Promise<string> {
   try {
-    await prepPage(page);
-    const query = encodeURIComponent(`${name} realtor email`);
-    await page.goto(`https://www.google.com/search?q=${query}`, {
-      waitUntil: "domcontentloaded",
+    const searchQuery = `${realtorDetails} realtor email`;
+
+    const serpRes = await axios.get("https://serpapi.com/search.json", {
+      params: {
+        q: searchQuery,
+        api_key: process.env.SERPAPI_KEY, // store in .env or config
+        engine: "google",
+        num: 5,
+      },
     });
 
-    const firstHref = await page.$eval(
-      "div.yuRUbf > a",
-      (a) => (a as HTMLAnchorElement).href,
-    );
-    await page.goto(firstHref, {
-      waitUntil: "domcontentloaded",
-      timeout: 20_000,
-    });
+    const results = serpRes.data.organic_results || [];
 
-    const html = await page.content();
-    const emailMatch = html.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
-    return emailMatch ? emailMatch[0] : "";
-  } catch {
+    for (const result of results.slice(0, 5)) {
+      try {
+        const text = result.snippet || "";
+        console.log("🔍 Searching for email in: " + text);
+        const match = text.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
+        if (match) return match[0];
+      } catch (err) {
+        console.warn(`❌ Failed to fetch or parse ${result.link}:`, err);
+      }
+    }
+
     return "";
-  } finally {
-    await page.close();
+  } catch (err) {
+    console.error("🔴 SerpAPI email lookup failed:", err);
+    return "";
   }
 }

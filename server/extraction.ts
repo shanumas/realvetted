@@ -1,10 +1,7 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 import { extractPropertyWithPuppeteer } from "./scrapers/puppeteer-direct-scraper";
-import {
-  getRealtorUrlFromAnyRealEstateUrl,
-  processPropertyWithSerpApi,
-} from "./scrapers/serpapi-extractor";
+import { getRealtorUrlFromAnyRealEstateUrl } from "./scrapers/serpapi-extractor";
 import _ from "lodash";
 
 /**
@@ -30,22 +27,22 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
   // Process each numeric field
   numericFields.forEach((field) => {
     const value = _.get(normalizedData, field);
-    
+
     // Handle empty values
     if (_.isEmpty(value) && !_.isNumber(value)) {
       _.set(normalizedData, field, null);
       return;
     }
-    
+
     // Skip if already a number
     if (_.isNumber(value)) {
       return;
     }
-    
+
     // Convert string values to numbers
     if (_.isString(value)) {
       let cleanedValue: string;
-      
+
       // Use specific cleaning pattern based on field type
       if (field === "price" || field === "squareFeet") {
         // For monetary or measurement values, keep decimal points but remove currency symbols, commas, etc.
@@ -60,7 +57,7 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
             const numerator = parseInt(fractionMatch[2]);
             const denominator = parseInt(fractionMatch[3]);
             if (denominator > 0) {
-              const result = whole + (numerator / denominator);
+              const result = whole + numerator / denominator;
               _.set(normalizedData, field, result);
               return;
             }
@@ -72,7 +69,7 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
           if (textMatch) {
             const whole = parseInt(textMatch[1]);
             const half = parseInt(textMatch[2]);
-            const result = whole + (half * 0.5);
+            const result = whole + half * 0.5;
             _.set(normalizedData, field, result);
             return;
           }
@@ -83,7 +80,7 @@ function normalizePropertyData(propertyData: PropertyAIData): PropertyAIData {
         // For integer values like bedrooms, etc.
         cleanedValue = value.replace(/[^0-9]/g, "");
       }
-      
+
       // Convert to number if it's a valid numeric string
       if (cleanedValue) {
         const numericValue = parseFloat(cleanedValue);
@@ -164,15 +161,27 @@ export async function extractPropertyFromUrl(
         );
 
         // Race the SerpAPI request against the timeout
-        const realtorUrl = await Promise.race([serpApiPromise, timeoutPromise]);
+        const propertyDetails = await Promise.race([
+          serpApiPromise,
+          timeoutPromise,
+        ]);
 
-        if (realtorUrl) {
-          console.log(`✅ Found Realtor.com equivalent URL: ${realtorUrl}`);
+        if (propertyDetails?.link) {
+          console.log(
+            `✅ Found Realtor.com equivalent URL: ${propertyDetails?.link}`,
+          );
+          console.log(
+            `✅ Property description: ${propertyDetails?.description}`,
+          );
           console.log(`Attempting extraction from Realtor.com URL instead...`);
 
           try {
             // Try to extract from Realtor.com URL
-            let propertyData = await extractPropertyWithPuppeteer(realtorUrl);
+            let propertyData = await extractPropertyWithPuppeteer(
+              url, //Original url
+              propertyDetails?.link,
+              propertyDetails?.description,
+            );
 
             // Normalize the data to ensure numeric fields are properly converted
             propertyData = normalizePropertyData(propertyData);
@@ -183,11 +192,6 @@ export async function extractPropertyFromUrl(
             // Add original URL as the source and include metadata
             return {
               ...propertyData,
-              propertyUrl: url, // Keep the original URL as the property source
-              _realtorUrl: realtorUrl, // Store the Realtor.com URL used
-              _extractionMethod: extractionMethod,
-              _extractionTimestamp: new Date().toISOString(),
-              _extractionSource: url,
             };
           } catch (realtorExtractionError) {
             console.error(
@@ -210,7 +214,10 @@ export async function extractPropertyFromUrl(
     // Step 2: Try direct extraction with Puppeteer (either on original URL or if SerpAPI failed)
     console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
     try {
-      let propertyData = await extractPropertyWithPuppeteer(url);
+      let propertyData = await extractPropertyWithPuppeteer(
+        url.split(":")[0],
+        url.split(":")[1],
+      );
 
       // Normalize the data to ensure numeric fields are properly converted
       propertyData = normalizePropertyData(propertyData);
