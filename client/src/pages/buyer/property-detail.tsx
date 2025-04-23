@@ -826,82 +826,14 @@ export default function BuyerPropertyDetail() {
                   <dl>
                     <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                       <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Home className="mr-2 h-4 w-4" /> Property type
+                        <Home className="mr-2 h-4 w-4" /> Address
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.propertyType || "Not specified"}
+                        {property.address}
                       </dd>
                     </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Tag className="mr-2 h-4 w-4" /> Price
-                      </dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.price
-                          ? `$${property.price.toLocaleString()}`
-                          : "Not specified"}
-                      </dd>
-                    </div>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Bed className="mr-2 h-4 w-4" /> Bedrooms
-                      </dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.bedrooms || "Not specified"}
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Bath className="mr-2 h-4 w-4" /> Bathrooms
-                      </dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.bathrooms || "Not specified"}
-                      </dd>
-                    </div>
-                    <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Square className="mr-2 h-4 w-4" /> Square footage
-                      </dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.squareFeet
-                          ? `${property.squareFeet.toLocaleString()} sqft`
-                          : "Not specified"}
-                      </dd>
-                    </div>
-                    <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                      <dt className="text-sm font-medium text-gray-500 flex items-center">
-                        <Calendar className="mr-2 h-4 w-4" /> Year built
-                      </dt>
-                      <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.yearBuilt || "Not specified"}
-                      </dd>
-                    </div>
-                    {property.description && (
-                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500 flex items-center">
-                          <FileText className="mr-2 h-4 w-4" /> Description
-                        </dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                          {property.description}
-                        </dd>
-                      </div>
-                    )}
-                    {property.features && property.features.length > 0 && (
-                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt className="text-sm font-medium text-gray-500 flex items-center">
-                          <ListTodo className="mr-2 h-4 w-4" /> Features
-                        </dt>
-                        <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                          <ul className="list-disc pl-5 space-y-1">
-                            {property.features.map((feature, index) => (
-                              <li key={index}>{feature}</li>
-                            ))}
-                          </ul>
-                        </dd>
-                      </div>
-                    )}
                     {property.propertyUrl && (
-                      <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                      <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                         <dt className="text-sm font-medium text-gray-500 flex items-center">
                           <Link className="mr-2 h-4 w-4" /> Original listing
                         </dt>
