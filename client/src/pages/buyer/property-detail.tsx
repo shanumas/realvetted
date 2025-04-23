@@ -600,21 +600,7 @@ export default function BuyerPropertyDetail() {
                           Viewings
                         </span>
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="activity"
-                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
-                      >
-                        <span className="flex items-center">
-                          <Activity className="mr-1 h-4 w-4" />
-                          Activity
-                        </span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="seller"
-                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
-                      >
-                        Seller Chat
-                      </TabsTrigger>
+
                       <TabsTrigger
                         value="agent"
                         className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
@@ -622,6 +608,15 @@ export default function BuyerPropertyDetail() {
                         Agent Chat
                       </TabsTrigger>
                     </TabsList>
+                    <TabsTrigger
+                      value="activity"
+                      className="data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                    >
+                      <span className="flex items-center">
+                        <Activity className="mr-1 h-4 w-4" />
+                        Activity
+                      </span>
+                    </TabsTrigger>
                   </div>
 
                   <TabsContent value="viewings">
@@ -734,25 +729,6 @@ export default function BuyerPropertyDetail() {
                         )}
                       </div>
                     </div>
-                  </TabsContent>
-
-                  <TabsContent value="seller">
-                    {property.sellerId ? (
-                      <ChatWindow
-                        propertyId={propertyId}
-                        receiverId={property.sellerId}
-                        receiverName={property.seller?.firstName || "Seller"}
-                        receiverDetails={property.seller || null}
-                      />
-                    ) : (
-                      <div className="p-4 text-center text-gray-500">
-                        <p>The seller hasn't joined the platform yet.</p>
-                        <p className="text-sm mt-1">
-                          Once they sign up, you'll be able to chat with them
-                          here.
-                        </p>
-                      </div>
-                    )}
                   </TabsContent>
 
                   <TabsContent value="agent">
