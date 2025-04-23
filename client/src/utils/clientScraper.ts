@@ -1,4 +1,4 @@
-import { PropertyAIData } from '../../shared/types';
+import type { PropertyAIData } from '../../../shared/types';
 
 /**
  * Client-side property data extractor

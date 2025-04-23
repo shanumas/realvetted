@@ -1882,6 +1882,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Find Realtor.com equivalent URL for a property URL (for client-side scraping)
+  app.post(
+    "/api/property/find-realtor-url",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const { originalUrl } = req.body;
+
+        if (!originalUrl || typeof originalUrl !== "string") {
+          return res.status(400).json({
+            success: false,
+            error: "Property URL is required"
+          });
+        }
+
+        console.log(`Finding Realtor.com URL for: ${originalUrl}`);
+        
+        // Use SerpAPI to find a Realtor.com equivalent URL
+        const realtorUrl = await getRealtorUrlFromAnyRealEstateUrl(originalUrl);
+        
+        if (realtorUrl) {
+          console.log(`✅ Found Realtor.com URL: ${realtorUrl}`);
+          return res.json({
+            success: true,
+            realtorUrl,
+            originalUrl
+          });
+        } else {
+          console.log(`⚠️ No Realtor.com URL found for: ${originalUrl}`);
+          return res.json({
+            success: false,
+            realtorUrl: null,
+            originalUrl,
+            error: "Could not find a Realtor.com equivalent URL"
+          });
+        }
+      } catch (error) {
+        console.error("Error finding Realtor.com URL:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to find Realtor.com URL",
+          originalUrl: req.body.originalUrl
+        });
+      }
+    }
+  );
+
   // Extract property details from a URL using web search (non-scraping approach)
   app.post(
     "/api/ai/extract-property-from-url",
@@ -1890,6 +1938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const { url } = req.body;
+        const { clientExtracted } = req.body; // Optional: data already extracted by the client
 
         if (!url || typeof url !== "string") {
           return res.status(400).json({
@@ -1898,6 +1947,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        // If client has already extracted data from Realtor.com, use that instead
+        // This avoids server-side scraping which gets blocked by Realtor.com
+        if (clientExtracted && url.includes("realtor.com")) {
+          console.log("Using client-side extracted data for Realtor.com URL");
+          
+          // Add server timestamp and source info
+          const resultWithMeta = {
+            ...clientExtracted,
+            _extractionTimestamp: new Date().toISOString(),
+            _extractionSource: url,
+            _extractionMethod: "client-side-scraping"
+          };
+          
+          return res.json(resultWithMeta);
+        }
+
+        // Otherwise use server-side extraction
+        console.log(`Server-side extraction for URL: ${url}`);
+        
         // Use enhanced extraction flow with SerpAPI integration
         // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
         // This approach bypasses blocking mechanisms on sites like Zillow
