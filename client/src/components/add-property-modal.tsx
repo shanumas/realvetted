@@ -200,38 +200,39 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
               </div>
               
               {/* Seller/Agent details */}
-              {(propertyData.sellerName || propertyData.sellerEmail || propertyData.sellerPhone) && (
+              {(propertyData.sellerName || propertyData.sellerEmail || propertyData.sellerPhone || 
+                propertyData.listingAgentName || propertyData.listingAgentEmail || propertyData.listingAgentPhone) && (
                 <div className="mt-4 pt-3 border-t border-gray-200">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Seller/Agent Information:</h5>
                   <div className="space-y-2 text-sm">
-                    {propertyData.sellerName && (
+                    {(propertyData.listingAgentName || propertyData.sellerName) && (
                       <div>
                         <span className="text-gray-500">Name:</span>
-                        <span className="font-medium"> {propertyData.sellerName}</span>
+                        <span className="font-medium"> {propertyData.listingAgentName || propertyData.sellerName}</span>
                       </div>
                     )}
-                    {propertyData.sellerCompany && (
+                    {(propertyData.listingAgentCompany || propertyData.sellerCompany) && (
                       <div>
                         <span className="text-gray-500">Company:</span>
-                        <span className="font-medium"> {propertyData.sellerCompany}</span>
+                        <span className="font-medium"> {propertyData.listingAgentCompany || propertyData.sellerCompany}</span>
                       </div>
                     )}
-                    {propertyData.sellerPhone && (
+                    {(propertyData.listingAgentPhone || propertyData.sellerPhone) && (
                       <div>
                         <span className="text-gray-500">Phone:</span>
-                        <span className="font-medium"> {propertyData.sellerPhone}</span>
+                        <span className="font-medium"> {propertyData.listingAgentPhone || propertyData.sellerPhone}</span>
                       </div>
                     )}
-                    {propertyData.sellerEmail && (
+                    {(propertyData.listingAgentEmail || propertyData.sellerEmail) && (
                       <div>
                         <span className="text-gray-500">Email:</span>
-                        <span className="font-medium"> {propertyData.sellerEmail}</span>
+                        <span className="font-medium"> {propertyData.listingAgentEmail || propertyData.sellerEmail}</span>
                       </div>
                     )}
-                    {propertyData.sellerLicenseNo && (
+                    {(propertyData.listingAgentLicenseNo || propertyData.sellerLicenseNo) && (
                       <div>
                         <span className="text-gray-500">License:</span>
-                        <span className="font-medium"> {propertyData.sellerLicenseNo}</span>
+                        <span className="font-medium"> {propertyData.listingAgentLicenseNo || propertyData.sellerLicenseNo}</span>
                       </div>
                     )}
                   </div>
