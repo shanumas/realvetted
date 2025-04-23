@@ -1,9 +1,9 @@
 import type { PropertyAIData } from "../../../shared/types";
 
 /**
- * Client-side property data extractor using a proxy approach
- * This function gets the HTML from the server and then parses it in the browser
- * This avoids CORS issues while still having the extraction logic run client-side
+ * Client-side property data extractor
+ * This function extracts property data directly from Realtor.com pages in the browser
+ * It avoids server-side scraping which gets rate-limited/blocked
  *
  * @param url The Realtor.com URL to extract data from
  * @returns Promise with the extracted property data
@@ -17,21 +17,26 @@ export async function extractPropertyFromRealtorUrl(
       throw new Error("This function only works with Realtor.com URLs");
     }
 
-    console.log("Getting HTML content from server proxy for:", url);
-    
-    // Use our server endpoint to get the HTML content
-    // This avoids CORS issues while still doing the parsing in the browser
-    const response = await fetch('/api/property/proxy-html', {
-      method: 'POST',
+    console.log("Extracting property data from Realtor.com URL: " + url);
+
+    // Create a fetch request with browser-like headers
+    const response = await fetch(url, {
       headers: {
-        'Content-Type': 'application/json'
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+        DNT: "1",
+        "Upgrade-Insecure-Requests": "1",
       },
-      body: JSON.stringify({ url })
     });
 
     if (!response.ok) {
       throw new Error(
-        `Failed to fetch Realtor.com page through proxy: ${response.status} ${response.statusText}`,
+        `Failed to fetch Realtor.com page: ${response.status} ${response.statusText}`,
       );
     }
 
