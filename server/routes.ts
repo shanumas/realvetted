@@ -4977,13 +4977,14 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
         // If the property has an agent, verify that the buyer has signed a BRBC with this agent
         if (property.agentId) {
-          // Check if there's a global BRBC agreement between the buyer and agent
+          // BRBC check removed - no longer required 
+          // Note: Keeping code commented for reference
+          /*
           const globalBrbc = await storage.getGlobalBRBCForBuyerAgent(
             req.user!.id,
             property.agentId,
           );
 
-          // If no global BRBC exists or it's not completed, return an error
           if (
             !globalBrbc ||
             (globalBrbc.status !== "completed" &&
@@ -4997,6 +4998,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               agentId: property.agentId,
             });
           }
+          */
         }
 
         // Allow multiple viewing requests from the same buyer
