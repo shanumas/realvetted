@@ -8,15 +8,20 @@
  *      and scrapes the first e‑mail address it finds
  */
 
-import puppeteer, { Browser, Page } from "puppeteer-core";
+import { Browser, Page } from "puppeteer-core";
 import * as cheerio from "cheerio";
 import { PropertyAIData } from "@shared/types";
+import _ from "lodash";
+import randomUseragent from "random-useragent";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
   url: string,
 ): Promise<PropertyAIData> {
-  const browser = await launchBrowser();
+  puppeteer.use(StealthPlugin());
+  const browser = await puppeteer.launch({ headless: true });
   try {
     /* --------------------------------------------------
      *  1)  scrape listing page with anti-detection measures
@@ -24,24 +29,30 @@ export async function extractPropertyWithPuppeteer(
     const listingPage = await browser.newPage();
 
     // Prepare the page with anti-bot measures
-    await prepPage(listingPage);
+    //await prepPage(listingPage);
+
+    const UAs = [
+      "Mozilla/5.0 … Chrome/125.0.0.0 Safari/537.36",
+      "Mozilla/5.0 … Edg/125.0.0.0",
+      "Mozilla/5.0 … Firefox/125.0",
+    ];
+    const UA = UAs[Math.floor(Math.random() * UAs.length)];
 
     await listingPage.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
     );
 
     // Navigate to the URL
-    await listingPage.goto(url, {
+    await listingPage.goto("https://www.realtor.com/...", {
       waitUntil: "domcontentloaded",
-      timeout: 30000,
     });
 
     // Wait for the content to load
-    await listingPage.waitForSelector("body", { timeout: 5000 });
+    //await listingPage.waitForSelector("body", { timeout: 5000 });
 
     // Extract the HTML content
-    const htmlContent = await listingPage.content();
-    const $ = cheerio.load(htmlContent);
+    const html = await listingPage.content();
+    const $ = cheerio.load(html);
     const bodyH = $("body").html()?.trim() ?? ""; // markup inside <body>
 
     console.log("2");
