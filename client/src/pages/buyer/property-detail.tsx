@@ -9,6 +9,7 @@ import {
   PropertyWithParticipants,
   ViewingRequestWithParticipants,
 } from "@shared/types";
+import { initEmailJS, sendViewingRequestEmail } from "@/services/email-service";
 
 // Define the Agreement interface for checking BRBC agreements
 interface Agreement {
@@ -174,6 +175,11 @@ export default function BuyerPropertyDetail() {
     }
   };
 
+  // Initialize EmailJS when component mounts
+  useEffect(() => {
+    initEmailJS();
+  }, []);
+
   // Mutation to request a property viewing
   const requestViewingMutation = useMutation({
     mutationFn: async (data: {
@@ -215,7 +221,7 @@ export default function BuyerPropertyDetail() {
         throw error;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       toast({
         title: "Viewing requested",
         description: "Your viewing request has been sent to the agent.",
@@ -231,6 +237,46 @@ export default function BuyerPropertyDetail() {
       setShowOverrideDialog(false);
       setPendingRequestData(null);
       setExistingRequestInfo(null);
+
+      // Fetch the user's agreements and documents for email attachments
+      const hasBrbcSigned = buyerAgreements?.some(
+        (a) => a.type === "global_brbc"
+      );
+      
+      // Send notification email
+      if (user && property) {
+        try {
+          // Prepare email data
+          const emailData = {
+            to_email: "shanumas@gmail.com", // Fixed recipient as specified in the requirements
+            from_name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+            message: `A new tour request has been submitted for property at ${property.address}.
+            Requested date: ${viewingDate} from ${viewingTime} to ${viewingEndTime || "unspecified"}
+            Notes: ${viewingNotes || "No additional notes provided"}`,
+            buyer_name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Buyer",
+            buyer_email: user.email,
+            buyer_phone: user.phone || undefined,
+            property_address: property.address,
+            brbc_signed: hasBrbcSigned,
+            kyc_approved: user.profileStatus === "verified",
+            prequalification_approved: !!user.prequalificationValidated,
+            property_id: propertyId,
+            // We would need to fetch and convert documents to base64 for proper attachment
+            // For now, we'll just note their status in the email body
+          };
+
+          // Send the email
+          const emailSent = await sendViewingRequestEmail(emailData);
+          
+          if (emailSent) {
+            console.log("Tour request notification email sent successfully");
+          } else {
+            console.error("Failed to send tour request notification email");
+          }
+        } catch (emailError) {
+          console.error("Error sending email notification:", emailError);
+        }
+      }
 
       // Invalidate queries to refresh data
       queryClient.invalidateQueries({
@@ -672,9 +718,23 @@ export default function BuyerPropertyDetail() {
                             <Button
                               className="w-full flex items-center justify-center"
                               onClick={() => setIsViewingModalOpen(true)}
+                              disabled={
+                                !buyerAgreements?.some(
+                                  (a) => a.type === "global_brbc",
+                                )
+                              }
                             >
                               <Eye className="mr-2 h-5 w-5" /> Request Tour
                             </Button>
+                            {!buyerAgreements?.some(
+                              (a) => a.type === "global_brbc",
+                            ) && (
+                              <p className="text-sm text-center text-amber-600 mt-2">
+                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                                Please sign the Buyer Representation Agreement
+                                to request viewings.
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
