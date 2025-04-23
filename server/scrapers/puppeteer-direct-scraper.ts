@@ -33,9 +33,16 @@ export async function extractPropertyWithPuppeteer(
       "Mozilla/5.0 … Edg/125.0.0.0",
       "Mozilla/5.0 … Firefox/125.0",
     ];
-    const UA = UAs[Math.floor(Math.random() * UAs.length)];
+    const UA =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"; //UAs[Math.floor(Math.random() * UAs.length)];
 
-    await listingPage.setUserAgent(randomUseragent.getRandom()); // each run → fresh, realistic desktop UA
+    await listingPage.setUserAgent(UA); // each run → fresh, realistic desktop UA
+
+    await listingPage.setViewport({ width: 1366, height: 768 });
+
+    await listingPage.goto(url, { waitUntil: "domcontentloaded" });
+    await new Promise((res) => setTimeout(res, 1000));
+    await listingPage.mouse.move(200, 300, { steps: 8 });
 
     // Navigate to the URL
     await listingPage.goto(url, {
