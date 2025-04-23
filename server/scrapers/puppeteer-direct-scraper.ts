@@ -21,7 +21,7 @@ export async function extractPropertyWithPuppeteer(
   url: string,
 ): Promise<PropertyAIData> {
   puppeteer.use(StealthPlugin());
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await launchBrowser(); // Use the launchBrowser function instead
   try {
     /* --------------------------------------------------
      *  1)  scrape listing page with anti-detection measures
@@ -43,7 +43,7 @@ export async function extractPropertyWithPuppeteer(
     );
 
     // Navigate to the URL
-    await listingPage.goto("https://www.realtor.com/...", {
+    await listingPage.goto(url, {
       waitUntil: "domcontentloaded",
     });
 
