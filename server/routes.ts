@@ -9,6 +9,7 @@ import {
   validatePrequalificationDocument,
 } from "./openai";
 import { extractPropertyFromUrl } from "./extraction";
+import { getRealtorUrlFromAnyRealEstateUrl } from "./scrapers/serpapi-extractor";
 import {
   sendTourRequestEmail,
   sendPrequalificationApprovalEmail,
