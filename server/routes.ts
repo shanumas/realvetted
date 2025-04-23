@@ -9,7 +9,6 @@ import {
   validatePrequalificationDocument,
 } from "./openai";
 import { extractPropertyFromUrl } from "./extraction";
-import { getRealtorUrlFromAnyRealEstateUrl } from "./scrapers/serpapi-extractor";
 import {
   sendTourRequestEmail,
   sendPrequalificationApprovalEmail,
@@ -1882,119 +1881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  // Find Realtor.com equivalent URL for a property URL (for client-side scraping)
-  app.post(
-    "/api/property/find-realtor-url",
-    isAuthenticated,
-    hasRole(["buyer"]),
-    async (req, res) => {
-      try {
-        const { originalUrl } = req.body;
-
-        if (!originalUrl || typeof originalUrl !== "string") {
-          return res.status(400).json({
-            success: false,
-            error: "Property URL is required"
-          });
-        }
-
-        console.log(`Finding Realtor.com URL for: ${originalUrl}`);
-        
-        // Use SerpAPI to find a Realtor.com equivalent URL
-        const realtorUrl = await getRealtorUrlFromAnyRealEstateUrl(originalUrl);
-        
-        if (realtorUrl) {
-          console.log(`✅ Found Realtor.com URL: ${realtorUrl}`);
-          return res.json({
-            success: true,
-            realtorUrl,
-            originalUrl
-          });
-        } else {
-          console.log(`⚠️ No Realtor.com URL found for: ${originalUrl}`);
-          return res.json({
-            success: false,
-            realtorUrl: null,
-            originalUrl,
-            error: "Could not find a Realtor.com equivalent URL"
-          });
-        }
-      } catch (error) {
-        console.error("Error finding Realtor.com URL:", error);
-        res.status(500).json({
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to find Realtor.com URL",
-          originalUrl: req.body.originalUrl
-        });
-      }
-    }
-  );
-  
-  // HTML Proxy endpoint - fetches HTML content server-side and returns it to the client
-  // This avoids CORS issues while still enabling client-side parsing
-  app.post(
-    "/api/property/proxy-html",
-    isAuthenticated,
-    hasRole(["buyer"]),
-    async (req, res) => {
-      try {
-        const { url } = req.body;
-        
-        if (!url || typeof url !== "string") {
-          return res.status(400).json({
-            success: false,
-            error: "URL is required"
-          });
-        }
-        
-        console.log(`Proxying HTML for URL: ${url}`);
-        
-        // Use node-fetch to get the HTML content server-side
-        const fetch = (await import('node-fetch')).default;
-        
-        // Generate a random user agent to avoid detection
-        const userAgents = [
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:94.0) Gecko/20100101 Firefox/94.0",
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
-        ];
-        const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
-        
-        // Create fetch options with browser-like headers
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': userAgent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'DNT': '1',
-            'Upgrade-Insecure-Requests': '1',
-          },
-          timeout: 15000, // 15 second timeout
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch HTML content: ${response.status} ${response.statusText}`);
-        }
-        
-        // Get the HTML content
-        const htmlContent = await response.text();
-        
-        // Send the HTML content back to the client
-        res.send(htmlContent);
-      } catch (error) {
-        console.error("HTML proxy error:", error);
-        res.status(500).json({
-          success: false,
-          error: error instanceof Error ? error.message : "Failed to proxy HTML content"
-        });
-      }
-    }
-  );
-
-  // Extract property details from a URL using a hybrid client-server approach
+  // Extract property details from a URL using web search (non-scraping approach)
   app.post(
     "/api/ai/extract-property-from-url",
     isAuthenticated,
@@ -2002,7 +1889,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const { url } = req.body;
-        const { clientExtracted } = req.body; // Optional: data already extracted by the client
 
         if (!url || typeof url !== "string") {
           return res.status(400).json({
@@ -2011,60 +1897,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // If client has already extracted data, use that as a starting point
-        // This is our preferred approach - client-side extraction avoids IP blocking
-        if (clientExtracted) {
-          console.log(`Using client-side extracted data with method: ${clientExtracted._extractionMethod || 'unknown'}`);
-          
-          // If this is direct client extraction from Realtor.com, trust it completely
-          if (clientExtracted._extractionMethod === 'client-side-direct' || 
-              (url.includes("realtor.com") && clientExtracted._extractionMethod === 'client-side-via-realtor')) {
-            // Add server timestamp and source info
-            const resultWithMeta = {
-              ...clientExtracted,
-              _extractionTimestamp: new Date().toISOString(),
-              _extractionSource: url,
-              _extractionMethod: clientExtracted._extractionMethod || "client-side-scraping"
-            };
-            return res.json(resultWithMeta);
-          }
-          
-          // If it's URL-based extraction or has partial data, try to augment with server data
-          // But respect the client-extracted data as much as possible
-          if (clientExtracted._extractionMethod === 'url-analysis') {
-            console.log('Augmenting URL-based client extraction with server data');
-            try {
-              // Use enhanced extraction with SerpAPI integration
-              const serverData = await extractPropertyFromUrl(url);
-              
-              // Merge, prioritizing server data but keeping client data as fallback
-              const mergedData = {
-                ...clientExtracted,     // Start with client-extracted data as base
-                ...serverData,          // Override with server data where available
-                // Keep original client extraction method info
-                _extractionSource: url,
-                _extractionTimestamp: new Date().toISOString(),
-                _extractionMethod: 'hybrid-client-server',
-                _clientMethod: clientExtracted._extractionMethod,
-                _serverMethod: 'serpapi-enhanced'
-              };
-              
-              return res.json(mergedData);
-            } catch (serverError) {
-              console.error('Server augmentation failed, using client-only data:', serverError);
-              // Return client data if server extraction fails
-              return res.json({
-                ...clientExtracted,
-                _extractionTimestamp: new Date().toISOString(),
-                _extractionSource: url
-              });
-            }
-          }
-        }
-        
-        // Fallback to server-side extraction if no client data available
-        console.log(`Falling back to server-side extraction for URL: ${url}`);
-        
         // Use enhanced extraction flow with SerpAPI integration
         // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
         // This approach bypasses blocking mechanisms on sites like Zillow
@@ -2074,8 +1906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const resultWithMeta = {
           ...propertyData,
           _extractionTimestamp: new Date().toISOString(),
-          _extractionSource: url,
-          _extractionMethod: 'server-side'
+          _extractionSource: url
         };
 
         res.json(resultWithMeta);

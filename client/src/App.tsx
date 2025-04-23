@@ -17,7 +17,6 @@ import SellerDashboard from "@/pages/seller/dashboard";
 import SellerPropertyDetail from "@/pages/seller/property-detail";
 import SellerPropertyView from "@/pages/seller/property-view";
 import AdminDashboard from "@/pages/admin/dashboard";
-import { PropertyScraperTestPage } from "./pages/PropertyScraperTest";
 import { Loader2 } from "lucide-react";
 
 function Router() {
@@ -43,9 +42,6 @@ function Router() {
       
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
-      
-      {/* Utility Routes (available to all authenticated users) */}
-      <ProtectedRoute path="/tools/property-scraper" component={PropertyScraperTestPage} allowedRoles={["buyer", "agent", "seller", "admin"]} />
       
       {/* Default route redirects to auth page */}
       <Route path="/" component={HomePage} />
