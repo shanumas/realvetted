@@ -1929,6 +1929,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+  
+  // HTML Proxy endpoint - fetches HTML content server-side and returns it to the client
+  // This avoids CORS issues while still enabling client-side parsing
+  app.post(
+    "/api/property/proxy-html",
+    isAuthenticated,
+    hasRole(["buyer"]),
+    async (req, res) => {
+      try {
+        const { url } = req.body;
+        
+        if (!url || typeof url !== "string") {
+          return res.status(400).json({
+            success: false,
+            error: "URL is required"
+          });
+        }
+        
+        console.log(`Proxying HTML for URL: ${url}`);
+        
+        // Use node-fetch to get the HTML content server-side
+        const fetch = (await import('node-fetch')).default;
+        
+        // Generate a random user agent to avoid detection
+        const userAgents = [
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:94.0) Gecko/20100101 Firefox/94.0",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15",
+        ];
+        const userAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+        
+        // Create fetch options with browser-like headers
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'DNT': '1',
+            'Upgrade-Insecure-Requests': '1',
+          },
+          timeout: 15000, // 15 second timeout
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch HTML content: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get the HTML content
+        const htmlContent = await response.text();
+        
+        // Send the HTML content back to the client
+        res.send(htmlContent);
+      } catch (error) {
+        console.error("HTML proxy error:", error);
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to proxy HTML content"
+        });
+      }
+    }
+  );
 
   // Extract property details from a URL using a hybrid client-server approach
   app.post(

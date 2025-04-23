@@ -1,0 +1,37 @@
+Access to fetch at 'https://www.realtor.com/realestateandhomes-detail/1033-Girard-St_San-Francisco_CA_94134_M12083-19254' from origin 'https://ddd843f4-6536-4617-bb66-f3e759ccaa96-00-37owsawm0tb7m.worf.replit.dev' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource. If an opaque response serves your needs, set the request's mode to 'no-cors' to fetch the resource with CORS disabled.Understand this error
+clientScraper.ts:21 
+            
+            
+           GET https://www.realtor.com/realestateandhomes-detail/1033-Girard-St_San-Francisco_CA_94134_M12083-19254 net::ERR_FAILED
+extractPropertyFromRealtorUrl @ clientScraper.ts:21
+extractPropertyFromAnyUrl @ clientScraper.ts:409
+await in extractPropertyFromAnyUrl
+extractPropertyFromUrl @ ai.ts:36
+await in extractPropertyFromUrl
+searchPropertyByUrl @ add-property-modal.tsx:49
+(anonymous) @ add-property-modal.tsx:117
+setTimeout
+(anonymous) @ add-property-modal.tsx:116
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=86c17965:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=86c17965:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=86c17965:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=86c17965:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=86c17965:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=86c17965:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=86c17965:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=86c17965:19416
+commitRoot @ chunk-RPCDYKBN.js?v=86c17965:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=86c17965:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=86c17965:9119
+flushSync @ chunk-RPCDYKBN.js?v=86c17965:18959
+finishEventHandler @ chunk-RPCDYKBN.js?v=86c17965:3569
+batchedUpdates @ chunk-RPCDYKBN.js?v=86c17965:3582
+dispatchEventForPluginEventSystem @ chunk-RPCDYKBN.js?v=86c17965:7173
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ chunk-RPCDYKBN.js?v=86c17965:5478
+dispatchEvent @ chunk-RPCDYKBN.js?v=86c17965:5472
+dispatchDiscreteEvent @ chunk-RPCDYKBN.js?v=86c17965:5449Understand this error
+clientScraper.ts:56 Client-side extraction error: TypeError: Failed to fetch
+    at extractPropertyFromRealtorUrl (clientScraper.ts:21:28)
+    at extractPropertyFromAnyUrl (clientScraper.ts:409:28)
+    at async extractPropertyFromUrl (ai.ts:36:26)
+    at async searchPropertyByUrl (add-property-modal.tsx:49:20)
