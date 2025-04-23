@@ -2,7 +2,7 @@ import emailjs from 'emailjs-com';
 
 // Initialize EmailJS with your user ID
 export const initEmailJS = () => {
-  const PUBLIC_KEY = import.meta.env.E_PUBLIC || '';
+  const PUBLIC_KEY = import.meta.env.VITE_E_PUBLIC || '';
   if (PUBLIC_KEY) {
     emailjs.init(PUBLIC_KEY);
   } else {
@@ -32,8 +32,8 @@ interface EmailParams {
  */
 export const sendViewingRequestEmail = async (params: EmailParams): Promise<boolean> => {
   try {
-    const PRIVATE_KEY = process.env.E_PRIVATE || '';
-    const TEMPLATE_ID = process.env.E_TEMPLATE || '';
+    const PRIVATE_KEY = import.meta.env.VITE_E_PRIVATE || '';
+    const TEMPLATE_ID = import.meta.env.VITE_E_TEMPLATE || '';
     
     if (!PRIVATE_KEY || !TEMPLATE_ID) {
       console.error('EmailJS credentials not found in environment variables');
