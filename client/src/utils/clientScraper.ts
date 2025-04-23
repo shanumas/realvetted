@@ -229,51 +229,162 @@ export async function findRealtorUrlFromOtherSite(url: string): Promise<string |
 }
 
 /**
+ * Extract property information directly from the URL structure
+ * This is a fallback method when we can't scrape the website directly
+ * Uses simple pattern matching to extract address, city, state, zip
+ * 
+ * @param url Property URL to analyze
+ * @returns Basic property data extracted from URL patterns
+ */
+export function extractFromUrlStructure(url: string): PropertyAIData {
+  const propertyData: PropertyAIData = {
+    address: 'Address unavailable',
+    propertyUrl: url,
+    _extractionMethod: 'url-analysis',
+    _extractionTimestamp: new Date().toISOString(),
+  };
+  
+  try {
+    // Remove protocol and www
+    const cleanUrl = url.replace(/^https?:\/\/(www\.)?/, '');
+    
+    // Extract domain
+    const domain = cleanUrl.split('/')[0];
+    propertyData.sourceSite = domain;
+    
+    // Different patterns for different sites
+    if (domain.includes('zillow.com')) {
+      // Example: zillow.com/homedetails/1234-Main-St-San-Francisco-CA-94117/123456_zpid/
+      const addressMatch = cleanUrl.match(/homedetails\/([^\/]+)/);
+      if (addressMatch && addressMatch[1]) {
+        const addressPart = addressMatch[1].replace(/-/g, ' ');
+        
+        // Try to extract city, state, zip
+        const cityStateMatch = addressPart.match(/([A-Za-z\s]+)\s([A-Z]{2})\s(\d{5})/);
+        if (cityStateMatch) {
+          propertyData.address = addressPart.replace(cityStateMatch[0], '').trim();
+          propertyData.city = cityStateMatch[1].trim();
+          propertyData.state = cityStateMatch[2];
+          propertyData.zip = cityStateMatch[3];
+        } else {
+          propertyData.address = addressPart;
+        }
+      }
+    } else if (domain.includes('redfin.com')) {
+      // Example: redfin.com/CA/San-Francisco/123-Main-St-94117/home/12345
+      const stateMatch = cleanUrl.match(/\/([A-Z]{2})\/([^\/]+)/);
+      if (stateMatch) {
+        propertyData.state = stateMatch[1];
+        
+        const cityStreetMatch = stateMatch[2].split('/');
+        if (cityStreetMatch.length >= 2) {
+          propertyData.city = cityStreetMatch[0].replace(/-/g, ' ');
+          
+          // Extract address and potentially zip
+          const streetZipMatch = cityStreetMatch[1].match(/(.+)-(\d{5})/);
+          if (streetZipMatch) {
+            propertyData.address = streetZipMatch[1].replace(/-/g, ' ');
+            propertyData.zip = streetZipMatch[2];
+          } else {
+            propertyData.address = cityStreetMatch[1].replace(/-/g, ' ');
+          }
+        }
+      }
+    } else if (domain.includes('realtor.com')) {
+      // Example: realtor.com/realestateandhomes-detail/123-Main-St_San-Francisco_CA_94117_M12345-67890
+      const detailMatch = cleanUrl.match(/detail\/([^\/]+)/);
+      if (detailMatch) {
+        const parts = detailMatch[1].split('_');
+        if (parts.length >= 4) {
+          propertyData.address = parts[0].replace(/-/g, ' ');
+          propertyData.city = parts[1].replace(/-/g, ' ');
+          propertyData.state = parts[2];
+          propertyData.zip = parts[3];
+        }
+      }
+    }
+    
+    // Make sure address is presentable
+    if (propertyData.address && propertyData.address !== 'Address unavailable') {
+      // Capitalize first letter of each word in address
+      propertyData.address = propertyData.address
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    if (propertyData.city) {
+      // Capitalize first letter of each word in city
+      propertyData.city = propertyData.city
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+    }
+    
+    return propertyData;
+  } catch (error) {
+    console.error('Error extracting from URL structure:', error);
+    return propertyData;
+  }
+}
+
+/**
  * Client-side property extraction for any real estate website
- * Uses a hybrid approach:
- * 1. For Realtor.com URLs: Extract directly from client
+ * Uses a hybrid approach that runs completely in the browser:
+ * 1. For Realtor.com URLs: Extract directly using DOM parsing
  * 2. For other sites: First try to find a Realtor.com equivalent URL, then extract
- * 3. If #2 fails, fall back to server-side extraction
+ * 3. If #2 fails, extract what we can from the URL structure
+ * 
+ * This approach avoids server-side scraping completely to prevent IP blocking
  * 
  * @param url Any real estate property URL
  * @returns The extracted property data
  */
 export async function extractPropertyFromAnyUrl(url: string): Promise<PropertyAIData> {
   try {
+    console.log('Extracting property data from URL:', url);
+    
     // If it's already a Realtor.com URL, extract directly
     if (url.includes('realtor.com')) {
+      console.log('Direct client extraction for Realtor.com URL');
       return await extractPropertyFromRealtorUrl(url);
     }
     
     // For other sites, try to find a Realtor.com equivalent first
+    console.log('Finding Realtor.com equivalent URL...');
     const realtorUrl = await findRealtorUrlFromOtherSite(url);
     
     if (realtorUrl) {
+      console.log('Found Realtor.com equivalent:', realtorUrl);
       // We found a Realtor.com URL, extract from it
-      const data = await extractPropertyFromRealtorUrl(realtorUrl);
-      return {
-        ...data,
-        propertyUrl: url, // Keep original URL as source
-        _realtorUrl: realtorUrl, // Store the Realtor URL we used
-        _extractionMethod: 'client-side-via-realtor',
-      };
+      try {
+        const data = await extractPropertyFromRealtorUrl(realtorUrl);
+        return {
+          ...data,
+          sourceUrl: url, // Original URL entered by the user
+          propertyUrl: realtorUrl, // The URL we extracted from
+          _realtorUrl: realtorUrl, // Store the Realtor URL we used
+          _extractionMethod: 'client-side-via-realtor',
+        };
+      } catch (realtorError) {
+        console.error('Failed to extract from Realtor.com equivalent:', realtorError);
+        // If Realtor.com extraction fails, fall back to URL analysis
+      }
+    } else {
+      console.log('No Realtor.com equivalent found. Using URL analysis fallback.');
     }
     
-    // If we couldn't find a Realtor.com URL, fall back to server-side extraction
-    // This takes longer but should work for any URL
-    const response = await fetch('/api/ai/extract-property-from-url', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ url }),
-    });
+    // Last resort: Try to extract information from the URL itself
+    // This won't have detailed information, but can provide basic address data
+    console.log('Falling back to URL structure analysis');
+    const urlBasedData = extractFromUrlStructure(url);
     
-    if (!response.ok) {
-      throw new Error(`Server extraction failed: ${response.status} ${response.statusText}`);
-    }
-    
-    return await response.json();
+    return {
+      ...urlBasedData,
+      sourceUrl: url,
+      _extractionMethod: 'url-analysis',
+      _extractionSource: 'Limited data extracted from URL structure. No Realtor.com equivalent found or extraction failed.',
+    };
   } catch (error) {
     console.error('Property extraction error:', error);
     

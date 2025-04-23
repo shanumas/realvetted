@@ -5,6 +5,10 @@ import type { PropertyAIData } from '../../../shared/types';
 /**
  * Property Scraper Test Page
  * Demonstrates client-side scraping of property data from real estate websites
+ * This approach avoids server-side scraping which gets blocked by Realtor.com
+ * 
+ * The entire extraction happens in the browser - we only use the server to
+ * find Realtor.com equivalent URLs via SerpAPI.
  */
 export function PropertyScraperTestPage() {
   const [propertyData, setPropertyData] = useState<PropertyAIData | null>(null);
@@ -32,8 +36,11 @@ export function PropertyScraperTestPage() {
         <p className="mb-2">
           <strong>Client-side Scraping:</strong> For Realtor.com URLs, data is extracted directly in your browser to avoid IP-based blocking.
         </p>
+        <p className="mb-2">
+          <strong>Realtor.com Conversion:</strong> For other sites like Zillow, we use SerpAPI on the server to find the Realtor.com equivalent, then extract that in the browser.
+        </p>
         <p>
-          <strong>Server-side Fallback:</strong> For other sites, we first try to find a Realtor.com equivalent, then fall back to server-side extraction if needed.
+          <strong>URL Analysis Fallback:</strong> If we can't find a Realtor.com equivalent, we extract basic address information from the URL structure itself.
         </p>
       </div>
       
@@ -111,7 +118,7 @@ export function PropertyScraperTestPage() {
                 document.getElementById('property-url')?.dispatchEvent(event);
               }}
             >
-              Redfin (server-side fallback if needed)
+              Redfin (URL-structure fallback extraction)
             </a>
           </li>
         </ul>

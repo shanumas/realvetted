@@ -84,7 +84,7 @@ export async function extractPropertyWithPuppeteer(
       }
     }
 
-    console.log("3:" + bodyH);
+    console.log("3 BOdy:" + bodyH);
 
     const data: PropertyAIData = {
       address: addressText || "Address unavailable",
