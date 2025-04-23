@@ -1,5 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +32,11 @@ interface AddPropertyModalProps {
   onSuccess: () => void;
 }
 
-export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModalProps) {
+export function AddPropertyModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: AddPropertyModalProps) {
   const { toast } = useToast();
   const [propertyData, setPropertyData] = useState<PropertyAIData | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -42,13 +53,13 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
   // Extract property data from URL
   const searchPropertyByUrl = async (url: string) => {
     if (!url || isSearching) return;
-    
+
     setIsSearching(true);
     try {
       // Use our client function to extract property details from URL
       const data = await extractPropertyFromUrl(url);
       setPropertyData(data);
-      
+
       toast({
         title: "Property found",
         description: "Successfully extracted data from the listing URL.",
@@ -56,7 +67,10 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
     } catch (error) {
       toast({
         title: "URL scraping failed",
-        description: error instanceof Error ? error.message : "Failed to extract property data from URL",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to extract property data from URL",
         variant: "destructive",
       });
     } finally {
@@ -80,45 +94,52 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
     onError: (error) => {
       toast({
         title: "Failed to add property",
-        description: error instanceof Error ? error.message : "Something went wrong",
+        description:
+          error instanceof Error ? error.message : "Something went wrong",
         variant: "destructive",
       });
     },
   });
 
-  const onSearchUrlSubmit = urlForm.handleSubmit((values: PropertyUrlFormValues) => {
-    searchPropertyByUrl(values.url);
-  });
+  const onSearchUrlSubmit = urlForm.handleSubmit(
+    (values: PropertyUrlFormValues) => {
+      searchPropertyByUrl(values.url);
+    },
+  );
 
   const handleAddProperty = () => {
     if (propertyData) {
       addPropertyMutation.mutate(propertyData);
     }
   };
-  
+
   // Watch for URL changes and auto-search
   const urlValue = useWatch({
     control: urlForm.control,
     name: "url",
   });
-  
+
   // Auto-search effect that triggers when URL field changes
   useEffect(() => {
     // Only proceed if there's a valid URL
-    if (!urlValue || typeof urlValue !== 'string' || urlForm.formState.errors.url) {
+    if (
+      !urlValue ||
+      typeof urlValue !== "string" ||
+      urlForm.formState.errors.url
+    ) {
       return; // Skip if URL is invalid
     }
-    
+
     // Don't search for very short URLs (still being typed)
     if (urlValue.length < 10) return;
-    
+
     // Add delay to prevent searching on every keystroke
     const timer = setTimeout(() => {
       searchPropertyByUrl(urlValue);
     }, 500);
-    
+
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlValue, urlForm.formState.errors.url]);
 
   return (
@@ -130,7 +151,7 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
             Add a property by providing a listing URL.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={onSearchUrlSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="property-url">Property Listing URL</Label>
@@ -141,34 +162,38 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
                 {...urlForm.register("url")}
               />
               <Button type="submit" disabled={isSearching} className="shrink-0">
-                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LinkIcon className="h-4 w-4" />
+                )}
               </Button>
             </div>
             {urlForm.formState.errors.url && (
-              <p className="text-sm text-red-500">{urlForm.formState.errors.url.message}</p>
+              <p className="text-sm text-red-500">
+                {urlForm.formState.errors.url.message}
+              </p>
             )}
             <p className="text-xs text-muted-foreground mt-1">
               Supported sites: Zillow, Redfin, Realtor.com, etc.
             </p>
           </div>
         </form>
-          
+
         {/* AI Found Property Details */}
         {propertyData && (
           <div className="mt-4">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">AI Found Property Details:</h4>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">
+              AI Found Property Details:
+            </h4>
             <div className="bg-gray-50 p-3 rounded-md">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-gray-500">Price:</span>
                   <span className="font-medium">
-                    {propertyData.price ? `$${propertyData.price.toLocaleString()}` : "Unknown"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Type:</span>
-                  <span className="font-medium">
-                    {propertyData.propertyType || "Unknown"}
+                    {propertyData.price
+                      ? `$${propertyData.price.toLocaleString()}`
+                      : "Unknown"}
                   </span>
                 </div>
                 <div>
@@ -184,55 +209,65 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Size:</span>
-                  <span className="font-medium">
-                    {propertyData.squareFeet ? `${propertyData.squareFeet.toLocaleString()} sqft` : "Unknown"}
-                  </span>
-                </div>
-                <div>
                   <span className="text-gray-500">Location:</span>
                   <span className="font-medium">
-                    {propertyData.city && propertyData.state 
-                      ? `${propertyData.city}, ${propertyData.state}` 
-                      : "Unknown"}
+                    {propertyData.address ? `` : "Unknown"}
                   </span>
                 </div>
               </div>
-              
+
               {/* Seller/Agent details */}
-              {(propertyData.sellerName || propertyData.sellerEmail || propertyData.sellerPhone || 
-                propertyData.listingAgentName || propertyData.listingAgentEmail || propertyData.listingAgentPhone) && (
+              {(propertyData.listingAgentName ||
+                propertyData.listingAgentEmail ||
+                propertyData.listingAgentPhone) && (
                 <div className="mt-4 pt-3 border-t border-gray-200">
-                  <h5 className="text-sm font-medium text-gray-700 mb-2">Seller/Agent Information:</h5>
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">
+                    Seller/Agent Information:
+                  </h5>
                   <div className="space-y-2 text-sm">
-                    {(propertyData.listingAgentName || propertyData.sellerName) && (
+                    {propertyData.listingAgentName && (
                       <div>
                         <span className="text-gray-500">Name:</span>
-                        <span className="font-medium"> {propertyData.listingAgentName || propertyData.sellerName}</span>
+                        <span className="font-medium">
+                          {" "}
+                          {propertyData.listingAgentName}
+                        </span>
                       </div>
                     )}
-                    {(propertyData.listingAgentCompany || propertyData.sellerCompany) && (
+                    {propertyData.listingAgentCompany && (
                       <div>
                         <span className="text-gray-500">Company:</span>
-                        <span className="font-medium"> {propertyData.listingAgentCompany || propertyData.sellerCompany}</span>
+                        <span className="font-medium">
+                          {" "}
+                          {propertyData.listingAgentCompany}
+                        </span>
                       </div>
                     )}
-                    {(propertyData.listingAgentPhone || propertyData.sellerPhone) && (
+                    {propertyData.listingAgentPhone && (
                       <div>
                         <span className="text-gray-500">Phone:</span>
-                        <span className="font-medium"> {propertyData.listingAgentPhone || propertyData.sellerPhone}</span>
+                        <span className="font-medium">
+                          {" "}
+                          {propertyData.listingAgentPhone}
+                        </span>
                       </div>
                     )}
-                    {(propertyData.listingAgentEmail || propertyData.sellerEmail) && (
+                    {propertyData.listingAgentEmail && (
                       <div>
                         <span className="text-gray-500">Email:</span>
-                        <span className="font-medium"> {propertyData.listingAgentEmail || propertyData.sellerEmail}</span>
+                        <span className="font-medium">
+                          {" "}
+                          {propertyData.listingAgentEmail}
+                        </span>
                       </div>
                     )}
-                    {(propertyData.listingAgentLicenseNo || propertyData.sellerLicenseNo) && (
+                    {propertyData.listingAgentLicenseNo && (
                       <div>
                         <span className="text-gray-500">License:</span>
-                        <span className="font-medium"> {propertyData.listingAgentLicenseNo || propertyData.sellerLicenseNo}</span>
+                        <span className="font-medium">
+                          {" "}
+                          {propertyData.listingAgentLicenseNo}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -241,13 +276,9 @@ export function AddPropertyModal({ isOpen, onClose, onSuccess }: AddPropertyModa
             </div>
           </div>
         )}
-        
+
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onClose}
-          >
+          <Button type="button" variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
