@@ -207,6 +207,7 @@ export default function BuyerPropertyDetail() {
           : undefined,
         notes: data.notes,
         override: data.override || false,
+        listingAgentEmail: data.listingAgentEmail, // Include agent email if available
       };
 
       console.log("Sending viewing request payload:", payload);
@@ -240,20 +241,24 @@ export default function BuyerPropertyDetail() {
 
       // Fetch the user's agreements and documents for email attachments
       const hasBrbcSigned = buyerAgreements?.some(
-        (a) => a.type === "global_brbc"
+        (a) => a.type === "global_brbc",
       );
-      
+
       // Send notification email
       if (user && property) {
         try {
           // Prepare email data
           const emailData = {
             to_email: "shanumas@gmail.com", // Fixed recipient as specified in the requirements
-            from_name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.email,
+            from_name:
+              `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+              user.email,
             message: `A new tour request has been submitted for property at ${property.address}.
             Requested date: ${viewingDate} from ${viewingTime} to ${viewingEndTime || "unspecified"}
             Notes: ${viewingNotes || "No additional notes provided"}`,
-            buyer_name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Buyer",
+            buyer_name:
+              `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+              "Buyer",
             buyer_email: user.email,
             buyer_phone: user.phone || undefined,
             property_address: property.address,
@@ -267,7 +272,7 @@ export default function BuyerPropertyDetail() {
 
           // Send the email
           const emailSent = await sendViewingRequestEmail(emailData);
-          
+
           if (emailSent) {
             console.log("Tour request notification email sent successfully");
           } else {

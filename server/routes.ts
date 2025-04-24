@@ -1901,12 +1901,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
         // This approach bypasses blocking mechanisms on sites like Zillow
         const propertyData = await extractPropertyFromUrl(url);
-        
+
         // Add timestamp and source information
         const resultWithMeta = {
           ...propertyData,
           _extractionTimestamp: new Date().toISOString(),
-          _extractionSource: url
+          _extractionSource: url,
         };
 
         res.json(resultWithMeta);
@@ -1936,20 +1936,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      console.log(`Test endpoint: Extracting property from URL: ${url} (timeout: ${timeoutSeconds}s)`);
-      
+      console.log(
+        `Test endpoint: Extracting property from URL: ${url} (timeout: ${timeoutSeconds}s)`,
+      );
+
       // Create a timeout promise to prevent hanging extraction attempts
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
-          reject(new Error(`Property extraction timed out after ${timeoutSeconds} seconds`));
+          reject(
+            new Error(
+              `Property extraction timed out after ${timeoutSeconds} seconds`,
+            ),
+          );
         }, timeoutSeconds * 1000);
       });
-      
+
       // Race between the actual extraction and the timeout
       // Race between the enhanced extraction (with SerpAPI) and the timeout
       const propertyData = await Promise.race([
         extractPropertyFromUrl(url),
-        timeoutPromise
+        timeoutPromise,
       ]);
 
       // Add extraction metadata to the result data
@@ -1957,34 +1963,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...propertyData,
         _extractionSource: url,
         _extractionTimestamp: new Date().toISOString(),
-        _extractionMethod: propertyData._realtorUrl ? 'serpapi+direct' : 'direct'
+        _extractionMethod: propertyData._realtorUrl
+          ? "serpapi+direct"
+          : "direct",
       };
 
       res.json(resultWithSource);
     } catch (error) {
       console.error("Property URL extraction error:", error);
-      
+
       // Determine specific error type for better client-side handling
       let errorType = "EXTRACTION_ERROR";
       let statusCode = 500;
-      
+
       if (error instanceof Error) {
         if (error.message.includes("timed out")) {
           errorType = "TIMEOUT_ERROR";
           statusCode = 408; // Request Timeout
-        } else if (error.message.includes("CAPTCHA") || error.message.includes("detected as a bot")) {
+        } else if (
+          error.message.includes("CAPTCHA") ||
+          error.message.includes("detected as a bot")
+        ) {
           errorType = "CAPTCHA_ERROR";
           statusCode = 403; // Forbidden
-        } else if (error.message.includes("Invalid URL") || error.message.includes("URL is required")) {
+        } else if (
+          error.message.includes("Invalid URL") ||
+          error.message.includes("URL is required")
+        ) {
           errorType = "INVALID_URL_ERROR";
           statusCode = 400; // Bad Request
         }
       }
-      
+
       res.status(statusCode).json({
         success: false,
-        error: error instanceof Error ? error.message : "Failed to extract property data from URL",
-        errorType: errorType
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to extract property data from URL",
+        errorType: errorType,
       });
     }
   });
@@ -4977,7 +4994,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
         // If the property has an agent, verify that the buyer has signed a BRBC with this agent
         if (property.agentId) {
-          // BRBC check removed - no longer required 
+          // BRBC check removed - no longer required
           // Note: Keeping code commented for reference
           /*
           const globalBrbc = await storage.getGlobalBRBCForBuyerAgent(
@@ -5126,6 +5143,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           // Determine the listing agent's email
           const listingAgentEmail =
             property.listingAgentEmail || property.sellerEmail;
+
+          console.log(
+            "------------------Listing agent email:",
+            JSON.stringify(property),
+          );
 
           if (buyer && listingAgentEmail) {
             // Send the email notification

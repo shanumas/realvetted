@@ -1,12 +1,12 @@
-import emailjs from 'emailjs-com';
+import emailjs from "emailjs-com";
 
 // Initialize EmailJS with your user ID
 export const initEmailJS = () => {
-  const PUBLIC_KEY = import.meta.env.VITE_E_PUBLIC || '';
+  const PUBLIC_KEY = import.meta.env.VITE_E_PUBLIC || "";
   if (PUBLIC_KEY) {
     emailjs.init(PUBLIC_KEY);
   } else {
-    console.error('EmailJS public key not found in environment variables');
+    console.error("EmailJS public key not found in environment variables");
   }
 };
 
@@ -30,13 +30,17 @@ interface EmailParams {
 /**
  * Send viewing request notification email via EmailJS
  */
-export const sendViewingRequestEmail = async (params: EmailParams): Promise<boolean> => {
+export const sendViewingRequestEmail = async (
+  params: EmailParams,
+): Promise<boolean> => {
   try {
-    const PRIVATE_KEY = import.meta.env.VITE_E_PRIVATE || '';
-    const TEMPLATE_ID = import.meta.env.VITE_E_TEMPLATE || '';
-    
+    const PRIVATE_KEY = import.meta.env.VITE_E_PRIVATE || "";
+    const TEMPLATE_ID = import.meta.env.VITE_E_TEMPLATE || "";
+
+    console.error("Sending email with params:" + params);
+
     if (!PRIVATE_KEY || !TEMPLATE_ID) {
-      console.error('EmailJS credentials not found in environment variables');
+      console.error("EmailJS credentials not found in environment variables");
       return false;
     }
 
@@ -44,35 +48,35 @@ export const sendViewingRequestEmail = async (params: EmailParams): Promise<bool
     let messageContent = `
       Buyer Name: ${params.buyer_name}
       Buyer Email: ${params.buyer_email}
-      ${params.buyer_phone ? `Buyer Phone: ${params.buyer_phone}` : ''}
+      ${params.buyer_phone ? `Buyer Phone: ${params.buyer_phone}` : ""}
       Property: ${params.property_address} (ID: ${params.property_id})
       
       Status Information:
-      - BRBC Signed: ${params.brbc_signed ? 'Yes' : 'No'}
-      - KYC Verification: ${params.kyc_approved ? 'Approved' : 'Not Approved'}
-      - Pre-qualification: ${params.prequalification_approved ? 'Approved' : 'Not Approved'}
+      - BRBC Signed: ${params.brbc_signed ? "Yes" : "No"}
+      - KYC Verification: ${params.kyc_approved ? "Approved" : "Not Approved"}
+      - Pre-qualification: ${params.prequalification_approved ? "Approved" : "Not Approved"}
       
       ${params.message}
     `;
 
     // Send the email
     const response = await emailjs.send(
-      'default_service', // Service ID - default for EmailJS
+      "default_service", // Service ID - default for EmailJS
       TEMPLATE_ID,
       {
         to_email: params.to_email,
         from_name: params.from_name,
         message: messageContent,
-        brbc_document: params.brbc_document || '',
-        prequalification_document: params.prequalification_document || '',
+        brbc_document: params.brbc_document || "",
+        prequalification_document: params.prequalification_document || "",
       },
-      PRIVATE_KEY
+      PRIVATE_KEY,
     );
 
-    console.log('Email sent successfully:', response);
+    console.log("Email sent successfully:", response);
     return true;
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error("Failed to send email:", error);
     return false;
   }
 };
