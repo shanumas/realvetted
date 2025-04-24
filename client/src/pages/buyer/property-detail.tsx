@@ -400,6 +400,7 @@ export default function BuyerPropertyDetail() {
       time: viewingTime,
       endTime: viewingEndTime,
       notes: viewingNotes,
+      listingAgentEmail: property.listingAgentEmail
     };
 
     setViewingRequestData(requestData);
