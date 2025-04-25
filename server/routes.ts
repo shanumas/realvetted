@@ -2009,6 +2009,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email outbox routes
+  app.get(
+    "/api/emails",
+    isAuthenticated,
+    hasRole(["admin", "agent"]),
+    async (req, res) => {
+      try {
+        const emails = await getAllEmails();
+        res.json({
+          success: true,
+          data: emails,
+        });
+      } catch (error) {
+        console.error("Error fetching emails:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch emails",
+        });
+      }
+    }
+  );
+
+  app.get(
+    "/api/emails/user/:userId",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const userId = parseInt(req.params.userId);
+        
+        // Only allow users to access their own emails unless they're an admin
+        if (req.user?.id !== userId && req.user?.role !== "admin") {
+          return res.status(403).json({
+            success: false,
+            error: "Unauthorized access to user emails",
+          });
+        }
+        
+        const emails = await getSentEmailsForUser(userId);
+        res.json({
+          success: true,
+          data: emails,
+        });
+      } catch (error) {
+        console.error("Error fetching user emails:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch user emails",
+        });
+      }
+    }
+  );
+
+  app.get(
+    "/api/emails/entity/:type/:id",
+    isAuthenticated,
+    async (req, res) => {
+      try {
+        const { type, id } = req.params;
+        const entityId = parseInt(id);
+        
+        // Validate entity type
+        if (!["viewing_request", "property", "agreement"].includes(type)) {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid entity type",
+          });
+        }
+        
+        const emails = await getSentEmailsForEntity(
+          type as "viewing_request" | "property" | "agreement",
+          entityId
+        );
+        
+        res.json({
+          success: true,
+          data: emails,
+        });
+      } catch (error) {
+        console.error("Error fetching entity emails:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch entity emails",
+        });
+      }
+    }
+  );
+
   // Web-based test endpoint for property extraction
   app.get("/api/test/property-extractor", (req, res) => {
     res.send(`

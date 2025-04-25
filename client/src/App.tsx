@@ -34,6 +34,7 @@ function Router() {
       <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/dashboard" component={AgentDashboard} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/property/:id" component={AgentPropertyDetail} allowedRoles={["agent"]} />
+      <ProtectedRoute path="/agent/email-outbox" component={() => import('@/pages/agent/email-outbox').then(module => ({ default: module.default }))} allowedRoles={["agent"]} />
       
       {/* Seller Routes */}
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} allowedRoles={["seller"]} />
@@ -42,6 +43,7 @@ function Router() {
       
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
+      <ProtectedRoute path="/admin/email-outbox" component={() => import('@/pages/admin/email-outbox').then(module => ({ default: module.default }))} allowedRoles={["admin"]} />
       
       {/* Default route redirects to auth page */}
       <Route path="/" component={HomePage} />
