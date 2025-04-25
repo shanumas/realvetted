@@ -134,16 +134,8 @@ ${body}
 ======= END EMAIL =======
   `);
 
-  // Get the keys for EmailJS
-  const PRIVATE_KEY = process.env.E_PRIVATE || "";
-  const PUBLIC_KEY = process.env.E_PUBLIC || "";
-  if (!PRIVATE_KEY) {
-    console.error("EmailJS private key not found in environment variables");
-  }
-  if (!PUBLIC_KEY) {
-    console.error("EmailJS public key not found in environment variables");
-  }
-
+  // EmailJS is already initialized with keys at the top of the file
+  
   try {
     // Prepare the message content
     const messageContent = body;
@@ -398,15 +390,7 @@ ${body}
 ======= END EMAIL =======
   `);
 
-  // Get the keys for EmailJS
-  const PRIVATE_KEY = process.env.E_PRIVATE || "";
-  const PUBLIC_KEY = process.env.E_PUBLIC || "";
-  if (!PRIVATE_KEY) {
-    console.error("EmailJS private key not found in environment variables");
-  }
-  if (!PUBLIC_KEY) {
-    console.error("EmailJS public key not found in environment variables");
-  }
+  // EmailJS is already initialized with keys at the top of the file
 
   try {
     // Prepare the message content for EmailJS
@@ -424,10 +408,6 @@ ${body}
         message: messageContent,
         brbc_document: "", // Not applicable for prequalification requests
         prequalification_document: prequalificationDocUrl || "",
-      },
-      {
-        publicKey: PUBLIC_KEY,
-        privateKey: PRIVATE_KEY,
       }
     );
 
