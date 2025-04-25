@@ -88,7 +88,7 @@ export function EmailList({ emails, isLoading }: EmailListProps) {
                     )}
                   </TableCell>
                   <TableCell className="text-gray-500 text-sm">
-                    {formatDistanceToNow(new Date(email.timestamp), { addSuffix: true })}
+                    {formatDistanceToNow(new Date(email.timestamp || new Date()), { addSuffix: true })}
                   </TableCell>
                   <TableCell className="font-medium">{email.subject}</TableCell>
                   <TableCell className="text-sm">
@@ -119,7 +119,7 @@ export function EmailList({ emails, isLoading }: EmailListProps) {
             <DialogTitle>{selectedEmail?.subject}</DialogTitle>
             <DialogDescription>
               {selectedEmail?.timestamp && 
-                formatDistanceToNow(new Date(selectedEmail.timestamp), { addSuffix: true })}
+                formatDistanceToNow(new Date(selectedEmail.timestamp || new Date()), { addSuffix: true })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

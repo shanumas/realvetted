@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Bell, Home, User, LogOut, Menu, X, Activity } from "lucide-react";
+import { Bell, Home, User, LogOut, Menu, X, Activity, Mail } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function SiteHeader() {
@@ -28,6 +28,7 @@ export function SiteHeader() {
         { href: "/agent/dashboard", label: "Dashboard", active: location === "/agent/dashboard" },
         { href: "#", label: "My Clients", active: false },
         { href: "#", label: "Available Leads", active: location.includes("leads") },
+        { href: "/agent/email-outbox", label: "Email Outbox", active: location.includes("email-outbox") },
       ];
     } else if (user?.role === "seller") {
       return [
@@ -40,6 +41,7 @@ export function SiteHeader() {
         { href: "/admin/dashboard", label: "Dashboard", active: location === "/admin/dashboard" },
         { href: "#", label: "Users", active: location.includes("users") },
         { href: "#", label: "Properties", active: location.includes("properties") },
+        { href: "/admin/email-outbox", label: "Email Outbox", active: location.includes("email-outbox") },
       ];
     }
     return [];
@@ -153,6 +155,16 @@ export function SiteHeader() {
                 </div>
                 
                 <div className="py-1 border-t border-gray-100">
+                  {(user?.role === "admin" || user?.role === "agent") && (
+                    <DropdownMenuItem asChild>
+                      <Link href={`/${user?.role}/email-outbox`}>
+                        <div className="flex items-center cursor-pointer w-full text-gray-700">
+                          <Mail className="mr-2 h-4 w-4" />
+                          <span>Email Outbox</span>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem asChild>
                     <Link href="#">
                       <div className="flex items-center cursor-pointer w-full text-gray-700">
@@ -236,6 +248,16 @@ export function SiteHeader() {
                           My Profile
                         </a>
                       </Link>
+                      
+                      {(user?.role === "admin" || user?.role === "agent") && (
+                        <Link href={`/${user?.role}/email-outbox`}>
+                          <a className="text-gray-700 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-4 py-2 text-sm rounded-md transition-colors duration-150"
+                            onClick={() => setMobileNavOpen(false)}>
+                            <Mail className="mr-2 h-4 w-4" />
+                            Email Outbox
+                          </a>
+                        </Link>
+                      )}
                       
                       <Link href="#">
                         <a className="text-gray-700 hover:bg-gray-50 hover:text-gray-900 group flex items-center px-4 py-2 text-sm rounded-md transition-colors duration-150"
