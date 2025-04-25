@@ -69,6 +69,7 @@ export interface IStorage {
   getEmail(id: number): Promise<Email | undefined>;
   getAllEmails(): Promise<Email[]>;
   getEmailsByUser(userId: number): Promise<Email[]>;
+  getEmailsByRole(role: string): Promise<Email[]>;
   getEmailsByRelatedEntity(
     entityType: string,
     entityId: number
@@ -1305,6 +1306,15 @@ export class PgStorage implements IStorage {
       .select()
       .from(emails)
       .where(eq(emails.sentById, userId))
+      .orderBy(desc(emails.timestamp));
+  }
+  
+  // Get emails sent by a specific role (e.g., all buyer emails)
+  async getEmailsByRole(role: string): Promise<Email[]> {
+    return await this.db
+      .select()
+      .from(emails)
+      .where(eq(emails.sentByRole, role))
       .orderBy(desc(emails.timestamp));
   }
 

@@ -2031,6 +2031,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   );
 
+  // Get emails by role (for admin to filter emails by user role)
+  app.get(
+    "/api/emails/role/:role",
+    isAuthenticated,
+    hasRole(["admin"]), // Admin only route
+    async (req, res) => {
+      try {
+        const role = req.params.role;
+        
+        // Validate role parameter
+        if (!["buyer", "agent", "admin", "seller"].includes(role)) {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid role specified",
+          });
+        }
+        
+        // Use storage method to get emails by sender role
+        const emails = await storage.getEmailsByRole(role);
+        
+        res.json({
+          success: true,
+          data: emails,
+        });
+      } catch (error) {
+        console.error("Error fetching emails by role:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to fetch role-specific emails",
+        });
+      }
+    }
+  );
+
   app.get(
     "/api/emails/user/:userId",
     isAuthenticated,
