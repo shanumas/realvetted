@@ -61,6 +61,17 @@ export interface IStorage {
   updateProperty(id: number, data: Partial<Property>): Promise<Property>;
   deleteProperty(id: number): Promise<void>;
 
+  // Email methods
+  createEmail(email: InsertEmail): Promise<Email>;
+  getEmail(id: number): Promise<Email | undefined>;
+  getAllEmails(): Promise<Email[]>;
+  getEmailsByUser(userId: number): Promise<Email[]>;
+  getEmailsByRelatedEntity(
+    entityType: string,
+    entityId: number
+  ): Promise<Email[]>;
+  updateEmailStatus(id: number, status: string, errorMessage?: string): Promise<Email>;
+
   // Message methods
   getMessage(id: number): Promise<Message | undefined>;
   getMessagesByProperty(
@@ -1258,6 +1269,77 @@ export class PgStorage implements IStorage {
 
     // Delete the tour request
     await this.db.delete(tourRequests).where(eq(tourRequests.id, id));
+  }
+
+  // Email methods
+  async createEmail(emailData: InsertEmail): Promise<Email> {
+    const result = await this.db
+      .insert(emails)
+      .values(emailData)
+      .returning();
+
+    return result[0];
+  }
+
+  async getEmail(id: number): Promise<Email | undefined> {
+    const result = await this.db
+      .select()
+      .from(emails)
+      .where(eq(emails.id, id));
+    
+    return result[0];
+  }
+
+  async getAllEmails(): Promise<Email[]> {
+    return await this.db
+      .select()
+      .from(emails)
+      .orderBy(desc(emails.timestamp));
+  }
+
+  async getEmailsByUser(userId: number): Promise<Email[]> {
+    return await this.db
+      .select()
+      .from(emails)
+      .where(eq(emails.sentById, userId))
+      .orderBy(desc(emails.timestamp));
+  }
+
+  async getEmailsByRelatedEntity(
+    entityType: string,
+    entityId: number
+  ): Promise<Email[]> {
+    return await this.db
+      .select()
+      .from(emails)
+      .where(
+        and(
+          eq(emails.relatedEntityType, entityType),
+          eq(emails.relatedEntityId, entityId)
+        )
+      )
+      .orderBy(desc(emails.timestamp));
+  }
+
+  async updateEmailStatus(
+    id: number, 
+    status: string, 
+    errorMessage?: string
+  ): Promise<Email> {
+    const result = await this.db
+      .update(emails)
+      .set({
+        status: status,
+        errorMessage: errorMessage || null
+      })
+      .where(eq(emails.id, id))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error(`Email with ID ${id} not found`);
+    }
+
+    return result[0];
   }
 }
 

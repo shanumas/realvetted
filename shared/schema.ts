@@ -234,6 +234,29 @@ export const prequalificationDocSchema = z.object({
   verificationMethod: z.literal("prequalification"), // Set this method
 });
 
+// Email records for the outbox
+export const emails = pgTable("emails", {
+  id: serial("id").primaryKey(),
+  externalId: text("external_id"),
+  to: text("to").array().notNull(),
+  cc: text("cc").array(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  status: text("status").notNull().default("sent"), // sent, failed
+  errorMessage: text("error_message"),
+  timestamp: timestamp("timestamp").defaultNow(),
+  sentById: integer("sent_by_id").notNull(),
+  sentByRole: text("sent_by_role").notNull(),
+  relatedEntityType: text("related_entity_type").notNull(), // viewing_request, property, agreement
+  relatedEntityId: integer("related_entity_id").notNull(),
+});
+
+// Email schema
+export const emailSchema = createInsertSchema(emails).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -249,6 +272,8 @@ export type Agreement = typeof agreements.$inferSelect;
 export type InsertAgreement = z.infer<typeof agreementSchema>;
 export type TourRequest = typeof tourRequests.$inferSelect;
 export type InsertTourRequest = z.infer<typeof tourRequestSchema>;
+export type Email = typeof emails.$inferSelect;
+export type InsertEmail = z.infer<typeof emailSchema>;
 
 // For backward compatibility during transition
 export type ViewingRequest = TourRequest;
