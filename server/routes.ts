@@ -12,6 +12,9 @@ import { extractPropertyFromUrl } from "./extraction";
 import {
   sendTourRequestEmail,
   sendPrequalificationApprovalEmail,
+  getAllEmails,
+  getSentEmailsForUser,
+  getSentEmailsForEntity
 } from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import {

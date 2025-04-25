@@ -1,8 +1,9 @@
-import { Property, User, ViewingRequest } from "@shared/schema";
+import { Property, User, ViewingRequest, Email, InsertEmail } from "@shared/schema";
+import { storage } from "./storage";
 import fs from "fs";
 import path from "path";
 
-// Record type for storing sent emails
+// Legacy interface for backward compatibility
 export interface SentEmail {
   id: string;
   to: string[];
@@ -20,7 +21,7 @@ export interface SentEmail {
   };
 }
 
-// In-memory store for sent emails (in a real app, these would be stored in the database)
+// For legacy compatibility until full migration - don't use this directly anymore
 const sentEmails: SentEmail[] = [];
 
 /**
@@ -112,8 +113,10 @@ ${body}
 ======= END EMAIL =======
   `);
 
-  // Create a sent email record
+  // Create a sent email record for both the old in-memory array and the database
   const emailId = `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
+  
+  // For legacy compatibility
   const sentEmail: SentEmail = {
     id: emailId,
     to,
@@ -131,10 +134,26 @@ ${body}
     }
   };
 
-  // Store the email record
+  // Store the email in the database
+  try {
+    await storage.createEmail({
+      externalId: emailId,
+      to,
+      cc,
+      subject,
+      body,
+      status: "sent",
+      sentById: buyer.id,
+      sentByRole: "buyer",
+      relatedEntityType: "viewing_request",
+      relatedEntityId: viewingRequest.id
+    });
+  } catch (error) {
+    console.error("Error storing email in database:", error);
+  }
+  
+  // Also keep for legacy compatibility
   sentEmails.push(sentEmail);
-
-  // In a real application, we would save this to the database
   
   return sentEmail;
 }
@@ -143,25 +162,86 @@ ${body}
  * Get all sent emails for a specific entity
  * @param entityType The type of entity (viewing_request, property, etc.)
  * @param entityId The ID of the entity
- * @returns Array of sent email records
+ * @returns Array of email records
  */
-export function getSentEmailsForEntity(
+export async function getSentEmailsForEntity(
   entityType: "viewing_request" | "property" | "agreement", 
   entityId: number
-): SentEmail[] {
-  return sentEmails.filter(email => 
-    email.relatedEntity.type === entityType && 
-    email.relatedEntity.id === entityId
-  );
+): Promise<Email[]> {
+  try {
+    // Get emails from the database
+    return await storage.getEmailsByRelatedEntity(entityType, entityId);
+  } catch (error) {
+    console.error("Error getting emails from database:", error);
+    
+    // Legacy fallback to in-memory array
+    const legacyEmails = sentEmails.filter(email => 
+      email.relatedEntity.type === entityType && 
+      email.relatedEntity.id === entityId
+    );
+    
+    // Convert legacy format to new format
+    return legacyEmails.map(convertLegacyEmailToDbEmail);
+  }
 }
 
 /**
  * Get all sent emails for a specific user
  * @param userId The user ID
- * @returns Array of sent email records
+ * @returns Array of email records
  */
-export function getSentEmailsForUser(userId: number): SentEmail[] {
-  return sentEmails.filter(email => email.sentBy.id === userId);
+export async function getSentEmailsForUser(userId: number): Promise<Email[]> {
+  try {
+    // Get emails from the database
+    return await storage.getEmailsByUser(userId);
+  } catch (error) {
+    console.error("Error getting emails from database:", error);
+    
+    // Legacy fallback to in-memory array
+    const legacyEmails = sentEmails.filter(email => email.sentBy.id === userId);
+    
+    // Convert legacy format to new format
+    return legacyEmails.map(convertLegacyEmailToDbEmail);
+  }
+}
+
+/**
+ * Get all emails in the system
+ * @returns Array of all email records
+ */
+export async function getAllEmails(): Promise<Email[]> {
+  try {
+    // Get emails from the database
+    return await storage.getAllEmails();
+  } catch (error) {
+    console.error("Error getting all emails from database:", error);
+    
+    // Legacy fallback to in-memory array
+    return sentEmails.map(convertLegacyEmailToDbEmail);
+  }
+}
+
+/**
+ * Convert a legacy email format to the new database email format
+ * @param legacyEmail Email in the old SentEmail format
+ * @returns Email in the new database Email format
+ */
+function convertLegacyEmailToDbEmail(legacyEmail: SentEmail): Email {
+  return {
+    id: 0, // This will be ignored
+    externalId: legacyEmail.id,
+    to: legacyEmail.to,
+    cc: legacyEmail.cc,
+    subject: legacyEmail.subject,
+    body: legacyEmail.body,
+    status: "sent",
+    errorMessage: null,
+    timestamp: legacyEmail.timestamp,
+    sentById: legacyEmail.sentBy.id,
+    sentByRole: legacyEmail.sentBy.role,
+    relatedEntityType: legacyEmail.relatedEntity.type,
+    relatedEntityId: legacyEmail.relatedEntity.id
+  };
 }
 
 /**
@@ -263,6 +343,8 @@ ${body}
 
   // Create a sent email record
   const emailId = generateUUID();
+  
+  // For legacy compatibility
   const sentEmail: SentEmail = {
     id: emailId,
     to,
@@ -280,7 +362,25 @@ ${body}
     }
   };
 
-  // Store the email record
+  // Store the email in the database
+  try {
+    await storage.createEmail({
+      externalId: emailId,
+      to,
+      cc: [],
+      subject,
+      body,
+      status: "sent",
+      sentById: buyer.id,
+      sentByRole: "buyer",
+      relatedEntityType: "agreement",
+      relatedEntityId: buyer.id
+    });
+  } catch (error) {
+    console.error("Error storing email in database:", error);
+  }
+  
+  // Also keep for legacy compatibility
   sentEmails.push(sentEmail);
   
   return sentEmail;

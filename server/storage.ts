@@ -13,6 +13,8 @@ import {
   InsertAgreement,
   ViewingRequest,
   InsertViewingRequest, // Keep for backward compatibility
+  Email,
+  InsertEmail,
   users,
   properties,
   messages,
@@ -20,6 +22,7 @@ import {
   propertyActivityLogs,
   agreements,
   tourRequests,
+  emails,
 } from "@shared/schema";
 import {
   LeadWithProperty,
