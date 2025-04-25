@@ -8,6 +8,7 @@ import {
 import { storage } from "./storage";
 import fs from "fs";
 import path from "path";
+import emailjs from "@emailjs/nodejs";
 
 // Legacy interface for backward compatibility
 export interface SentEmail {
@@ -116,8 +117,7 @@ ${agent && agent.addressLine1 ? `${agent.addressLine1}${agent.city && agent.stat
 REALVetted – Real Estate, Verified and Simplified
   `;
 
-  // In a production app, this would connect to an email service like SendGrid or Mailgun
-  // For now, we'll just log the email and store it in our in-memory array
+  // Log email details for debugging
   console.log(`
 ======= TOUR REQUEST EMAIL NOTIFICATION =======
 TO: ${to.join(", ")}
@@ -127,6 +127,40 @@ BODY:
 ${body}
 ======= END EMAIL =======
   `);
+
+  // Get the private key for EmailJS
+  const PRIVATE_KEY = process.env.E_PRIVATE || "";
+  if (!PRIVATE_KEY) {
+    console.error("EmailJS private key not found in environment variables");
+  }
+
+  try {
+    // Prepare the message content
+    const messageContent = body;
+
+    // Send email using EmailJS Node.js version
+    const response = await emailjs.send(
+      "service_erfsoqn", // Service ID
+      "template_4bptn9b", // Template ID
+      {
+        to_email: to.join(", "),
+        cc_email: cc.join(", "), // Include buyer's agent in CC
+        from_name: agent ? `${agent.firstName} ${agent.lastName}` : "REALVetted Agent",
+        subject: subject,
+        message: messageContent,
+        brbc_document: "", // Not applicable for tour requests
+        prequalification_document: "", // Not applicable for tour requests
+      },
+      {
+        publicKey: "",
+        privateKey: PRIVATE_KEY,
+      }
+    );
+
+    console.log("Email sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending email with EmailJS:", error);
+  }
 
   // Create a sent email record for both the old in-memory array and the database
   const emailId = `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
@@ -348,8 +382,7 @@ Thank you,
 REALVetted - Real Estate, Verified and Simplified
 `;
 
-  // In a production app, this would connect to an email service like SendGrid or Mailgun
-  // For now, we'll just log the email and store it in our in-memory array
+  // Log email details for debugging
   console.log(`
 ======= PRE-QUALIFICATION APPROVAL REQUEST EMAIL =======
 TO: ${to.join(", ")}
@@ -358,6 +391,40 @@ BODY:
 ${body}
 ======= END EMAIL =======
   `);
+
+  // Get the private key for EmailJS
+  const PRIVATE_KEY = process.env.E_PRIVATE || "";
+  if (!PRIVATE_KEY) {
+    console.error("EmailJS private key not found in environment variables");
+  }
+
+  try {
+    // Prepare the message content for EmailJS
+    const messageContent = body;
+
+    // Send email using EmailJS Node.js version
+    const response = await emailjs.send(
+      "service_erfsoqn", // Service ID
+      "template_4bptn9b", // Template ID
+      {
+        to_email: to.join(", "),
+        cc_email: "", // No CC recipients for prequalification emails
+        from_name: "REALVetted Prequalification Service",
+        subject: subject,
+        message: messageContent,
+        brbc_document: "", // Not applicable for prequalification requests
+        prequalification_document: prequalificationDocUrl || "",
+      },
+      {
+        publicKey: "",
+        privateKey: PRIVATE_KEY,
+      }
+    );
+
+    console.log("Prequalification email sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending prequalification email with EmailJS:", error);
+  }
 
   // Create a sent email record
   const emailId = generateUUID();
