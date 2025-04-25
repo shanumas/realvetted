@@ -10,6 +10,12 @@ import fs from "fs";
 import path from "path";
 import emailjs from "@emailjs/nodejs";
 
+// Initialize EmailJS with public key
+emailjs.init({
+  publicKey: process.env.E_PUBLIC,
+  privateKey: process.env.E_PRIVATE,
+});
+
 // Legacy interface for backward compatibility
 export interface SentEmail {
   id: string;
@@ -128,10 +134,14 @@ ${body}
 ======= END EMAIL =======
   `);
 
-  // Get the private key for EmailJS
+  // Get the keys for EmailJS
   const PRIVATE_KEY = process.env.E_PRIVATE || "";
+  const PUBLIC_KEY = process.env.E_PUBLIC || "";
   if (!PRIVATE_KEY) {
     console.error("EmailJS private key not found in environment variables");
+  }
+  if (!PUBLIC_KEY) {
+    console.error("EmailJS public key not found in environment variables");
   }
 
   try {
@@ -150,10 +160,6 @@ ${body}
         message: messageContent,
         brbc_document: "", // Not applicable for tour requests
         prequalification_document: "", // Not applicable for tour requests
-      },
-      {
-        publicKey: "",
-        privateKey: PRIVATE_KEY,
       }
     );
 
@@ -392,10 +398,14 @@ ${body}
 ======= END EMAIL =======
   `);
 
-  // Get the private key for EmailJS
+  // Get the keys for EmailJS
   const PRIVATE_KEY = process.env.E_PRIVATE || "";
+  const PUBLIC_KEY = process.env.E_PUBLIC || "";
   if (!PRIVATE_KEY) {
     console.error("EmailJS private key not found in environment variables");
+  }
+  if (!PUBLIC_KEY) {
+    console.error("EmailJS public key not found in environment variables");
   }
 
   try {
@@ -416,7 +426,7 @@ ${body}
         prequalification_document: prequalificationDocUrl || "",
       },
       {
-        publicKey: "",
+        publicKey: PUBLIC_KEY,
         privateKey: PRIVATE_KEY,
       }
     );
