@@ -20,7 +20,6 @@ import axios from "axios";
 /** ------------ main exported function with enhanced anti-detection and CAPTCHA handling ------------ */
 export async function extractPropertyWithPuppeteer(
   originalUrl: string,
-  url: string, //compass.com URL
   description: string,
 ): Promise<PropertyAIData> {
   puppeteer.use(StealthPlugin());
@@ -28,63 +27,31 @@ export async function extractPropertyWithPuppeteer(
   try {
     /*     url =
       "https://www.compass.com/listing/1257-fulton-street-san-francisco-ca-94117/1775115899818324705/"; */
-    console.log("🌐 Extracting property data from URL:", url);
-    /* --------------------------------------------------
-     *  1)  scrape listing page with anti-detection measures
-     * -------------------------------------------------- */
-    const listingPage = await browser.newPage();
+    console.log("🌐 Extracting property data from Description:", description);
 
-    // Prepare the page with anti-bot measures
-    await prepPage(listingPage);
+    let data: PropertyAIData;
 
-    await listingPage.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ...",
-    );
+    if (description) {
+      data = await extractAgentDataWithGPT(description);
+    } else {
+      console.log("Description is empty");
+      data = EMPTY_PROPERTY;
+    }
 
-    // Navigate to the URL
-    await listingPage.goto(url, {
-      waitUntil: "domcontentloaded",
-    });
-
-    // Wait for the content to load
-    await listingPage.waitForSelector("body", { timeout: 10000 });
-
-    // Wait a bit longer for dynamic content to load
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // Extract the HTML content
-    const html = await listingPage.content();
-    const $ = cheerio.load(html);
-
-    // 1. Get full <main> tag content
-    const mainHtml = $("main").html() ?? "";
-
-    // 2. Load only the <main> content into cheerio
-    const _$ = cheerio.load(mainHtml);
-
-    // 3. Extract span with data-tn="courtesy-of-text"
-    const courtesyText = _$(
-      "#courtesy-of-text, span[data-tn='courtesy-of-text']",
-    )
-      .text()
-      .trim();
-
-    console.log("courtesyText" + courtesyText);
-
-    const data: PropertyAIData = await extractAgentDataWithGPT(
-      description + " , " + courtesyText,
-    );
     console.log("Complete data " + JSON.stringify(data));
     data.propertyUrl = originalUrl;
 
-    if (courtesyText) {
-      const email = await findAgentEmail(courtesyText);
+    if (description) {
+      const email = await findAgentEmail(description);
       if (email) {
         data.listingAgentEmail = email;
       } else {
         data.listingAgentEmail =
           process.env.LISTING_AGENT_FALLBACK ?? "shanumas@gmail.com";
       }
+      //RIP
+      console.log("-----Extracted Email: " + email);
+      data.listingAgentEmail = "shanumas@gmail.com";
     }
 
     console.log("Complete data " + JSON.stringify(data));
@@ -92,7 +59,7 @@ export async function extractPropertyWithPuppeteer(
     return data;
   } catch (err) {
     console.error("❌ extractPropertyWithPuppeteer failed:", err);
-    return { ...EMPTY_PROPERTY, propertyUrl: url };
+    return { ...EMPTY_PROPERTY, propertyUrl: originalUrl };
   } finally {
     await browser.close();
   }
@@ -110,7 +77,7 @@ You are a real estate data extractor. Extract the listing agent details from thi
 
 Extract the following fields as JSON:
 - address
-- price
+- price - Total asking (sale) price, never monthly cost.
 - bedrooms
 - bathrooms
 - listingAgentName
@@ -426,22 +393,31 @@ async function prepPage(page: Page) {
   });
 }
 
-export async function findAgentEmail(realtorDetails: string): Promise<string> {
+export async function findAgentEmail(allDetails: string): Promise<string> {
   try {
-    const searchQuery = `${realtorDetails} realtor email`;
+    const realtorDetailsOnly = (
+      allDetails.match(/Listed by\s*([\s\S]*?)(?=Listed by|$)/i)?.[1] || ""
+    ).trim();
+
+    console.log("------🔍 Searching for agent email in:", realtorDetailsOnly);
+    const searchQuery = `${realtorDetailsOnly} realtor email`;
 
     const serpRes = await axios.get("https://serpapi.com/search.json", {
       params: {
         q: searchQuery,
         api_key: process.env.SERPAPI_KEY, // store in .env or config
         engine: "google",
-        num: 5,
+        num: 2,
       },
     });
 
     const results = serpRes.data.organic_results || [];
+    console.log(
+      "------🔍 Search results from email search query:",
+      JSON.stringify(results),
+    );
 
-    for (const result of results.slice(0, 5)) {
+    for (const result of results.slice(0, 2)) {
       try {
         const text = result.snippet || "";
         console.log("🔍 Searching for email in: " + text);

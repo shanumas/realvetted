@@ -1,8 +1,8 @@
 import OpenAI from "openai";
 import { PropertyAIData } from "@shared/types";
 import { extractPropertyWithPuppeteer } from "./scrapers/puppeteer-direct-scraper";
-import { getRealtorUrlFromAnyRealEstateUrl } from "./scrapers/serpapi-extractor";
 import _ from "lodash";
+import { processPropertyWithSerpApi } from "./scrapers/serpapi-extractor";
 
 /**
  * Normalize property data to ensure numeric fields are properly converted to numbers
@@ -140,54 +140,28 @@ export async function extractPropertyFromUrl(
 
   try {
     // Track extraction method for metadata
-    let extractionMethod = "direct";
-    let startTime = Date.now();
 
     // Step 1: For Zillow and other heavily protected sites, try to get a Realtor.com URL first
-    if (
-      EXTRACTION_CONFIG.USE_SERPAPI_PRELIMINARY_STEP &&
-      shouldUseSerpApi(url)
-    ) {
+    if (true) {
       console.log(`Using SerpAPI to find a Realtor.com URL for: ${url}`);
 
       try {
-        // Set a timeout for the SerpAPI request
-        const serpApiPromise = getRealtorUrlFromAnyRealEstateUrl(url);
-        const timeoutPromise = new Promise<null>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("SerpAPI request timed out")),
-            EXTRACTION_CONFIG.SERPAPI_TIMEOUT_MS,
-          ),
-        );
+        const propertyDescription = await processPropertyWithSerpApi(url);
 
-        // Race the SerpAPI request against the timeout
-        const propertyDetails = await Promise.race([
-          serpApiPromise,
-          timeoutPromise,
-        ]);
-
-        if (propertyDetails?.link) {
+        if (propertyDescription) {
           console.log(
-            `✅ Found Realtor.com equivalent URL: ${propertyDetails?.link}`,
+            `✅ Start extraction from description: ${propertyDescription}`,
           );
-          console.log(
-            `✅ Property description: ${propertyDetails?.description}`,
-          );
-          console.log(`Attempting extraction from Realtor.com URL instead...`);
 
           try {
-            // Try to extract from Realtor.com URL
+            // Try to extract from Extraction site URL
             let propertyData = await extractPropertyWithPuppeteer(
               url, //Original url
-              propertyDetails?.link,
-              propertyDetails?.description,
+              propertyDescription,
             );
 
             // Normalize the data to ensure numeric fields are properly converted
             propertyData = normalizePropertyData(propertyData);
-
-            // Set extraction metadata
-            extractionMethod = "serpapi+direct";
 
             // Add original URL as the source and include metadata
             return {
@@ -210,77 +184,23 @@ export async function extractPropertyFromUrl(
         console.log("Proceeding with direct URL extraction");
       }
     }
-
-    // Step 2: Try direct extraction with Puppeteer (either on original URL or if SerpAPI failed)
-    console.log(`Using enhanced Puppeteer scraping for URL: ${url}`);
-    try {
-      let propertyData = await extractPropertyWithPuppeteer(
-        url.split(":")[0],
-        url.split(":")[1],
-      );
-
-      // Normalize the data to ensure numeric fields are properly converted
-      propertyData = normalizePropertyData(propertyData);
-
-      // Add metadata to the result
-      return {
-        ...propertyData,
-        _extractionMethod: "direct",
-        _extractionTimestamp: new Date().toISOString(),
-        _extractionSource: url,
-      };
-    } catch (puppeteerError) {
-      console.error("Enhanced Puppeteer scraping failed:", puppeteerError);
-
-      // Step 3: Fallback to URL analysis with OpenAI if scraping fails
-      console.log("Falling back to URL analysis");
-      let urlAnalysisData = await extractFromUrlStructure(url);
-
-      // Normalize the data to ensure numeric fields are properly converted
-      urlAnalysisData = normalizePropertyData(urlAnalysisData);
-
-      // Add metadata to the result
-      return {
-        ...urlAnalysisData,
-        _extractionMethod: "url-analysis",
-        _extractionTimestamp: new Date().toISOString(),
-        _extractionSource: url,
-      };
-    }
+    throw new Error("No extraction strategy succeeded"); // ⬅️ add this line to throw an error if no extraction strategy succeeded
   } catch (error) {
     console.error("Error in property URL extraction:", error);
 
     // Create a fallback property result with minimal data
     const fallbackResult: PropertyAIData = {
       address: "Address could not be extracted",
-      city: "",
-      state: "",
-      zip: "",
-      propertyType: "Unknown",
       bedrooms: null,
       bathrooms: null,
-      squareFeet: null,
       price: null,
-      yearBuilt: null,
       description: "Property information could not be extracted",
-      features: [],
       listingAgentName: "",
       listingAgentPhone: "",
       listingAgentEmail: "",
       listingAgentCompany: "",
       listingAgentLicenseNo: "",
       propertyUrl: url,
-      imageUrls: [],
-      sellerName: "",
-      sellerPhone: "",
-      sellerCompany: "",
-      sellerLicenseNo: "",
-      sellerEmail: "",
-      listedby: "",
-      // Add extraction metadata
-      _extractionMethod: "error",
-      _extractionTimestamp: new Date().toISOString(),
-      _extractionSource: url,
     };
 
     return fallbackResult;
