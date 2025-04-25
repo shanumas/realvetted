@@ -1,4 +1,10 @@
-import { Property, User, ViewingRequest, Email, InsertEmail } from "@shared/schema";
+import {
+  Property,
+  User,
+  ViewingRequest,
+  Email,
+  InsertEmail,
+} from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
 import path from "path";
@@ -38,35 +44,44 @@ export async function sendTourRequestEmail(
   property: Property,
   buyer: User,
   agent: User | undefined,
-  listingAgentEmail: string
+  listingAgentEmail: string,
 ): Promise<SentEmail> {
   // Format the date and time for the email
   const requestDate = new Date(viewingRequest.requestedDate);
   const requestEndDate = new Date(viewingRequest.requestedEndDate);
-  
-  const dateOptions: Intl.DateTimeFormatOptions = { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+
+  const dateOptions: Intl.DateTimeFormatOptions = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   };
-  const timeOptions: Intl.DateTimeFormatOptions = { 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: true
+  const timeOptions: Intl.DateTimeFormatOptions = {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
   };
 
-  const formattedDate = requestDate.toLocaleDateString('en-US', dateOptions);
-  const formattedStartTime = requestDate.toLocaleTimeString('en-US', timeOptions);
-  const formattedEndTime = requestEndDate.toLocaleTimeString('en-US', timeOptions);
+  const formattedDate = requestDate.toLocaleDateString("en-US", dateOptions);
+  const formattedStartTime = requestDate.toLocaleTimeString(
+    "en-US",
+    timeOptions,
+  );
+  const formattedEndTime = requestEndDate.toLocaleTimeString(
+    "en-US",
+    timeOptions,
+  );
   const formattedDateTime = `${formattedDate} between ${formattedStartTime} and ${formattedEndTime}`;
 
   // Determine verification status
-  const isKYCVerified = buyer.verificationMethod === "kyc" && buyer.profileStatus === "verified";
-  const hasPrequalification = buyer.verificationMethod === "prequalification" && buyer.prequalificationValidated;
-  const verificationInfo = isKYCVerified 
-    ? "For your assurance, the buyer has been fully vetted through a Know Your Customer (KYC) verification process." 
-    : hasPrequalification 
+  const isKYCVerified =
+    buyer.verificationMethod === "kyc" && buyer.profileStatus === "verified";
+  const hasPrequalification =
+    buyer.verificationMethod === "prequalification" &&
+    buyer.prequalificationValidated;
+  const verificationInfo = isKYCVerified
+    ? "For your assurance, the buyer has been fully vetted through a Know Your Customer (KYC) verification process."
+    : hasPrequalification
       ? "For your assurance, the buyer has provided a verified pre-qualification document from a lender."
       : "The buyer's verification is pending. Please exercise caution.";
 
@@ -115,7 +130,7 @@ ${body}
 
   // Create a sent email record for both the old in-memory array and the database
   const emailId = `email_${new Date().getTime()}_${Math.random().toString(36).substring(2, 10)}`;
-  
+
   // For legacy compatibility
   const sentEmail: SentEmail = {
     id: emailId,
@@ -126,12 +141,12 @@ ${body}
     timestamp: new Date(),
     sentBy: {
       id: buyer.id,
-      role: "buyer"
+      role: "buyer",
     },
     relatedEntity: {
       type: "viewing_request",
-      id: viewingRequest.id
-    }
+      id: viewingRequest.id,
+    },
   };
 
   // Store the email in the database
@@ -146,15 +161,15 @@ ${body}
       sentById: buyer.id,
       sentByRole: "buyer",
       relatedEntityType: "viewing_request",
-      relatedEntityId: viewingRequest.id
+      relatedEntityId: viewingRequest.id,
     });
   } catch (error) {
     console.error("Error storing email in database:", error);
   }
-  
+
   // Also keep for legacy compatibility
   sentEmails.push(sentEmail);
-  
+
   return sentEmail;
 }
 
@@ -165,21 +180,22 @@ ${body}
  * @returns Array of email records
  */
 export async function getSentEmailsForEntity(
-  entityType: "viewing_request" | "property" | "agreement", 
-  entityId: number
+  entityType: "viewing_request" | "property" | "agreement",
+  entityId: number,
 ): Promise<Email[]> {
   try {
     // Get emails from the database
     return await storage.getEmailsByRelatedEntity(entityType, entityId);
   } catch (error) {
     console.error("Error getting emails from database:", error);
-    
+
     // Legacy fallback to in-memory array
-    const legacyEmails = sentEmails.filter(email => 
-      email.relatedEntity.type === entityType && 
-      email.relatedEntity.id === entityId
+    const legacyEmails = sentEmails.filter(
+      (email) =>
+        email.relatedEntity.type === entityType &&
+        email.relatedEntity.id === entityId,
     );
-    
+
     // Convert legacy format to new format
     return legacyEmails.map(convertLegacyEmailToDbEmail);
   }
@@ -196,10 +212,12 @@ export async function getSentEmailsForUser(userId: number): Promise<Email[]> {
     return await storage.getEmailsByUser(userId);
   } catch (error) {
     console.error("Error getting emails from database:", error);
-    
+
     // Legacy fallback to in-memory array
-    const legacyEmails = sentEmails.filter(email => email.sentBy.id === userId);
-    
+    const legacyEmails = sentEmails.filter(
+      (email) => email.sentBy.id === userId,
+    );
+
     // Convert legacy format to new format
     return legacyEmails.map(convertLegacyEmailToDbEmail);
   }
@@ -215,7 +233,7 @@ export async function getAllEmails(): Promise<Email[]> {
     return await storage.getAllEmails();
   } catch (error) {
     console.error("Error getting all emails from database:", error);
-    
+
     // Legacy fallback to in-memory array
     return sentEmails.map(convertLegacyEmailToDbEmail);
   }
@@ -240,7 +258,7 @@ function convertLegacyEmailToDbEmail(legacyEmail: SentEmail): Email {
     sentById: legacyEmail.sentBy.id,
     sentByRole: legacyEmail.sentBy.role,
     relatedEntityType: legacyEmail.relatedEntity.type,
-    relatedEntityId: legacyEmail.relatedEntity.id
+    relatedEntityId: legacyEmail.relatedEntity.id,
   };
 }
 
@@ -271,14 +289,14 @@ export async function sendPrequalificationApprovalEmail(
     downPaymentAmount?: string;
     additionalNotes?: string;
   },
-  supportingDocsUrls?: string[]
+  supportingDocsUrls?: string[],
 ): Promise<SentEmail> {
   // Prepare recipient email
   const to = ["shanumas@gmail.com"];
-  
+
   // Construct the email body
   const subject = `Pre-qualification Approval Request - ${buyer.firstName} ${buyer.lastName}`;
-  
+
   let body = `
 Dear Admin,
 
@@ -308,20 +326,20 @@ Additional Notes:
 ${approvalFormData.additionalNotes || "None provided"}
 `;
   }
-  
+
   // Add supporting documents if provided
   if (supportingDocsUrls && supportingDocsUrls.length > 0) {
     body += `
 --- Supporting Documents ---
 The buyer has provided ${supportingDocsUrls.length} supporting document(s):
 `;
-    
+
     supportingDocsUrls.forEach((url, index) => {
       body += `
 Document ${index + 1}: ${url}`;
     });
   }
-  
+
   body += `
 
 Please review the document(s) and update the user's verification status accordingly.
@@ -343,7 +361,7 @@ ${body}
 
   // Create a sent email record
   const emailId = generateUUID();
-  
+
   // For legacy compatibility
   const sentEmail: SentEmail = {
     id: emailId,
@@ -354,12 +372,12 @@ ${body}
     timestamp: new Date(),
     sentBy: {
       id: buyer.id,
-      role: "buyer"
+      role: "buyer",
     },
     relatedEntity: {
       type: "agreement", // Using 'agreement' type for pre-qualification
-      id: buyer.id // Using buyer ID since we don't have a specific entity
-    }
+      id: buyer.id, // Using buyer ID since we don't have a specific entity
+    },
   };
 
   // Store the email in the database
@@ -374,14 +392,14 @@ ${body}
       sentById: buyer.id,
       sentByRole: "buyer",
       relatedEntityType: "agreement",
-      relatedEntityId: buyer.id
+      relatedEntityId: buyer.id,
     });
   } catch (error) {
     console.error("Error storing email in database:", error);
   }
-  
+
   // Also keep for legacy compatibility
   sentEmails.push(sentEmail);
-  
+
   return sentEmail;
 }

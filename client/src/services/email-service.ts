@@ -59,10 +59,14 @@ export const sendViewingRequestEmail = async (
       ${params.message}
     `;
 
+    console.log(
+      "----------Message content to send: " + JSON.stringify(messageContent),
+    );
+
     // Send the email
     const response = await emailjs.send(
-      "default_service", // Service ID - default for EmailJS
-      TEMPLATE_ID,
+      "service_erfsoqn", // Service ID - default for EmailJS
+      "template_4bptn9b",
       {
         to_email: params.to_email,
         from_name: params.from_name,
