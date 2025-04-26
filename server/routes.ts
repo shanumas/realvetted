@@ -37,6 +37,10 @@ import {
   ViewingRequestWithParticipants,
   WebSocketMessage,
 } from "@shared/types";
+import {
+  getPublicViewingRequestLink,
+  validateViewingToken,
+} from "./token-service";
 import multer from "multer";
 import { randomBytes } from "crypto";
 import { scrypt, timingSafeEqual } from "crypto";

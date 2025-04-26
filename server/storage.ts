@@ -15,6 +15,8 @@ import {
   InsertViewingRequest, // Keep for backward compatibility
   Email,
   InsertEmail,
+  ViewingToken,
+  InsertViewingToken,
   users,
   properties,
   messages,
@@ -23,6 +25,7 @@ import {
   agreements,
   tourRequests,
   emails,
+  viewingTokens,
 } from "@shared/schema";
 import {
   LeadWithProperty,
@@ -135,6 +138,13 @@ export interface IStorage {
   ): Promise<ViewingRequest>;
   deleteViewingRequest(id: number): Promise<void>;
 
+  // Viewing token methods
+  createViewingToken(tokenData: InsertViewingToken): Promise<ViewingToken>;
+  getViewingTokenByToken(token: string): Promise<ViewingToken | undefined>;
+  getViewingTokensByRequestId(requestId: number): Promise<ViewingToken[]>;
+  updateViewingToken(id: number, data: Partial<ViewingToken>): Promise<ViewingToken>;
+  invalidateViewingToken(token: string): Promise<ViewingToken>;
+  
   // Session store
   sessionStore: session.Store;
 }
@@ -1350,6 +1360,76 @@ export class PgStorage implements IStorage {
 
     if (result.length === 0) {
       throw new Error(`Email with ID ${id} not found`);
+    }
+
+    return result[0];
+  }
+
+  // Viewing token methods
+  async createViewingToken(tokenData: InsertViewingToken): Promise<ViewingToken> {
+    const result = await this.db
+      .insert(viewingTokens)
+      .values({
+        token: tokenData.token,
+        viewingRequestId: tokenData.viewingRequestId,
+        expiresAt: tokenData.expiresAt,
+        active: tokenData.active ?? true,
+        createdAt: new Date(),
+      })
+      .returning();
+
+    return result[0];
+  }
+
+  async getViewingTokenByToken(token: string): Promise<ViewingToken | undefined> {
+    const result = await this.db
+      .select()
+      .from(viewingTokens)
+      .where(eq(viewingTokens.token, token));
+    
+    return result[0];
+  }
+
+  async getViewingTokensByRequestId(requestId: number): Promise<ViewingToken[]> {
+    return await this.db
+      .select()
+      .from(viewingTokens)
+      .where(eq(viewingTokens.viewingRequestId, requestId));
+  }
+
+  async updateViewingToken(id: number, data: Partial<ViewingToken>): Promise<ViewingToken> {
+    const result = await this.db
+      .update(viewingTokens)
+      .set({
+        ...data,
+        // Don't allow updating these fields manually
+        id: undefined,
+        token: undefined,
+        viewingRequestId: undefined,
+        createdAt: undefined,
+      })
+      .where(eq(viewingTokens.id, id))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error(`Viewing token with ID ${id} not found`);
+    }
+
+    return result[0];
+  }
+
+  async invalidateViewingToken(token: string): Promise<ViewingToken> {
+    const result = await this.db
+      .update(viewingTokens)
+      .set({
+        active: false,
+        lastAccessedAt: new Date(),
+      })
+      .where(eq(viewingTokens.token, token))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error(`Viewing token '${token}' not found`);
     }
 
     return result[0];
