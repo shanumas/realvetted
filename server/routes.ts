@@ -31,6 +31,7 @@ import {
   viewingRequestSchema,
   User,
   ViewingRequest,
+  Property,
 } from "@shared/schema";
 import {
   PropertyAIData,
@@ -6823,6 +6824,193 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       res.status(500).json({
         success: false,
         error: "Failed to check global BRBC agreement",
+      });
+    }
+  });
+  
+  // Public endpoint to access a viewing request using a token (for listing agents)
+  app.get("/api/public/viewing/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing token"
+        });
+      }
+      
+      // Validate the token and get associated data
+      const validationResult = await validateViewingToken(token);
+      
+      if (!validationResult) {
+        return res.status(404).json({
+          success: false,
+          error: "Invalid or expired token"
+        });
+      }
+      
+      const { viewingRequest, property, buyer, agent } = validationResult;
+      
+      // Format the buyer name safely
+      const buyerName = buyer ? 
+        `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : 
+        'Unknown Buyer';
+        
+      // Format the agent name safely  
+      const agentName = agent ? 
+        `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email : 
+        undefined;
+      
+      // Return the viewing request data with the property
+      const response: PublicViewingResponse = {
+        success: true,
+        viewingRequest: {
+          ...viewingRequest,
+          buyer,
+          agent
+        },
+        property,
+        buyerName,
+        agentName
+      };
+      
+      res.json(response);
+    } catch (error) {
+      console.error('Error accessing public viewing:', error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to retrieve viewing request"
+      });
+    }
+  });
+
+  // Public endpoint to update a viewing request using a token (for listing agents)
+  app.patch("/api/public/viewing/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { status, confirmedDate, confirmedEndDate, responseMessage } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: "Missing token"
+        });
+      }
+      
+      // Validate the token and get associated data
+      const validationResult = await validateViewingToken(token);
+      
+      if (!validationResult) {
+        return res.status(404).json({
+          success: false,
+          error: "Invalid or expired token"
+        });
+      }
+      
+      const { viewingRequest, property } = validationResult;
+      
+      // Validate the status
+      if (
+        status &&
+        ![
+          "pending",
+          "accepted",
+          "rejected",
+          "rescheduled",
+          "completed",
+          "cancelled",
+        ].includes(status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid status value",
+        });
+      }
+      
+      // Create update data object
+      const updateData: Partial<ViewingRequest> = {};
+      if (status) updateData.status = status;
+      if (confirmedDate) updateData.confirmedDate = new Date(confirmedDate);
+      if (confirmedEndDate) updateData.confirmedEndDate = new Date(confirmedEndDate);
+      if (responseMessage) updateData.responseMessage = responseMessage;
+      
+      // If accepting or rescheduling from external access, record who confirmed
+      // For public access, we'll use the seller or listing agent as the confirmer if available
+      if (["accepted", "rescheduled"].includes(status)) {
+        // For public access, we'll use the property's seller or agent ID, prioritizing the agent
+        updateData.confirmedById = property.agentId || property.sellerId || null;
+      }
+      
+      // Update the viewing request
+      const updatedRequest = await storage.updateViewingRequest(
+        viewingRequest.id,
+        updateData,
+      );
+      
+      // Log the activity
+      try {
+        await storage.createPropertyActivityLog({
+          propertyId: property.id,
+          userId: property.agentId || property.sellerId || null,
+          activity: `Viewing request ${status} via public link`,
+          details: {
+            requestId: updatedRequest.id,
+            status: updatedRequest.status,
+            updatedVia: "public_link",
+          },
+        });
+      } catch (logError) {
+        console.error(
+          "Failed to create activity log for public viewing request update:",
+          logError,
+        );
+        // Continue without failing the whole request
+      }
+      
+      // Send WebSocket notifications to all relevant users
+      const notifyUserIds = [viewingRequest.buyerId]; // Always notify the buyer
+      
+      // Notify the buyer's agent if assigned
+      if (viewingRequest.buyerAgentId) {
+        notifyUserIds.push(viewingRequest.buyerAgentId);
+      }
+      
+      // Notify the seller's agent if assigned
+      if (viewingRequest.sellerAgentId) {
+        notifyUserIds.push(viewingRequest.sellerAgentId);
+      }
+      
+      // Notify the seller if assigned
+      if (property.sellerId) {
+        notifyUserIds.push(property.sellerId);
+      }
+      
+      // Notify the property's agent if assigned
+      if (property.agentId) {
+        notifyUserIds.push(property.agentId);
+      }
+      
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: "property_update",
+        data: {
+          propertyId: property.id,
+          viewingRequestId: updatedRequest.id,
+          action: "viewing_request_updated",
+          status: updatedRequest.status,
+          message: `Viewing request has been ${updatedRequest.status} by listing agent via public link`,
+        },
+      });
+      
+      res.json({
+        success: true,
+        data: updatedRequest,
+      });
+    } catch (error) {
+      console.error("Update public viewing request error:", error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to update viewing request",
       });
     }
   });
