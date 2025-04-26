@@ -257,6 +257,23 @@ export const emailSchema = createInsertSchema(emails).omit({
   timestamp: true,
 });
 
+// Viewing request public access tokens
+export const viewingTokens = pgTable("viewing_tokens", {
+  id: serial("id").primaryKey(),
+  token: text("token").notNull().unique(),
+  viewingRequestId: integer("viewing_request_id").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  lastAccessedAt: timestamp("last_accessed_at"),
+});
+
+export const viewingTokenSchema = createInsertSchema(viewingTokens).omit({
+  id: true,
+  createdAt: true,
+  lastAccessedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -274,6 +291,8 @@ export type TourRequest = typeof tourRequests.$inferSelect;
 export type InsertTourRequest = z.infer<typeof tourRequestSchema>;
 export type Email = typeof emails.$inferSelect;
 export type InsertEmail = z.infer<typeof emailSchema>;
+export type ViewingToken = typeof viewingTokens.$inferSelect;
+export type InsertViewingToken = z.infer<typeof viewingTokenSchema>;
 
 // For backward compatibility during transition
 export type ViewingRequest = TourRequest;
