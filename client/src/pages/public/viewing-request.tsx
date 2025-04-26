@@ -92,7 +92,7 @@ interface PublicViewingResponse {
 export default function PublicViewingRequest() {
   const { token } = useParams();
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState<string>("12:00");
   const [endTime, setEndTime] = useState<string>("13:00");
   const [responseMessage, setResponseMessage] = useState("");
@@ -641,7 +641,7 @@ export default function PublicViewingRequest() {
                   <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onSelect={(date) => setSelectedDate(date)}
+                    onSelect={(date) => date && setSelectedDate(date)}
                     className="border rounded-md"
                     disabled={(date) => date < new Date()}
                   />
