@@ -37,6 +37,15 @@ import {
   ViewingRequestWithParticipants,
   WebSocketMessage,
 } from "@shared/types";
+
+// Type definition for viewing request response to listing agent
+interface PublicViewingResponse {
+  success: boolean;
+  viewingRequest: ViewingRequestWithParticipants;
+  property: Property;
+  buyerName?: string;
+  agentName?: string;
+}
 import {
   getPublicViewingRequestLink,
   validateViewingToken,
@@ -5411,6 +5420,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             message: "A new viewing has been requested",
             propertyId: property.id,
             viewingRequestId: viewingRequest.id,
+            publicViewingLink: publicViewingLink,
           },
         });
 
@@ -5438,9 +5448,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           );
 
           if (buyer && listingAgentEmail) {
-            // Send the email notification
+            // Add the public link to the viewing request for the email
+            const viewingRequestWithLink = {
+              ...viewingRequest,
+              publicViewingLink
+            };
+            
+            // Send the email notification with public link
             await sendTourRequestEmail(
-              viewingRequest,
+              viewingRequestWithLink, // Use the enhanced object with public link
               property,
               buyer,
               agent,
@@ -5449,7 +5465,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             );
 
             console.log(
-              `Sent tour request notification email to: ${listingAgentEmail}`,
+              `Sent tour request notification email with public link to: ${listingAgentEmail}`,
             );
           } else {
             console.warn(
@@ -5466,7 +5482,10 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
         res.status(201).json({
           success: true,
-          data: viewingRequest,
+          data: {
+            ...viewingRequest,
+            publicViewingLink
+          },
         });
       } catch (error) {
         console.error("Create viewing request error:", error);
@@ -5538,10 +5557,14 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               agent = await storage.getUser(request.buyerAgentId);
             }
 
+            // Generate public viewing link for each request
+            const publicViewingLink = await getPublicViewingRequestLink(request.id);
+            
             return {
               ...request,
               buyer,
               agent,
+              publicViewingLink
             } as ViewingRequestWithParticipants;
           }),
         );
@@ -5579,10 +5602,14 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
                 ? await storage.getUser(request.sellerAgentId)
                 : undefined;
 
+            // Generate public viewing link
+            const publicViewingLink = await getPublicViewingRequestLink(request.id);
+            
             return {
               ...request,
               property,
               agent,
+              publicViewingLink
             };
           }),
         );
@@ -5619,11 +5646,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               : undefined;
 
             // Include the agent information to fix the missing agent data issue
+            // Generate public viewing link
+            const publicViewingLink = await getPublicViewingRequestLink(request.id);
+            
             return {
               ...request,
               property,
               buyer,
               agent,
+              publicViewingLink
             };
           }),
         );
