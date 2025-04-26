@@ -92,7 +92,7 @@ interface PublicViewingResponse {
 export default function PublicViewingRequest() {
   const { token } = useParams();
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState<string>("12:00");
   const [endTime, setEndTime] = useState<string>("13:00");
   const [responseMessage, setResponseMessage] = useState("");
@@ -149,7 +149,6 @@ export default function PublicViewingRequest() {
       toast({
         title: "Success!",
         description: "You have accepted the viewing request.",
-        variant: "success",
       });
 
       refetch();
@@ -195,7 +194,6 @@ export default function PublicViewingRequest() {
       toast({
         title: "Success!",
         description: "You have rejected the viewing request.",
-        variant: "success",
       });
 
       refetch();
@@ -262,7 +260,6 @@ export default function PublicViewingRequest() {
       toast({
         title: "Success!",
         description: "You have rescheduled the viewing request.",
-        variant: "success",
       });
 
       setIsRescheduling(false);
@@ -644,7 +641,7 @@ export default function PublicViewingRequest() {
                   <Calendar
                     mode="single"
                     selected={selectedDate}
-                    onSelect={setSelectedDate}
+                    onSelect={(date) => setSelectedDate(date)}
                     className="border rounded-md"
                     disabled={(date) => date < new Date()}
                   />

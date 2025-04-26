@@ -1,8 +1,13 @@
 import { Switch, Route, Redirect, useLocation } from "wouter";
-import { useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+
+// Lazy load pages
+const PublicViewingRequest = lazy(() => import("@/pages/public/viewing-request"));
+const AgentEmailOutbox = lazy(() => import("@/pages/agent/email-outbox"));
+const AdminEmailOutbox = lazy(() => import("@/pages/admin/email-outbox"));
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import NotFound from "@/pages/not-found";
@@ -34,7 +39,14 @@ function Router() {
       <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/dashboard" component={AgentDashboard} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/property/:id" component={AgentPropertyDetail} allowedRoles={["agent"]} />
-      <ProtectedRoute path="/agent/email-outbox" component={() => import('@/pages/agent/email-outbox').then(module => ({ default: module.default }))} allowedRoles={["agent"]} />
+      <ProtectedRoute path="/agent/email-outbox" component={(props) => (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2">Loading email outbox...</p>
+        </div>}>
+          <AgentEmailOutbox {...props} />
+        </Suspense>
+      )} allowedRoles={["agent"]} />
       
       {/* Seller Routes */}
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} allowedRoles={["seller"]} />
@@ -43,7 +55,24 @@ function Router() {
       
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
-      <ProtectedRoute path="/admin/email-outbox" component={() => import('@/pages/admin/email-outbox').then(module => ({ default: module.default }))} allowedRoles={["admin"]} />
+      <ProtectedRoute path="/admin/email-outbox" component={(props) => (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2">Loading admin email outbox...</p>
+        </div>}>
+          <AdminEmailOutbox {...props} />
+        </Suspense>
+      )} allowedRoles={["admin"]} />
+      
+      {/* Public Routes (No Authentication Required) */}
+      <Route path="/public/viewing-request/:token" component={(props) => (
+        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="ml-2">Loading viewing request...</p>
+        </div>}>
+          <PublicViewingRequest {...props} />
+        </Suspense>
+      )} />
       
       {/* Default route redirects to auth page */}
       <Route path="/" component={HomePage} />
