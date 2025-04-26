@@ -2456,6 +2456,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Public viewing request routes (no authentication required)
+  
+  // Get a viewing request by token (public access)
+  app.get("/api/public/viewing-request/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid token"
+        });
+      }
+      
+      // Validate the token and get viewing request data
+      const validationResult = await validateViewingToken(token);
+      
+      if (!validationResult || !validationResult.isValid) {
+        return res.status(403).json({
+          success: false,
+          error: validationResult?.errorMessage || "Invalid or expired token"
+        });
+      }
+      
+      // Format the dates for display
+      const requestData = {
+        viewingRequest: validationResult.viewingRequest,
+        property: validationResult.property,
+        buyer: {
+          // Only include necessary buyer info to protect privacy
+          firstName: validationResult.buyer.firstName,
+          lastName: validationResult.buyer.lastName,
+          email: validationResult.buyer.email,
+          phone: validationResult.buyer.phone
+        },
+        agent: validationResult.agent ? {
+          // Only include necessary agent info
+          firstName: validationResult.agent.firstName,
+          lastName: validationResult.agent.lastName,
+          email: validationResult.agent.email,
+          phone: validationResult.agent.phone
+        } : null,
+        token: token
+      };
+      
+      res.json({
+        success: true,
+        data: requestData
+      });
+    } catch (error) {
+      console.error("Error getting public viewing request:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to get viewing request information"
+      });
+    }
+  });
+  
+  // Handle public viewing request response (accept, reject, reschedule)
+  app.post("/api/public/viewing-request/:token/respond", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { status, responseMessage, confirmedDate, confirmedEndDate } = req.body;
+      
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid token"
+        });
+      }
+      
+      // Validate the status
+      if (!["accepted", "rejected", "rescheduled"].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid status. Must be one of: accepted, rejected, rescheduled"
+        });
+      }
+      
+      // For rescheduled requests, ensure we have new dates
+      if (status === "rescheduled" && (!confirmedDate || !confirmedEndDate)) {
+        return res.status(400).json({
+          success: false,
+          error: "Confirmed date and end date are required for rescheduling"
+        });
+      }
+      
+      // Validate the token and get viewing request data
+      const validationResult = await validateViewingToken(token);
+      
+      if (!validationResult || !validationResult.isValid) {
+        return res.status(403).json({
+          success: false,
+          error: validationResult?.errorMessage || "Invalid or expired token"
+        });
+      }
+      
+      // Don't allow changing a viewing request that's not pending
+      if (validationResult.viewingRequest.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          error: `This viewing request has already been ${validationResult.viewingRequest.status}`
+        });
+      }
+      
+      // Create update data object
+      const updateData: Partial<ViewingRequest> = {
+        status,
+        responseMessage: responseMessage || null,
+        updatedAt: new Date()
+      };
+      
+      // Add confirmed dates if provided
+      if (confirmedDate) {
+        updateData.confirmedDate = new Date(confirmedDate);
+      }
+      
+      if (confirmedEndDate) {
+        updateData.confirmedEndDate = new Date(confirmedEndDate);
+      }
+      
+      // Update the viewing request
+      const updatedRequest = await storage.updateViewingRequest(
+        validationResult.viewingRequest.id,
+        updateData
+      );
+      
+      // Log the activity
+      await storage.createPropertyActivityLog({
+        propertyId: validationResult.property.id,
+        userId: null, // No user ID since this is a public action
+        activity: `Viewing request ${status} by listing agent`,
+        details: {
+          requestId: updatedRequest.id,
+          status: updatedRequest.status,
+          via: "public_link"
+        }
+      });
+      
+      // Make token single-use if the status is accepted or rejected
+      if (status === "accepted" || status === "rejected") {
+        await storage.invalidateViewingToken(token);
+      }
+      
+      // Return success response
+      res.json({
+        success: true,
+        data: {
+          viewingRequest: updatedRequest,
+          message: `Viewing request ${status === "accepted" ? "accepted" : status === "rejected" ? "rejected" : "rescheduled"} successfully`
+        }
+      });
+    } catch (error) {
+      console.error("Error responding to viewing request:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to respond to viewing request"
+      });
+    }
+  });
+
   // Admin routes
   app.get(
     "/api/admin/users",
@@ -5184,6 +5345,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         // Create the viewing request
         const viewingRequest =
           await storage.createViewingRequest(requestDataWithAgent);
+          
+        // Generate a public link for the viewing request (similar to Calendly)
+        const publicViewingLink = await getPublicViewingRequestLink(viewingRequest.id);
 
         // Log the activity
         try {
@@ -5196,6 +5360,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               requestedDate: viewingRequest.requestedDate,
               requestedEndDate: viewingRequest.requestedEndDate,
               agentId: property.agentId,
+              publicViewingLink: publicViewingLink
             },
           });
         } catch (logError) {
