@@ -52,6 +52,7 @@ export async function sendTourRequestEmail(
   buyer: User,
   agent: User | undefined,
   listingAgentEmail: string,
+  listingAgentName: string
 ): Promise<SentEmail> {
   // Format the date and time for the email
   const requestDate = new Date(viewingRequest.requestedDate);
@@ -96,49 +97,20 @@ export async function sendTourRequestEmail(
   const to = [listingAgentEmail];
   const cc = agent ? [agent.email] : [];
 
-  // Construct the email body
-  const subject = `Home Preview Request – ${property.address}`;
-  const body = `
-Dear ${property.listingAgentName || "Listing Agent"},
-
-I hope this email finds you well. I am reaching out on behalf of my client, ${buyer.firstName} ${buyer.lastName}, who is interested in previewing your listing at ${property.address}. They have selected a preferred date and time for the showing: ${formattedDateTime}.
-
-As their designated buyer's agent through our REALVetted platform, I want to ensure a smooth process. Please note that I will not be attending the showing in person. Instead, I kindly ask that you or a representative from your team grant my client access to the home at the scheduled time.
-
-${verificationInfo} Additionally, a signed Buyer Representation and Broker Compensation Agreement are on file. Their direct contact information is as follows:
-
-Buyer Name: ${buyer.firstName} ${buyer.lastName}
-Phone Number: ${buyer.phone || "Not provided"}
-
-To confirm the requested showing, please respond to this email or contact the buyer directly. If the proposed time does not work, feel free to reach out to ${buyer.firstName} ${buyer.lastName} directly to arrange an alternative. 
-
-Should you have any questions or require further details, I am happy to assist.
-
-Thank you for your time and cooperation—I look forward to working together.
-
-${agent ? `${agent.firstName} ${agent.lastName}` : "REALVetted Agent"}
-${agent && agent.licenseNumber ? `DRE License #${agent.licenseNumber}` : ""}
-${agent && agent.phone ? `Direct Phone ${agent.phone}` : ""}
-${agent && agent.addressLine1 ? `${agent.addressLine1}${agent.city && agent.state ? `, ${agent.city}, ${agent.state}` : ""}` : ""}
-REALVetted – Real Estate, Verified and Simplified
-  `;
-
   // Log email details for debugging
   console.log(`
 ======= TOUR REQUEST EMAIL NOTIFICATION =======
 TO: ${to.join(", ")}
 CC: ${cc.join(", ")}
-SUBJECT: ${subject}
-BODY:
-${body}
+SUBJECT: ""
+BODY: ""
 ======= END EMAIL =======
   `);
 
   // EmailJS is already initialized with keys at the top of the file
-  
+
   try {
     // Prepare the message content
-    const messageContent = body;
 
     // Send email using EmailJS Node.js version
     const response = await emailjs.send(
@@ -147,12 +119,17 @@ ${body}
       {
         to_email: to.join(", "),
         cc_email: cc.join(", "), // Include buyer's agent in CC
-        from_name: agent ? `${agent.firstName} ${agent.lastName}` : "REALVetted Agent",
-        subject: subject,
-        message: messageContent,
+
         brbc_document: "", // Not applicable for tour requests
         prequalification_document: "", // Not applicable for tour requests
-      }
+
+        buyer_name: buyer.firstName + " " + buyer.lastName,
+        buyer_phone: buyer.phone,
+        buyer_email: buyer.email,
+        property_address: property.address,
+        requested_date_time: formattedDateTime,
+        listing_agent_name: listingAgentName || "Listing Agent",
+      },
     );
 
     console.log("Email sent successfully:", response);
@@ -168,8 +145,6 @@ ${body}
     id: emailId,
     to,
     cc,
-    subject,
-    body,
     timestamp: new Date(),
     sentBy: {
       id: buyer.id,
@@ -187,8 +162,8 @@ ${body}
       externalId: emailId,
       to,
       cc,
-      subject,
-      body,
+      "subject",
+      "body",
       status: "sent",
       sentById: buyer.id,
       sentByRole: "buyer",
@@ -408,7 +383,7 @@ ${body}
         message: messageContent,
         brbc_document: "", // Not applicable for prequalification requests
         prequalification_document: prequalificationDocUrl || "",
-      }
+      },
     );
 
     console.log("Prequalification email sent successfully:", response);

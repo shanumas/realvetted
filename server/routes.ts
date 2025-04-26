@@ -14,7 +14,7 @@ import {
   sendPrequalificationApprovalEmail,
   getAllEmails,
   getSentEmailsForUser,
-  getSentEmailsForEntity
+  getSentEmailsForEntity,
 } from "./email-service";
 import { lookupCaliforniaLicense } from "./license-lookup";
 import {
@@ -2028,7 +2028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Failed to fetch emails",
         });
       }
-    }
+    },
   );
 
   // Get emails by role (for admin to filter emails by user role)
@@ -2039,7 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req, res) => {
       try {
         const role = req.params.role;
-        
+
         // Validate role parameter
         if (!["buyer", "agent", "admin", "seller"].includes(role)) {
           return res.status(400).json({
@@ -2047,10 +2047,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             error: "Invalid role specified",
           });
         }
-        
+
         // Use storage method to get emails by sender role
         const emails = await storage.getEmailsByRole(role);
-        
+
         res.json({
           success: true,
           data: emails,
@@ -2062,73 +2062,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: "Failed to fetch role-specific emails",
         });
       }
-    }
+    },
   );
 
-  app.get(
-    "/api/emails/user/:userId",
-    isAuthenticated,
-    async (req, res) => {
-      try {
-        const userId = parseInt(req.params.userId);
-        
-        // Only allow users to access their own emails unless they're an admin
-        if (req.user?.id !== userId && req.user?.role !== "admin") {
-          return res.status(403).json({
-            success: false,
-            error: "Unauthorized access to user emails",
-          });
-        }
-        
-        const emails = await getSentEmailsForUser(userId);
-        res.json({
-          success: true,
-          data: emails,
-        });
-      } catch (error) {
-        console.error("Error fetching user emails:", error);
-        res.status(500).json({
-          success: false,
-          error: "Failed to fetch user emails",
-        });
-      }
-    }
-  );
+  app.get("/api/emails/user/:userId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
 
-  app.get(
-    "/api/emails/entity/:type/:id",
-    isAuthenticated,
-    async (req, res) => {
-      try {
-        const { type, id } = req.params;
-        const entityId = parseInt(id);
-        
-        // Validate entity type
-        if (!["viewing_request", "property", "agreement"].includes(type)) {
-          return res.status(400).json({
-            success: false,
-            error: "Invalid entity type",
-          });
-        }
-        
-        const emails = await getSentEmailsForEntity(
-          type as "viewing_request" | "property" | "agreement",
-          entityId
-        );
-        
-        res.json({
-          success: true,
-          data: emails,
-        });
-      } catch (error) {
-        console.error("Error fetching entity emails:", error);
-        res.status(500).json({
+      // Only allow users to access their own emails unless they're an admin
+      if (req.user?.id !== userId && req.user?.role !== "admin") {
+        return res.status(403).json({
           success: false,
-          error: "Failed to fetch entity emails",
+          error: "Unauthorized access to user emails",
         });
       }
+
+      const emails = await getSentEmailsForUser(userId);
+      res.json({
+        success: true,
+        data: emails,
+      });
+    } catch (error) {
+      console.error("Error fetching user emails:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch user emails",
+      });
     }
-  );
+  });
+
+  app.get("/api/emails/entity/:type/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { type, id } = req.params;
+      const entityId = parseInt(id);
+
+      // Validate entity type
+      if (!["viewing_request", "property", "agreement"].includes(type)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid entity type",
+        });
+      }
+
+      const emails = await getSentEmailsForEntity(
+        type as "viewing_request" | "property" | "agreement",
+        entityId,
+      );
+
+      res.json({
+        success: true,
+        data: emails,
+      });
+    } catch (error) {
+      console.error("Error fetching entity emails:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch entity emails",
+      });
+    }
+  });
 
   // Web-based test endpoint for property extraction
   app.get("/api/test/property-extractor", (req, res) => {
@@ -5268,6 +5260,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           const listingAgentEmail =
             property.listingAgentEmail || property.sellerEmail;
 
+          const listingAgentName =
+            property.listingAgentName || property.sellerName;
+
           console.log(
             "------------------Listing agent email:",
             JSON.stringify(property),
@@ -5281,6 +5276,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               buyer,
               agent,
               listingAgentEmail,
+              listingAgentName,
             );
 
             console.log(
