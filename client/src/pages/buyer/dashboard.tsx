@@ -809,7 +809,15 @@ export default function BuyerDashboard() {
               )}
             </TabsContent>
 
-            <TabsContent value="viewingRequests" className="p-0"></TabsContent>
+            <TabsContent value="viewingRequests" className="p-0">
+              {/* Fetch and display viewing requests */}
+              {user && (
+                <ViewingRequestsList 
+                  userId={user.id} 
+                  role="buyer" 
+                />
+              )}
+            </TabsContent>
           </Tabs>
         </div>
       </main>

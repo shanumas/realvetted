@@ -145,6 +145,8 @@ BODY: ""
     id: emailId,
     to,
     cc,
+    subject: "Property Tour Request",
+    body: "Tour request notification for property",
     timestamp: new Date(),
     sentBy: {
       id: buyer.id,
