@@ -10,7 +10,16 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, FileText, Check, User, UserPlus, Eye, ChevronUp, ChevronDown } from "lucide-react";
+import {
+  Loader2,
+  FileText,
+  Check,
+  User,
+  UserPlus,
+  Eye,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import SignatureCanvas from "react-signature-canvas";
@@ -50,7 +59,7 @@ export function BRBCPdfViewer({
   const [isLoading, setIsLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState("");
   const [cachedPdfUrl, setCachedPdfUrl] = useState<string | null>(null); // Store last valid PDF to avoid losing form data
-  const [isSigning, setIsSigning] = useState(false);
+  const [isSigning, setIsSigning] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -59,6 +68,7 @@ export function BRBCPdfViewer({
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [showTermsDetails, setShowTermsDetails] = useState(false);
   const [showAgreementTermsPage, setShowAgreementTermsPage] = useState(true);
+  const [hasPreviewedOnce, setHasPreviewedOnce] = useState(false);
 
   // Calculate today's date and end date (90 days from today)
   const today = new Date();
@@ -253,7 +263,8 @@ export function BRBCPdfViewer({
       setFormFields({});
       setTermsAgreed(false);
       setShowTermsDetails(false);
-      
+      setHasPreviewedOnce(false);
+
       // For existing signed agreements, show them directly
       // For new agreements, show the terms page first
       fetchExistingAgreement().then((found) => {
@@ -865,7 +876,7 @@ export function BRBCPdfViewer({
       }
       return;
     }
-    
+
     // Check if the user has agreed to the terms
     if (!termsAgreed) {
       toast({
@@ -1058,32 +1069,82 @@ export function BRBCPdfViewer({
               <div className="flex-grow p-6 overflow-y-auto">
                 <div className="max-w-3xl mx-auto">
                   <div className="mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-4">Agreement Terms</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                      Agreement Terms
+                    </h2>
                     <p className="text-gray-600 mb-4">
-                      Before proceeding to view and sign the Buyer Representation and Broker Compensation Agreement, 
-                      please review the following important terms and disclosures:
+                      Before proceeding to view and sign the Buyer
+                      Representation and Broker Compensation Agreement, please
+                      review the following important terms and disclosures:
                     </p>
-                    
+
                     <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm">
-                      <h3 className="text-lg font-medium text-gray-900 mb-3">REALVetted - BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT and Disclosure Packet</h3>
-                      
+                      <h3 className="text-lg font-medium text-gray-900 mb-3">
+                        REALVetted - BUYER REPRESENTATION AND BROKER
+                        COMPENSATION AGREEMENT and Disclosure Packet
+                      </h3>
+
                       <p className="text-gray-700 mb-4">
-                        This document contains mandatory disclosures and agreements required by California law when working with a real estate broker.
-                        By signing this agreement, you acknowledge and accept the terms contained in all the following documents:
+                        This document contains mandatory disclosures and
+                        agreements required by California law when working with
+                        a real estate broker. By signing this agreement, you
+                        acknowledge and accept the terms contained in all the
+                        following documents:
                       </p>
-                      
+
                       <div className="border-t border-gray-200 pt-3 mb-2">
-                        <h4 className="font-medium text-gray-900 mb-2">Summary of Documents:</h4>
+                        <h4 className="font-medium text-gray-900 mb-2">
+                          Summary of Documents:
+                        </h4>
                         <ol className="list-decimal ml-5 space-y-2 text-gray-700">
-                          <li><strong>DISCLOSURE REGARDING REAL ESTATE AGENCY RELATIONSHIP (C.A.R. Form AD)</strong> - Explains the legal relationship between you and the real estate agent/broker.</li>
-                          <li><strong>BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT (C.A.R. Form BRBC)</strong> - Outlines the terms of your representation and how your broker will be compensated.</li>
-                          <li><strong>BROKER COMPENSATION ADVISORY (C.A.R. Form BCA, 7/24)</strong> - Details how brokers are compensated and recent changes in industry practices.</li>
-                          <li><strong>BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)</strong> - Informs you of your responsibility to investigate properties.</li>
-                          <li><strong>POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR SELLER (C.A.R. Form PRBS)</strong> - Discloses that your broker may represent multiple clients.</li>
-                          <li><strong>CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY</strong> - Explains your privacy rights under California law.</li>
+                          <li>
+                            <strong>
+                              DISCLOSURE REGARDING REAL ESTATE AGENCY
+                              RELATIONSHIP (C.A.R. Form AD)
+                            </strong>{" "}
+                            - Explains the legal relationship between you and
+                            the real estate agent/broker.
+                          </li>
+                          <li>
+                            <strong>
+                              BUYER REPRESENTATION AND BROKER COMPENSATION
+                              AGREEMENT (C.A.R. Form BRBC)
+                            </strong>{" "}
+                            - Outlines the terms of your representation and how
+                            your broker will be compensated.
+                          </li>
+                          <li>
+                            <strong>
+                              BROKER COMPENSATION ADVISORY (C.A.R. Form BCA,
+                              7/24)
+                            </strong>{" "}
+                            - Details how brokers are compensated and recent
+                            changes in industry practices.
+                          </li>
+                          <li>
+                            <strong>
+                              BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)
+                            </strong>{" "}
+                            - Informs you of your responsibility to investigate
+                            properties.
+                          </li>
+                          <li>
+                            <strong>
+                              POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR
+                              SELLER (C.A.R. Form PRBS)
+                            </strong>{" "}
+                            - Discloses that your broker may represent multiple
+                            clients.
+                          </li>
+                          <li>
+                            <strong>
+                              CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY
+                            </strong>{" "}
+                            - Explains your privacy rights under California law.
+                          </li>
                         </ol>
                       </div>
-                      
+
                       <div className="mt-4">
                         <Button
                           variant="outline"
@@ -1103,39 +1164,81 @@ export function BRBCPdfViewer({
                           )}
                         </Button>
                       </div>
-                      
+
                       {showTermsDetails && (
                         <div className="mt-4 border-t border-gray-200 pt-4 text-sm text-gray-700 space-y-4">
                           <div>
-                            <h5 className="font-semibold mb-1">DISCLOSURE REGARDING REAL ESTATE AGENCY RELATIONSHIP (C.A.R. Form AD)</h5>
-                            <p>This mandatory disclosure explains that a real estate agent can represent a buyer, a seller, or both in a transaction. It details the fiduciary duties owed to you as a client, including loyalty, confidentiality, and full disclosure.</p>
+                            <h5 className="font-semibold mb-1">
+                              DISCLOSURE REGARDING REAL ESTATE AGENCY
+                              RELATIONSHIP (C.A.R. Form AD)
+                            </h5>
+                            <p>
+                              This mandatory disclosure explains that a real
+                              estate agent can represent a buyer, a seller, or
+                              both in a transaction. It details the fiduciary
+                              duties owed to you as a client, including loyalty,
+                              confidentiality, and full disclosure.
+                            </p>
                           </div>
-                          
+
                           <div>
-                            <h5 className="font-semibold mb-1">BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT (C.A.R. Form BRBC)</h5>
-                            <p>This agreement establishes the professional relationship between you (the buyer) and the broker. It creates a legal obligation for the broker to represent your best interests while searching for and purchasing property. The agreement also specifies:</p>
+                            <h5 className="font-semibold mb-1">
+                              BUYER REPRESENTATION AND BROKER COMPENSATION
+                              AGREEMENT (C.A.R. Form BRBC)
+                            </h5>
+                            <p>
+                              This agreement establishes the professional
+                              relationship between you (the buyer) and the
+                              broker. It creates a legal obligation for the
+                              broker to represent your best interests while
+                              searching for and purchasing property. The
+                              agreement also specifies:
+                            </p>
                             <ul className="list-disc ml-5 mt-1">
-                              <li>The duration of the representation (typically 90 days)</li>
+                              <li>
+                                The duration of the representation (typically 90
+                                days)
+                              </li>
                               <li>The geographic area covered</li>
                               <li>Property types you're interested in</li>
                               <li>How the broker will be compensated</li>
                               <li>Your obligations as a client</li>
                             </ul>
                           </div>
-                          
+
                           <div>
-                            <h5 className="font-semibold mb-1">BROKER COMPENSATION ADVISORY (C.A.R. Form BCA, 7/24)</h5>
-                            <p>This document explains how real estate brokers are compensated and the changes in compensation practices following recent legal settlements. It clarifies that:</p>
+                            <h5 className="font-semibold mb-1">
+                              BROKER COMPENSATION ADVISORY (C.A.R. Form BCA,
+                              7/24)
+                            </h5>
+                            <p>
+                              This document explains how real estate brokers are
+                              compensated and the changes in compensation
+                              practices following recent legal settlements. It
+                              clarifies that:
+                            </p>
                             <ul className="list-disc ml-5 mt-1">
                               <li>Commission rates are negotiable</li>
-                              <li>Buyers may be responsible for paying some or all of their broker's commission</li>
-                              <li>Different types of listing agreements and their compensation implications</li>
+                              <li>
+                                Buyers may be responsible for paying some or all
+                                of their broker's commission
+                              </li>
+                              <li>
+                                Different types of listing agreements and their
+                                compensation implications
+                              </li>
                             </ul>
                           </div>
-                          
+
                           <div>
-                            <h5 className="font-semibold mb-1">BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)</h5>
-                            <p>This advisory emphasizes your responsibility to thoroughly investigate the property before completing the purchase. It recommends:</p>
+                            <h5 className="font-semibold mb-1">
+                              BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)
+                            </h5>
+                            <p>
+                              This advisory emphasizes your responsibility to
+                              thoroughly investigate the property before
+                              completing the purchase. It recommends:
+                            </p>
                             <ul className="list-disc ml-5 mt-1">
                               <li>Hiring professional inspectors</li>
                               <li>Researching neighborhood conditions</li>
@@ -1143,25 +1246,49 @@ export function BRBCPdfViewer({
                               <li>Investigating natural hazards</li>
                             </ul>
                           </div>
-                          
+
                           <div>
-                            <h5 className="font-semibold mb-1">POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR SELLER (C.A.R. Form PRBS)</h5>
-                            <p>This disclosure informs you that your broker may represent multiple buyers interested in the same properties or may represent both buyers and sellers in different transactions. It explains how the broker will handle potential conflicts of interest.</p>
+                            <h5 className="font-semibold mb-1">
+                              POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR
+                              SELLER (C.A.R. Form PRBS)
+                            </h5>
+                            <p>
+                              This disclosure informs you that your broker may
+                              represent multiple buyers interested in the same
+                              properties or may represent both buyers and
+                              sellers in different transactions. It explains how
+                              the broker will handle potential conflicts of
+                              interest.
+                            </p>
                           </div>
-                          
+
                           <div>
-                            <h5 className="font-semibold mb-1">CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY</h5>
-                            <p>This advisory explains your rights under California's privacy laws, including:</p>
+                            <h5 className="font-semibold mb-1">
+                              CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY
+                            </h5>
+                            <p>
+                              This advisory explains your rights under
+                              California's privacy laws, including:
+                            </p>
                             <ul className="list-disc ml-5 mt-1">
-                              <li>Right to know what personal information is collected</li>
+                              <li>
+                                Right to know what personal information is
+                                collected
+                              </li>
                               <li>Right to delete personal information</li>
-                              <li>Right to opt-out of the sale of personal information</li>
-                              <li>Right to non-discrimination for exercising these rights</li>
+                              <li>
+                                Right to opt-out of the sale of personal
+                                information
+                              </li>
+                              <li>
+                                Right to non-discrimination for exercising these
+                                rights
+                              </li>
                             </ul>
                           </div>
                         </div>
                       )}
-                      
+
                       <div className="flex items-center mt-6 mb-1">
                         <input
                           id="terms-agreement"
@@ -1170,18 +1297,23 @@ export function BRBCPdfViewer({
                           checked={termsAgreed}
                           onChange={(e) => setTermsAgreed(e.target.checked)}
                         />
-                        <label htmlFor="terms-agreement" className="ml-2 block text-gray-700">
-                          I have read and understand the Agreement Terms and all associated disclosures, and I agree to the terms outlined in these documents.
+                        <label
+                          htmlFor="terms-agreement"
+                          className="ml-2 block text-gray-700"
+                        >
+                          I have read and understand the Agreement Terms and all
+                          associated disclosures, and I agree to the terms
+                          outlined in these documents.
                         </label>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex justify-end space-x-3 mt-8">
                     <Button variant="outline" onClick={handleClose}>
                       Cancel
                     </Button>
-                    <Button 
+                    <Button
                       onClick={() => setShowAgreementTermsPage(false)}
                       disabled={!termsAgreed}
                     >
@@ -1215,8 +1347,8 @@ export function BRBCPdfViewer({
             )}
 
             {/* Signature Panel (only visible when signing) */}
-            {isSigning && (
-              <div className="w-full md:w-1/3 border-l border-gray-200 p-4 flex flex-col">
+            {
+              <div className="w-full md:w-1/3 border-l border-gray-200 flex flex-col">
                 <Tabs
                   value={activeTab}
                   onValueChange={(newTab) => {
@@ -1231,7 +1363,7 @@ export function BRBCPdfViewer({
                   className="flex-grow flex flex-col"
                 >
                   {/* Main tabs for Buyer 1 and Buyer 2 */}
-                  <TabsList className="w-full grid grid-cols-2 mb-4">
+                  <TabsList className="w-full grid grid-cols-2 mb-2">
                     <TabsTrigger
                       value="buyer1-signature"
                       className="flex items-center"
@@ -1449,7 +1581,7 @@ export function BRBCPdfViewer({
                   </div>
                 </Tabs>
               </div>
-            )}
+            }
           </div>
 
           <DialogFooter className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-2">
@@ -1460,119 +1592,62 @@ export function BRBCPdfViewer({
               </div>
             ) : (
               <div className="flex-1 flex items-center">
-                {!isSigning ? (
+                <div className="flex items-center">
+                  {/* Preview button - shows PDF with signatures without submitting */}
                   <Button
-                    className="mr-2 mt-0"
-                    onClick={() => setIsSigning(true)}
+                    variant="outline"
+                    onClick={previewSignedPdf}
+                    disabled={isPreviewing || isSubmitting}
+                    className="mr-2"
                   >
-                    Sign Agreement
+                    {isPreviewing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Previewing...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview
+                      </>
+                    )}
                   </Button>
-                ) : (
-                  <>
-                    <div className="flex flex-col items-start w-full mb-4">
-                      <div className="flex justify-between items-center w-full mb-2">
-                        <h3 className="text-sm font-semibold">Agreement Terms</h3>
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="p-0 h-auto text-amber-700"
-                          onClick={() => setShowTermsDetails(!showTermsDetails)}
-                        >
-                          {showTermsDetails ? "Hide Details" : "Show Details"}
-                        </Button>
-                      </div>
-                      
-                      {showTermsDetails && (
-                        <div className="bg-amber-50 p-3 rounded-md mb-3 max-h-40 overflow-y-auto text-sm border border-amber-200 w-full">
-                          <div className="space-y-2">
-                            <p className="font-semibold">REALVetted - BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT and Disclosure Packet:</p>
-                            <p>This document serves as a full, line-by-line explanation of each mandatory disclosure form and agreement required when working with a real estate broker under California law.</p>
-                            <ol className="list-decimal pl-5 space-y-2">
-                              <li><strong>DISCLOSURE REGARDING REAL ESTATE AGENCY RELATIONSHIP (C.A.R. Form AD)</strong> - Informs the buyer of the legal relationship between them and the real estate agent or broker.</li>
-                              <li><strong>BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT (C.A.R. Form BRBC)</strong> - Outlines the legal relationship, representation scope, and compensation terms between the buyer and the broker.</li>
-                              <li><strong>BROKER COMPENSATION ADVISORY (C.A.R. Form BCA, 7/24)</strong> - Explains how brokers are compensated and outlines recent legal changes affecting compensation practices.</li>
-                              <li><strong>BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)</strong> - Informs the buyer of their responsibility to investigate the property they are purchasing.</li>
-                              <li><strong>POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR SELLER (C.A.R. Form PRBS)</strong> - Discloses that a broker may represent multiple clients simultaneously.</li>
-                              <li><strong>CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY</strong> - Informs consumers of their rights under the California Consumer Privacy Act.</li>
-                            </ol>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-start mt-1 mb-3">
-                        <div className="flex h-5 items-center">
-                          <input
-                            id="terms-agree"
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            checked={termsAgreed}
-                            onChange={(e) => setTermsAgreed(e.target.checked)}
-                          />
-                        </div>
-                        <label htmlFor="terms-agree" className="ml-2 block text-sm text-gray-700">
-                          I have read and understand the Buyer Representation and Broker Compensation Agreement and all associated disclosures, and I agree to the terms outlined in these documents.
-                        </label>
-                      </div>
-                    </div>
 
-                    <div className="flex items-center">
-                      {/* Preview button - shows PDF with signatures without submitting */}
-                      <Button
-                        variant="outline"
-                        onClick={previewSignedPdf}
-                        disabled={isPreviewing || isSubmitting}
-                        className="mr-2"
-                      >
-                        {isPreviewing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Previewing...
-                          </>
-                        ) : (
-                          <>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Preview
-                          </>
-                        )}
-                      </Button>
+                  {/* Submit button - now shows confirmation dialog */}
+                  <Button
+                    onClick={() => {
+                      // Force a final check of all signatures before submission
+                      if (signatureRef.current) {
+                        setSignatureIsEmpty(signatureRef.current.isEmpty());
+                      }
+                      if (initialsRef.current) {
+                        setInitialsIsEmpty(initialsRef.current.isEmpty());
+                      }
 
-                      {/* Submit button - now shows confirmation dialog */}
-                      <Button
-                        onClick={() => {
-                          // Force a final check of all signatures before submission
-                          if (signatureRef.current) {
-                            setSignatureIsEmpty(signatureRef.current.isEmpty());
-                          }
-                          if (initialsRef.current) {
-                            setInitialsIsEmpty(initialsRef.current.isEmpty());
-                          }
-
-                          // Use a short timeout to let state update before submitting
-                          setTimeout(() => {
-                            handleSubmitSignature();
-                          }, 50);
-                        }}
-                        disabled={
-                          isSubmitting ||
-                          isPreviewing ||
-                          (!savedSignatures.primary && signatureIsEmpty) ||
-                          (!savedSignatures.initials && initialsIsEmpty) ||
-                          !termsAgreed
-                        }
-                        className="mr-2"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          "Submit Agreement"
-                        )}
-                      </Button>
-                    </div>
-                  </>
-                )}
+                      // Use a short timeout to let state update before submitting
+                      setTimeout(() => {
+                        handleSubmitSignature();
+                      }, 50);
+                    }}
+                    disabled={
+                      isSubmitting ||
+                      isPreviewing ||
+                      (!savedSignatures.primary && signatureIsEmpty) ||
+                      (!savedSignatures.initials && initialsIsEmpty) ||
+                      !termsAgreed
+                    }
+                    className="mr-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Submit Agreement"
+                    )}
+                  </Button>
+                </div>
 
                 <Button variant="outline" onClick={handleClose}>
                   {hasSigned ? "Close" : "Cancel"}
