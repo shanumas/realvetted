@@ -5,6 +5,8 @@ import {
   InsertProperty,
   Message,
   InsertMessage,
+  SupportMessage,
+  InsertSupportMessage,
   AgentLead,
   InsertAgentLead,
   PropertyActivityLog,
@@ -20,6 +22,7 @@ import {
   users,
   properties,
   messages,
+  supportMessages,
   agentLeads,
   propertyActivityLogs,
   agreements,
@@ -144,6 +147,14 @@ export interface IStorage {
   getViewingTokensByRequestId(requestId: number): Promise<ViewingToken[]>;
   updateViewingToken(id: number, data: Partial<ViewingToken>): Promise<ViewingToken>;
   invalidateViewingToken(token: string): Promise<ViewingToken>;
+  
+  // Support chat methods
+  getSupportMessage(id: number): Promise<SupportMessage | undefined>;
+  getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]>;
+  createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
+  markSupportMessageAsRead(id: number): Promise<SupportMessage>;
+  getUnreadSupportMessageCount(): Promise<number>;
+  getActiveSupportSessions(): Promise<{sessionId: string, lastMessage: Date, unreadCount: number}[]>;
   
   // Session store
   sessionStore: session.Store;
@@ -1433,6 +1444,77 @@ export class PgStorage implements IStorage {
     }
 
     return result[0];
+  }
+
+  // Support chat methods
+  async getSupportMessage(id: number): Promise<SupportMessage | undefined> {
+    const result = await this.db
+      .select()
+      .from(supportMessages)
+      .where(eq(supportMessages.id, id));
+    return result[0];
+  }
+
+  async getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]> {
+    return await this.db
+      .select()
+      .from(supportMessages)
+      .where(eq(supportMessages.sessionId, sessionId))
+      .orderBy(supportMessages.timestamp);
+  }
+
+  async createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage> {
+    const result = await this.db
+      .insert(supportMessages)
+      .values(message)
+      .returning();
+    return result[0];
+  }
+
+  async markSupportMessageAsRead(id: number): Promise<SupportMessage> {
+    const result = await this.db
+      .update(supportMessages)
+      .set({ isRead: true })
+      .where(eq(supportMessages.id, id))
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error(`Support message with ID ${id} not found`);
+    }
+
+    return result[0];
+  }
+
+  async getUnreadSupportMessageCount(): Promise<number> {
+    // Count all unread messages that are not from admin (i.e., from users)
+    const result = await this.db
+      .select({
+        count: this.db.fn.count(supportMessages.id)
+      })
+      .from(supportMessages)
+      .where(
+        and(
+          eq(supportMessages.isRead, false),
+          eq(supportMessages.isAdmin, false)
+        )
+      );
+    
+    return Number(result[0]?.count) || 0;
+  }
+
+  async getActiveSupportSessions(): Promise<{sessionId: string, lastMessage: Date, unreadCount: number}[]> {
+    // Raw query to get all active sessions with the time of last message and count of unread messages
+    const result = await this.pool.query(`
+      SELECT 
+        session_id as "sessionId", 
+        MAX(timestamp) as "lastMessage",
+        SUM(CASE WHEN is_read = false AND is_admin = false THEN 1 ELSE 0 END) as "unreadCount"
+      FROM support_messages 
+      GROUP BY session_id
+      ORDER BY MAX(timestamp) DESC
+    `);
+    
+    return result.rows;
   }
 }
 
