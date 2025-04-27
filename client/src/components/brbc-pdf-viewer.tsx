@@ -798,6 +798,9 @@ export function BRBCPdfViewer({
       ) {
         // Set the PDF URL to the preview PDF
         setPdfUrl(response.data.pdfUrl);
+        
+        // Mark that user has previewed the document at least once
+        setHasPreviewedOnce(true);
       } else {
         throw new Error("Failed to generate preview");
       }
@@ -1614,39 +1617,48 @@ export function BRBCPdfViewer({
                   </Button>
 
                   {/* Submit button - now shows confirmation dialog */}
-                  <Button
-                    onClick={() => {
-                      // Force a final check of all signatures before submission
-                      if (signatureRef.current) {
-                        setSignatureIsEmpty(signatureRef.current.isEmpty());
-                      }
-                      if (initialsRef.current) {
-                        setInitialsIsEmpty(initialsRef.current.isEmpty());
-                      }
+                  <div className="flex flex-col">
+                    <Button
+                      onClick={() => {
+                        // Force a final check of all signatures before submission
+                        if (signatureRef.current) {
+                          setSignatureIsEmpty(signatureRef.current.isEmpty());
+                        }
+                        if (initialsRef.current) {
+                          setInitialsIsEmpty(initialsRef.current.isEmpty());
+                        }
 
-                      // Use a short timeout to let state update before submitting
-                      setTimeout(() => {
-                        handleSubmitSignature();
-                      }, 50);
-                    }}
-                    disabled={
-                      isSubmitting ||
-                      isPreviewing ||
-                      (!savedSignatures.primary && signatureIsEmpty) ||
-                      (!savedSignatures.initials && initialsIsEmpty) ||
-                      !termsAgreed
-                    }
-                    className="mr-2"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Submitting...
-                      </>
-                    ) : (
-                      "Submit Agreement"
+                        // Use a short timeout to let state update before submitting
+                        setTimeout(() => {
+                          handleSubmitSignature();
+                        }, 50);
+                      }}
+                      disabled={
+                        isSubmitting ||
+                        isPreviewing ||
+                        (!savedSignatures.primary && signatureIsEmpty) ||
+                        (!savedSignatures.initials && initialsIsEmpty) ||
+                        !termsAgreed ||
+                        !hasPreviewedOnce
+                      }
+                      className="mr-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        "Submit Agreement"
+                      )}
+                    </Button>
+                    
+                    {!hasPreviewedOnce && !isPreviewing && (
+                      <span className="text-xs text-amber-600 mt-1">
+                        Please view preview at least once before submitting
+                      </span>
                     )}
-                  </Button>
+                  </div>
                 </div>
 
                 <Button variant="outline" onClick={handleClose}>
