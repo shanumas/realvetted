@@ -190,7 +190,7 @@ BODY: ""
  * @returns Array of email records
  */
 export async function getSentEmailsForEntity(
-  entityType: "viewing_request" | "property" | "agreement",
+  entityType: "viewing_request" | "property" | "agreement" | "support_chat",
   entityId: number,
 ): Promise<Email[]> {
   try {
@@ -437,4 +437,94 @@ ${body}
   sentEmails.push(sentEmail);
 
   return sentEmail;
+}
+
+/**
+ * Send notification email when a new support chat session starts
+ * @param customerName Name of the customer who started the chat
+ * @param customerEmail Email of the customer (if provided)
+ * @param initialMessage The first message sent by the customer
+ * @param sessionId The unique session ID for joining the chat
+ * @returns The sent email record
+ */
+export async function sendSupportChatNotification(
+  customerName: string,
+  customerEmail: string,
+  initialMessage: string,
+  sessionId: string
+): Promise<Email | null> {
+  // Admin email that will receive notifications
+  const adminEmail = "shanumas@gmail.com";
+  
+  // Prepare email content
+  const subject = `New Customer Support Chat - ${customerName}`;
+  const body = `
+Dear Admin,
+
+A new customer support chat has been initiated:
+
+Customer: ${customerName}
+Email: ${customerEmail}
+Session ID: ${sessionId}
+Time: ${new Date().toLocaleString()}
+
+First message:
+"${initialMessage}"
+
+Please log in to the admin dashboard to respond to this customer.
+Support chat URL: https://realvetted.com/admin/support/${sessionId}
+
+Thank you,
+REALVetted Support System
+  `;
+
+  console.log(`
+======= SUPPORT CHAT NOTIFICATION EMAIL =======
+TO: ${adminEmail}
+SUBJECT: ${subject}
+BODY:
+${body}
+======= END EMAIL =======
+  `);
+
+  try {
+    // Send email using EmailJS
+    const response = await emailjs.send(
+      "service_z8eslzt", // Service ID
+      "template_4bptn9b", // Template ID
+      {
+        to_email: adminEmail,
+        cc_email: "", // No CC for support notifications
+        from_name: "REALVetted Support System",
+        subject: subject,
+        message: body,
+      }
+    );
+
+    console.log("Support chat notification email sent successfully:", response);
+
+    // Create email record in database
+    const emailId = generateUUID();
+    try {
+      const newEmail = await storage.createEmail({
+        externalId: emailId,
+        to: [adminEmail],
+        cc: [],
+        subject,
+        body,
+        status: "sent",
+        sentById: 0, // System-generated email
+        sentByRole: "system",
+        relatedEntityType: "support_chat",
+        relatedEntityId: 0, // No specific ID for support chats yet
+      });
+      return newEmail;
+    } catch (error) {
+      console.error("Error storing support chat notification email in database:", error);
+      return null;
+    }
+  } catch (error) {
+    console.error("Error sending support chat notification email:", error);
+    return null;
+  }
 }

@@ -9,7 +9,7 @@ interface Client {
   lastPing: number;
 }
 
-export function setupWebSocketServer(server: Server) {
+export function setupWebSocketServer(server: Server, supportChatHandler?: Function) {
   // Create WebSocket server on a specific path
   const wss = new WebSocketServer({ server, path: '/ws' });
   
@@ -34,6 +34,26 @@ export function setupWebSocketServer(server: Server) {
         switch (data.type) {
           case 'message':
             await handleChatMessage(data.data, client);
+            break;
+          
+          case 'support':
+            // Handle support chat messages
+            if (supportChatHandler) {
+              const result = await supportChatHandler(data.data, client);
+              if (result) {
+                // Broadcast support message to admins
+                broadcastToAdmins({
+                  type: 'support',
+                  data: result
+                });
+                
+                // Send back to the original sender
+                socket.send(JSON.stringify({
+                  type: 'support',
+                  data: result
+                }));
+              }
+            }
             break;
             
           case 'ping':
@@ -153,8 +173,26 @@ export function setupWebSocketServer(server: Server) {
     });
   }
   
+  // Broadcast message to all admin users
+  async function broadcastToAdmins(message: WebSocketMessage) {
+    const messageStr = JSON.stringify(message);
+    
+    // Get all admin users
+    const adminUsers = await storage.getUsersByRole('admin');
+    const adminIds = adminUsers.map(user => user.id);
+    
+    // Send to all connected admin users
+    clients.forEach((client) => {
+      if (client.userId && adminIds.includes(client.userId) && 
+          client.socket.readyState === WebSocket.OPEN) {
+        client.socket.send(messageStr);
+      }
+    });
+  }
+  
   return {
     broadcastToUsers,
-    broadcast
+    broadcast,
+    broadcastToAdmins
   };
 }
