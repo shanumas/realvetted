@@ -136,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const inline = req.query.inline !== "false"; // Default to inline viewing unless specified
 
       // Only allow specific PDF files to be served
-      if (!["brbc.pdf", "brsr.pdf"].includes(filename)) {
+      if (!["brbc.pdf"].includes(filename)) {
         return res.status(404).json({
           success: false,
           error: "File not found",
@@ -2467,29 +2467,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Public viewing request routes (no authentication required)
-  
+
   // Get a viewing request by token (public access)
   app.get("/api/public/viewing-request/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      
+
       if (!token) {
         return res.status(400).json({
           success: false,
-          error: "Invalid token"
+          error: "Invalid token",
         });
       }
-      
+
       // Validate the token and get viewing request data
       const validationResult = await validateViewingToken(token);
-      
+
       if (!validationResult || !validationResult.isValid) {
         return res.status(403).json({
           success: false,
-          error: validationResult?.errorMessage || "Invalid or expired token"
+          error: validationResult?.errorMessage || "Invalid or expired token",
         });
       }
-      
+
       // Format the dates for display
       const requestData = {
         viewingRequest: validationResult.viewingRequest,
@@ -2499,100 +2499,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: validationResult.buyer.firstName,
           lastName: validationResult.buyer.lastName,
           email: validationResult.buyer.email,
-          phone: validationResult.buyer.phone
+          phone: validationResult.buyer.phone,
         },
-        agent: validationResult.agent ? {
-          // Only include necessary agent info
-          firstName: validationResult.agent.firstName,
-          lastName: validationResult.agent.lastName,
-          email: validationResult.agent.email,
-          phone: validationResult.agent.phone
-        } : null,
-        token: token
+        agent: validationResult.agent
+          ? {
+              // Only include necessary agent info
+              firstName: validationResult.agent.firstName,
+              lastName: validationResult.agent.lastName,
+              email: validationResult.agent.email,
+              phone: validationResult.agent.phone,
+            }
+          : null,
+        token: token,
       };
-      
+
       res.json({
         success: true,
-        data: requestData
+        data: requestData,
       });
     } catch (error) {
       console.error("Error getting public viewing request:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to get viewing request information"
+        error: "Failed to get viewing request information",
       });
     }
   });
-  
+
   // Handle public viewing request response (accept, reject, reschedule)
   app.post("/api/public/viewing-request/:token/respond", async (req, res) => {
     try {
       const { token } = req.params;
-      const { status, responseMessage, confirmedDate, confirmedEndDate } = req.body;
-      
+      const { status, responseMessage, confirmedDate, confirmedEndDate } =
+        req.body;
+
       if (!token) {
         return res.status(400).json({
           success: false,
-          error: "Invalid token"
+          error: "Invalid token",
         });
       }
-      
+
       // Validate the status
       if (!["accepted", "rejected", "rescheduled"].includes(status)) {
         return res.status(400).json({
           success: false,
-          error: "Invalid status. Must be one of: accepted, rejected, rescheduled"
+          error:
+            "Invalid status. Must be one of: accepted, rejected, rescheduled",
         });
       }
-      
+
       // For rescheduled requests, ensure we have new dates
       if (status === "rescheduled" && (!confirmedDate || !confirmedEndDate)) {
         return res.status(400).json({
           success: false,
-          error: "Confirmed date and end date are required for rescheduling"
+          error: "Confirmed date and end date are required for rescheduling",
         });
       }
-      
+
       // Validate the token and get viewing request data
       const validationResult = await validateViewingToken(token);
-      
+
       if (!validationResult || !validationResult.isValid) {
         return res.status(403).json({
           success: false,
-          error: validationResult?.errorMessage || "Invalid or expired token"
+          error: validationResult?.errorMessage || "Invalid or expired token",
         });
       }
-      
+
       // Don't allow changing a viewing request that's not pending
       if (validationResult.viewingRequest.status !== "pending") {
         return res.status(400).json({
           success: false,
-          error: `This viewing request has already been ${validationResult.viewingRequest.status}`
+          error: `This viewing request has already been ${validationResult.viewingRequest.status}`,
         });
       }
-      
+
       // Create update data object
       const updateData: Partial<ViewingRequest> = {
         status,
         responseMessage: responseMessage || null,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
-      
+
       // Add confirmed dates if provided
       if (confirmedDate) {
         updateData.confirmedDate = new Date(confirmedDate);
       }
-      
+
       if (confirmedEndDate) {
         updateData.confirmedEndDate = new Date(confirmedEndDate);
       }
-      
+
       // Update the viewing request
       const updatedRequest = await storage.updateViewingRequest(
         validationResult.viewingRequest.id,
-        updateData
+        updateData,
       );
-      
+
       // Log the activity
       await storage.createPropertyActivityLog({
         propertyId: validationResult.property.id,
@@ -2601,28 +2605,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         details: {
           requestId: updatedRequest.id,
           status: updatedRequest.status,
-          via: "public_link"
-        }
+          via: "public_link",
+        },
       });
-      
+
       // Make token single-use if the status is accepted or rejected
       if (status === "accepted" || status === "rejected") {
         await storage.invalidateViewingToken(token);
       }
-      
+
       // Return success response
       res.json({
         success: true,
         data: {
           viewingRequest: updatedRequest,
-          message: `Viewing request ${status === "accepted" ? "accepted" : status === "rejected" ? "rejected" : "rescheduled"} successfully`
-        }
+          message: `Viewing request ${status === "accepted" ? "accepted" : status === "rejected" ? "rejected" : "rescheduled"} successfully`,
+        },
       });
     } catch (error) {
       console.error("Error responding to viewing request:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to respond to viewing request"
+        error: "Failed to respond to viewing request",
       });
     }
   });
@@ -5355,9 +5359,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         // Create the viewing request
         const viewingRequest =
           await storage.createViewingRequest(requestDataWithAgent);
-          
+
         // Generate a public link for the viewing request (similar to Calendly)
-        const publicViewingLink = await getPublicViewingRequestLink(viewingRequest.id);
+        const publicViewingLink = await getPublicViewingRequestLink(
+          viewingRequest.id,
+        );
 
         // Log the activity
         try {
@@ -5370,7 +5376,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               requestedDate: viewingRequest.requestedDate,
               requestedEndDate: viewingRequest.requestedEndDate,
               agentId: property.agentId,
-              publicViewingLink: publicViewingLink
+              publicViewingLink: publicViewingLink,
             },
           });
         } catch (logError) {
@@ -5452,9 +5458,9 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             // Add the public link to the viewing request for the email
             const viewingRequestWithLink = {
               ...viewingRequest,
-              publicViewingLink
+              publicViewingLink,
             };
-            
+
             // Send the email notification with public link
             await sendTourRequestEmail(
               viewingRequestWithLink, // Use the enhanced object with public link
@@ -5485,7 +5491,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           success: true,
           data: {
             ...viewingRequest,
-            publicViewingLink
+            publicViewingLink,
           },
         });
       } catch (error) {
@@ -5559,13 +5565,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             }
 
             // Generate public viewing link for each request
-            const publicViewingLink = await getPublicViewingRequestLink(request.id);
-            
+            const publicViewingLink = await getPublicViewingRequestLink(
+              request.id,
+            );
+
             return {
               ...request,
               buyer,
               agent,
-              publicViewingLink
+              publicViewingLink,
             } as ViewingRequestWithParticipants;
           }),
         );
@@ -5604,13 +5612,15 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
                 : undefined;
 
             // Generate public viewing link
-            const publicViewingLink = await getPublicViewingRequestLink(request.id);
-            
+            const publicViewingLink = await getPublicViewingRequestLink(
+              request.id,
+            );
+
             return {
               ...request,
               property,
               agent,
-              publicViewingLink
+              publicViewingLink,
             };
           }),
         );
@@ -5648,14 +5658,16 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
             // Include the agent information to fix the missing agent data issue
             // Generate public viewing link
-            const publicViewingLink = await getPublicViewingRequestLink(request.id);
-            
+            const publicViewingLink = await getPublicViewingRequestLink(
+              request.id,
+            );
+
             return {
               ...request,
               property,
               buyer,
               agent,
-              publicViewingLink
+              publicViewingLink,
             };
           }),
         );
@@ -6827,60 +6839,62 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       });
     }
   });
-  
+
   // Public endpoint to access a viewing request using a token (for listing agents)
   app.get("/api/public/viewing/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      
+
       if (!token) {
         return res.status(400).json({
           success: false,
-          error: "Missing token"
+          error: "Missing token",
         });
       }
-      
+
       // Validate the token and get associated data
       const validationResult = await validateViewingToken(token);
-      
+
       if (!validationResult) {
         return res.status(404).json({
           success: false,
-          error: "Invalid or expired token"
+          error: "Invalid or expired token",
         });
       }
-      
+
       const { viewingRequest, property, buyer, agent } = validationResult;
-      
+
       // Format the buyer name safely
-      const buyerName = buyer ? 
-        `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email : 
-        'Unknown Buyer';
-        
-      // Format the agent name safely  
-      const agentName = agent ? 
-        `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || agent.email : 
-        undefined;
-      
+      const buyerName = buyer
+        ? `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() ||
+          buyer.email
+        : "Unknown Buyer";
+
+      // Format the agent name safely
+      const agentName = agent
+        ? `${agent.firstName || ""} ${agent.lastName || ""}`.trim() ||
+          agent.email
+        : undefined;
+
       // Return the viewing request data with the property
       const response: PublicViewingResponse = {
         success: true,
         viewingRequest: {
           ...viewingRequest,
           buyer,
-          agent
+          agent,
         },
         property,
         buyerName,
-        agentName
+        agentName,
       };
-      
+
       res.json(response);
     } catch (error) {
-      console.error('Error accessing public viewing:', error);
+      console.error("Error accessing public viewing:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to retrieve viewing request"
+        error: "Failed to retrieve viewing request",
       });
     }
   });
@@ -6889,27 +6903,28 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.patch("/api/public/viewing/:token", async (req, res) => {
     try {
       const { token } = req.params;
-      const { status, confirmedDate, confirmedEndDate, responseMessage } = req.body;
-      
+      const { status, confirmedDate, confirmedEndDate, responseMessage } =
+        req.body;
+
       if (!token) {
         return res.status(400).json({
           success: false,
-          error: "Missing token"
+          error: "Missing token",
         });
       }
-      
+
       // Validate the token and get associated data
       const validationResult = await validateViewingToken(token);
-      
+
       if (!validationResult) {
         return res.status(404).json({
           success: false,
-          error: "Invalid or expired token"
+          error: "Invalid or expired token",
         });
       }
-      
+
       const { viewingRequest, property } = validationResult;
-      
+
       // Validate the status
       if (
         status &&
@@ -6927,27 +6942,29 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           error: "Invalid status value",
         });
       }
-      
+
       // Create update data object
       const updateData: Partial<ViewingRequest> = {};
       if (status) updateData.status = status;
       if (confirmedDate) updateData.confirmedDate = new Date(confirmedDate);
-      if (confirmedEndDate) updateData.confirmedEndDate = new Date(confirmedEndDate);
+      if (confirmedEndDate)
+        updateData.confirmedEndDate = new Date(confirmedEndDate);
       if (responseMessage) updateData.responseMessage = responseMessage;
-      
+
       // If accepting or rescheduling from external access, record who confirmed
       // For public access, we'll use the seller or listing agent as the confirmer if available
       if (["accepted", "rescheduled"].includes(status)) {
         // For public access, we'll use the property's seller or agent ID, prioritizing the agent
-        updateData.confirmedById = property.agentId || property.sellerId || null;
+        updateData.confirmedById =
+          property.agentId || property.sellerId || null;
       }
-      
+
       // Update the viewing request
       const updatedRequest = await storage.updateViewingRequest(
         viewingRequest.id,
         updateData,
       );
-      
+
       // Log the activity
       try {
         await storage.createPropertyActivityLog({
@@ -6967,30 +6984,30 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         );
         // Continue without failing the whole request
       }
-      
+
       // Send WebSocket notifications to all relevant users
       const notifyUserIds = [viewingRequest.buyerId]; // Always notify the buyer
-      
+
       // Notify the buyer's agent if assigned
       if (viewingRequest.buyerAgentId) {
         notifyUserIds.push(viewingRequest.buyerAgentId);
       }
-      
+
       // Notify the seller's agent if assigned
       if (viewingRequest.sellerAgentId) {
         notifyUserIds.push(viewingRequest.sellerAgentId);
       }
-      
+
       // Notify the seller if assigned
       if (property.sellerId) {
         notifyUserIds.push(property.sellerId);
       }
-      
+
       // Notify the property's agent if assigned
       if (property.agentId) {
         notifyUserIds.push(property.agentId);
       }
-      
+
       websocketServer.broadcastToUsers(notifyUserIds, {
         type: "property_update",
         data: {
@@ -7001,7 +7018,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           message: `Viewing request has been ${updatedRequest.status} by listing agent via public link`,
         },
       });
-      
+
       res.json({
         success: true,
         data: updatedRequest,
@@ -7010,7 +7027,10 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       console.error("Update public viewing request error:", error);
       res.status(500).json({
         success: false,
-        error: error instanceof Error ? error.message : "Failed to update viewing request",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update viewing request",
       });
     }
   });

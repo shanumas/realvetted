@@ -737,11 +737,26 @@ export default function BuyerPropertyDetail() {
                             {!buyerAgreements?.some(
                               (a) => a.type === "global_brbc",
                             ) && (
-                              <p className="text-sm text-center text-amber-600 mt-2">
-                                <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
-                                Please sign the Buyer Representation Agreement
-                                to request viewings.
-                              </p>
+                              <div className="text-sm text-center text-amber-600 mt-2">
+                                <p className="mb-1">
+                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
+                                  Please sign the Buyer Representation Agreement
+                                  to request viewings.
+                                </p>
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-amber-700 p-0 h-auto font-medium underline"
+                                  onClick={() =>
+                                    window.open(
+                                      "/api/docs/brbc.pdf?fillable=true&prefill=buyer",
+                                      "_blank",
+                                    )
+                                  }
+                                >
+                                  Sign Representation Agreement
+                                </Button>
+                              </div>
                             )}
                           </div>
                         )}
@@ -770,30 +785,6 @@ export default function BuyerPropertyDetail() {
                           <div className="text-center py-8 text-gray-500">
                             <Eye className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                             <p className="mb-3">No tour requests yet</p>
-                            {!buyerAgreements?.some(
-                              (a) => a.type === "global_brbc",
-                            ) && (
-                              <div className="text-sm text-center text-amber-600 mt-2">
-                                <p className="mb-1">
-                                  <AlertTriangle className="inline-block mr-1 h-4 w-4 text-amber-500" />
-                                  Please sign the Buyer Representation Agreement
-                                  to request viewings.
-                                </p>
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  className="text-amber-700 p-0 h-auto font-medium underline"
-                                  onClick={() =>
-                                    window.open(
-                                      "/api/docs/brsr.pdf?fillable=true&prefill=buyer",
-                                      "_blank",
-                                    )
-                                  }
-                                >
-                                  Sign Representation Agreement
-                                </Button>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
