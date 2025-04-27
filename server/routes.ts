@@ -451,7 +451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         try {
           await storage.updateUser(req.user!.id, {
-            verificationMethod: "prequalification",
+            verificationMethod: "pre-qual",
             prequalificationDocUrl: fileUrl,
             prequalificationValidated: false, // Will be validated via AI in the next step
             profileStatus: "pending", // Set to pending until validated
@@ -496,10 +496,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Update user record based on validation result
           if (validationResult.validated) {
+            // Check if user also has KYC verification
+            const hasKYC = user.verificationMethod === "kyc";
+            
             // Success - update user record with validation information
             await storage.updateUser(req.user!.id, {
               prequalificationValidated: true,
               profileStatus: "verified",
+              // If user already has KYC verification, set method to "both"
+              verificationMethod: hasKYC ? "both" : "pre-qual",
               prequalificationData: validationResult.data,
               prequalificationMessage: validationResult.message,
               prequalificationAttempts: currentAttempts + 1,

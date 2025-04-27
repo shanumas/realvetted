@@ -82,12 +82,17 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     switch (status) {
       case "success":
         profileStatus = "verified";
-        // Also update the verification method to "kyc" when verification succeeds
+        
+        // Check if the user also has pre-qualification validation
+        const hasPreQual = user.prequalificationValidated === true;
+        
+        // Also update the verification method based on whether they have pre-qualification
         await storage.updateUser(userId, {
           profileStatus: "verified",
-          verificationMethod: "kyc",
+          verificationMethod: hasPreQual ? "both" : "kyc",
         });
-        console.log(`User ${userId} verified successfully via KYC`);
+        
+        console.log(`User ${userId} verified successfully via KYC${hasPreQual ? " and pre-qualification" : ""}`);
         return; // Return early since we've already updated the user
         break;
       case "declined":
@@ -157,13 +162,23 @@ export async function checkVeriffSessionStatus(
           try {
             const userId = parseInt(data.verification.vendorData);
             if (!isNaN(userId)) {
+              // Get the current user to check for pre-qualification
+              const user = await storage.getUser(userId);
+              if (!user) {
+                throw new Error(`User not found with ID: ${userId}`);
+              }
+              
+              // Check if user has pre-qualification validation
+              const hasPreQual = user.prequalificationValidated === true;
+              
               // Update user profileStatus and verificationMethod
               await storage.updateUser(userId, {
                 profileStatus: "verified",
-                verificationMethod: "kyc",
+                verificationMethod: hasPreQual ? "both" : "kyc",
               });
+              
               console.log(
-                `User ${userId} verified successfully via KYC (from status check)`,
+                `User ${userId} verified successfully via KYC${hasPreQual ? " and pre-qualification" : ""} (from status check)`,
               );
             }
           } catch (updateError) {
