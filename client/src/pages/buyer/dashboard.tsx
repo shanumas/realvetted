@@ -311,14 +311,24 @@ export default function BuyerDashboard() {
                       </span>
                       {user?.profileStatus === "verified" && (
                         <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                          {user?.verificationMethod !== "prequalification" &&
-                          user?.profileStatus === "verified" &&
-                          user?.prequalificationValidated
-                            ? "Verified through both KYC and pre-qualification letter"
-                            : user?.verificationMethod !== "prequalification" &&
-                                user?.profileStatus === "verified"
-                              ? "Verified through KYC"
-                              : "Verified through pre-qualification letter"}
+                          {(() => {
+                            // KYC verification
+                            const hasKYC = user?.verificationMethod === "kyc";
+                            // Pre-qualification verification
+                            const hasPreQual = user?.prequalificationValidated === true;
+                            // Verification by pre-qualification only
+                            const preQualOnly = user?.verificationMethod === "prequalification";
+                            
+                            if (hasKYC && hasPreQual) {
+                              return "Verified through both KYC and pre-qualification";
+                            } else if (hasKYC) {
+                              return "Verified through KYC";
+                            } else if (preQualOnly || hasPreQual) {
+                              return "Verified through pre-qualification";
+                            } else {
+                              return "Verified"; // Fallback
+                            }
+                          })()}
                         </span>
                       )}
                     </span>
@@ -369,72 +379,99 @@ export default function BuyerDashboard() {
                       <Shield className="h-2.5 w-2.5 text-blue-700" />
                     </div>
                     <h5 className="font-medium text-gray-800 text-xs">
-                      Submit KYC
+                      Identity Verification (KYC)
                     </h5>
                   </div>
 
-                  {/* Veriff logo */}
-                  <div className="h-5 ml-1 flex items-center">
-                    <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
-                      by{" "}
-                      <span className="font-bold ml-0.5 text-blue-800">
-                        VERIFF
-                      </span>
+                  {/* Status badge for KYC */}
+                  {user?.verificationMethod === "kyc" && (
+                    <div className="bg-green-100 px-1.5 py-0.5 rounded text-[10px] font-medium text-green-700 border border-green-200">
+                      ✓ Verified
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Veriff logo */}
+                  {!user?.verificationMethod && (
+                    <div className="h-5 ml-1 flex items-center">
+                      <div className="text-[10px] text-blue-700 font-semibold italic flex items-center">
+                        by{" "}
+                        <span className="font-bold ml-0.5 text-blue-800">
+                          VERIFF
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {user?.verificationMethod === "kyc" ? (
                   <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
-                    ✓ Identity verified successfully
+                    ✓ Identity verified successfully through our secure KYC process
                   </div>
                 ) : (
-                  <Button
-                    className="w-full py-1 px-2 h-auto text-[10px]"
-                    onClick={startVerification}
-                    disabled={isVerifyingIdentity || isVerificationStarted}
-                  >
-                    {isVerifyingIdentity ? (
-                      <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />
-                    ) : (
-                      <Shield className="mr-1 h-2.5 w-2.5" />
-                    )}
-                    {isVerificationStarted
-                      ? "In Progress..."
-                      : isVerifyingIdentity
-                        ? "Starting..."
-                        : "Verify Now"}
-                  </Button>
+                  <>
+                    <div className="text-[10px] text-gray-600 mb-2">
+                      Complete identity verification using official ID documents.
+                    </div>
+                    <Button
+                      className="w-full py-1 px-2 h-auto text-[10px]"
+                      onClick={startVerification}
+                      disabled={isVerifyingIdentity || isVerificationStarted}
+                    >
+                      {isVerifyingIdentity ? (
+                        <Loader2 className="mr-1 h-2.5 w-2.5 animate-spin" />
+                      ) : (
+                        <Shield className="mr-1 h-2.5 w-2.5" />
+                      )}
+                      {isVerificationStarted
+                        ? "Verification In Progress..."
+                        : isVerifyingIdentity
+                          ? "Starting Verification..."
+                          : "Verify Identity Now"}
+                    </Button>
+                  </>
                 )}
               </div>
 
-              {/* "OR" divider */}
+              {/* Divider between verification options */}
               <div className="flex items-center justify-center mb-2">
                 <div className="border-t border-gray-200 flex-grow"></div>
-                <div className="mx-2 text-xs text-gray-500 font-medium">OR</div>
+                <div className="mx-2 text-xs text-gray-500 font-medium">Choose one verification method</div>
                 <div className="border-t border-gray-200 flex-grow"></div>
               </div>
 
               {/* Pre-qualification upload section - smaller */}
               <div className="bg-white rounded-md border border-gray-200 p-2">
-                <div className="flex items-center mb-1">
-                  <div className="bg-purple-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
-                    <Upload className="h-2.5 w-2.5 text-purple-700" />
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center">
+                    <div className="bg-purple-100 rounded-full w-5 h-5 flex items-center justify-center mr-1.5">
+                      <Upload className="h-2.5 w-2.5 text-purple-700" />
+                    </div>
+                    <h5 className="font-medium text-gray-800 text-xs">
+                      Pre-qualification Letter
+                    </h5>
                   </div>
-                  <h5 className="font-medium text-gray-800 text-xs">
-                    Upload Pre-qualification
-                  </h5>
+                  
+                  {/* Status badge */}
+                  {user?.prequalificationDocUrl && (
+                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                      user?.prequalificationValidated 
+                        ? "bg-green-100 text-green-700 border-green-200" 
+                        : "bg-amber-100 text-amber-700 border-amber-200"
+                    }`}>
+                      {user?.prequalificationValidated ? "✓ Verified" : "Pending"}
+                    </div>
+                  )}
                 </div>
 
                 {user?.prequalificationDocUrl ? (
                   <>
-                    <div className="mb-1 flex-grow">
+                    <div className="mb-2 flex-grow">
                       <div
                         className={`text-[10px] font-medium ${user?.prequalificationValidated ? "text-green-600" : "text-amber-600"}`}
                       >
                         {user?.prequalificationValidated
-                          ? "✓ Document validated successfully"
-                          : "⚠️ Document validation pending"}
+                          ? "✓ Pre-qualification document validated successfully"
+                          : "⚠️ Document validation in progress"}
                       </div>
                       {user?.prequalificationMessage &&
                         !user?.prequalificationValidated && (
@@ -455,6 +492,9 @@ export default function BuyerDashboard() {
                   </>
                 ) : (
                   <>
+                    <div className="text-[10px] text-gray-600 mb-2">
+                      Upload your pre-qualification letter to verify your buying power.
+                    </div>
                     <Button
                       className="w-full py-1 px-2 h-auto text-[10px]"
                       onClick={() => setIsPrequalificationModalOpen(true)}
