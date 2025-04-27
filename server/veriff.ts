@@ -61,6 +61,7 @@ export async function createVeriffSession(
 export async function processVeriffWebhook(webhookData: any): Promise<void> {
   try {
     // Validate webhook signature if needed
+    console.log("--------Received Veriff webhook data:");
 
     const userId = parseInt(webhookData.vendorData);
     const status = webhookData.verification.status;
@@ -82,9 +83,9 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
       case "success":
         profileStatus = "verified";
         // Also update the verification method to "kyc" when verification succeeds
-        await storage.updateUser(userId, { 
+        await storage.updateUser(userId, {
           profileStatus: "verified",
-          verificationMethod: "kyc" 
+          verificationMethod: "kyc",
         });
         console.log(`User ${userId} verified successfully via KYC`);
         return; // Return early since we've already updated the user
@@ -145,25 +146,34 @@ export async function checkVeriffSessionStatus(
       const data = JSON.parse(responseText);
       if (data && data.decision) {
         console.log(`Verification status: ${data.decision}`);
-        
+
         // If verification is successful and we have the vendorData (user ID),
         // also update the verification method to KYC
-        if (data.decision === "success" && data.verification && data.verification.vendorData) {
+        if (
+          data.decision === "success" &&
+          data.verification &&
+          data.verification.vendorData
+        ) {
           try {
             const userId = parseInt(data.verification.vendorData);
             if (!isNaN(userId)) {
               // Update user profileStatus and verificationMethod
               await storage.updateUser(userId, {
                 profileStatus: "verified",
-                verificationMethod: "kyc"
+                verificationMethod: "kyc",
               });
-              console.log(`User ${userId} verified successfully via KYC (from status check)`);
+              console.log(
+                `User ${userId} verified successfully via KYC (from status check)`,
+              );
             }
           } catch (updateError) {
-            console.error("Error updating user verification method:", updateError);
+            console.error(
+              "Error updating user verification method:",
+              updateError,
+            );
           }
         }
-        
+
         return data.decision;
       } else {
         return data.decision || "pending";

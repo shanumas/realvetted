@@ -311,10 +311,12 @@ export default function BuyerDashboard() {
                       </span>
                       {user?.profileStatus === "verified" && (
                         <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                          {user?.verificationMethod === "prequalification" &&
+                          {user?.verificationMethod !== "prequalification" &&
+                          user?.profileStatus === "verified" &&
                           user?.prequalificationValidated
                             ? "Verified through both KYC and pre-qualification letter"
-                            : user?.verificationMethod === "prequalification"
+                            : user?.verificationMethod !== "prequalification" &&
+                                user?.profileStatus === "verified"
                               ? "Verified through KYC"
                               : "Verified through pre-qualification letter"}
                         </span>
