@@ -45,20 +45,50 @@ export interface PrequalificationData {
 
 /**
  * Validate pre-qualification document
+ * 
+ * @param filePathOrText Either a file path or the text content from a document
+ * @param userData Optional user data to enhance validation
+ * @returns Validation result with extracted data and validity status
  */
 export async function validatePrequalificationDocument(
-  pdfText: string,
-): Promise<{ isValid: boolean; data: PrequalificationData }> {
+  filePathOrText: string,
+  userData?: {
+    firstName?: string | null;
+    lastName?: string | null;
+  }
+): Promise<{ validated: boolean; data: PrequalificationData; message?: string }> {
   try {
-    // If no API key, use mock for development
+    // If no API key, return empty validation
     if (
       !process.env.OPENAI_API_KEY ||
       process.env.OPENAI_API_KEY === "dummy_key_for_development"
     ) {
       console.log("No OpenAI API key provided, returning empty validation");
       return {
-        isValid: false,
-        data: {}, // Empty object, no fake data
+        validated: false,
+        data: {}, 
+        message: "API key is missing. Manual validation required."
+      };
+    }
+
+    // Extract text from PDF if a file path is provided
+    let pdfText: string;
+    if (filePathOrText && fs.existsSync(filePathOrText)) {
+      console.log("Extracting text from PDF file:", filePathOrText);
+      // Use the PDF extraction utility
+      const extractedText = await extractPdfText(filePathOrText);
+      pdfText = extractedText;
+    } else {
+      // Assume the input is already text
+      pdfText = filePathOrText;
+    }
+
+    // If we couldn't extract any meaningful text
+    if (!pdfText || pdfText.trim().length < 50) {
+      return {
+        validated: false,
+        data: {},
+        message: "Could not extract sufficient text from document. Please upload a text-based PDF."
       };
     }
 
@@ -85,7 +115,7 @@ export async function validatePrequalificationDocument(
     `;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // Using the latest model for better validation
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
           role: "system",
@@ -117,16 +147,26 @@ export async function validatePrequalificationDocument(
       approvalDate: result.approvalDate || null,
       expirationDate: result.expirationDate || null,
     };
-
+    
+    // Check if the document is valid
+    const isValid = result.isValidDocument === true;
+    
+    // Create appropriate message
+    let message = isValid 
+      ? "Document successfully validated as a pre-qualification letter." 
+      : "Document does not appear to be a valid pre-qualification letter.";
+      
     return {
-      isValid: result.isValidDocument === true,
+      validated: isValid,
       data: validationData,
+      message: message
     };
   } catch (error) {
     console.error("Error validating pre-qualification document:", error);
     return {
-      isValid: false,
+      validated: false,
       data: {},
+      message: "Error processing document. Please try a different file format."
     };
   }
 }
