@@ -1083,7 +1083,7 @@ export function BRBCPdfViewer({
                     {/* Buyer 1 Signature Section */}
                     <div>
                       {/* Buyer 1 Information Fields */}
-                      <div className="mb-4 space-y-3">
+                      <div className="space-y-3">
                         <div className="flex flex-col">
                           <label className="text-sm font-medium mb-1 text-gray-700">
                             Full Name:
@@ -1109,7 +1109,7 @@ export function BRBCPdfViewer({
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center">
                         <h4 className="font-medium">
                           Signature - full signature
                         </h4>
@@ -1123,7 +1123,7 @@ export function BRBCPdfViewer({
                           Clear
                         </Button>
                       </div>
-                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                      <div className="border border-gray-300 rounded-md flex-grow bg-white h-32">
                         <SignatureCanvas
                           ref={signatureRef}
                           canvasProps={{
@@ -1136,7 +1136,7 @@ export function BRBCPdfViewer({
                       </div>
 
                       {/* Buyer 1 Initials Section */}
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center">
                         <h4 className="font-medium">
                           Initials - short signature
                         </h4>
@@ -1150,7 +1150,7 @@ export function BRBCPdfViewer({
                           Clear
                         </Button>
                       </div>
-                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
+                      <div className="border border-gray-300 rounded-md flex-grow bg-white h-24 w-1/2">
                         <SignatureCanvas
                           ref={initialsRef}
                           canvasProps={{
@@ -1172,9 +1172,9 @@ export function BRBCPdfViewer({
                     {/* Buyer 2 Signature Section */}
                     <div>
                       {/* Buyer 2 Information Fields - Only Name */}
-                      <div className="mb-4">
+                      <div className="">
                         <div className="flex flex-col">
-                          <label className="text-sm font-medium mb-1 text-gray-700">
+                          <label className="text-sm font-medium text-gray-700">
                             Full Name:
                           </label>
                           <input
@@ -1193,7 +1193,7 @@ export function BRBCPdfViewer({
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center">
                         <h4 className="font-medium">
                           Signature - Full Signature
                         </h4>
@@ -1207,7 +1207,7 @@ export function BRBCPdfViewer({
                           Clear
                         </Button>
                       </div>
-                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-32">
+                      <div className="border border-gray-300 rounded-md lex-grow bg-white h-32">
                         <SignatureCanvas
                           ref={buyer2SignatureRef}
                           canvasProps={{
@@ -1220,7 +1220,7 @@ export function BRBCPdfViewer({
                       </div>
 
                       {/* Buyer 2 Initials Section */}
-                      <div className="flex justify-between items-center mb-2">
+                      <div className="flex justify-between items-center">
                         <h4 className="font-medium">
                           Initials - Short Signature
                         </h4>
@@ -1234,7 +1234,7 @@ export function BRBCPdfViewer({
                           Clear
                         </Button>
                       </div>
-                      <div className="border border-gray-300 rounded-md mb-4 flex-grow bg-white h-24 w-1/2">
+                      <div className="border border-gray-300 rounded-md flex-grow bg-white h-24 w-1/2">
                         <SignatureCanvas
                           ref={buyer2InitialsRef}
                           canvasProps={{
@@ -1269,7 +1269,9 @@ export function BRBCPdfViewer({
                       }}
                       className="w-24"
                     >
-                      {activeTab === "buyer1-signature" ? "Buyer 2" : "Buyer 1"}
+                      {activeTab === "buyer1-signature"
+                        ? "Goto Buyer 2"
+                        : "Goto Buyer 1"}
                     </Button>
                   </div>
                 </Tabs>

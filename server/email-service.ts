@@ -52,7 +52,7 @@ export async function sendTourRequestEmail(
   buyer: User,
   agent: User | undefined,
   listingAgentEmail: string,
-  listingAgentName: string
+  listingAgentName: string,
 ): Promise<SentEmail> {
   // Format the date and time for the email
   const requestDate = new Date(viewingRequest.requestedDate);
@@ -114,7 +114,7 @@ BODY: ""
 
     // Send email using EmailJS Node.js version
     const response = await emailjs.send(
-      "service_erfsoqn", // Service ID
+      "service_z8eslzt", // Service ID
       "template_4bptn9b", // Template ID
       {
         to_email: to.join(", "),
@@ -375,7 +375,7 @@ ${body}
 
     // Send email using EmailJS Node.js version
     const response = await emailjs.send(
-      "service_erfsoqn", // Service ID
+      "service_z8eslzt", // Service ID
       "template_4bptn9b", // Template ID
       {
         to_email: to.join(", "),
