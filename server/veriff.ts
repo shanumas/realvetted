@@ -81,6 +81,13 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     switch (status) {
       case "success":
         profileStatus = "verified";
+        // Also update the verification method to "kyc" when verification succeeds
+        await storage.updateUser(userId, { 
+          profileStatus: "verified",
+          verificationMethod: "kyc" 
+        });
+        console.log(`User ${userId} verified successfully via KYC`);
+        return; // Return early since we've already updated the user
         break;
       case "declined":
         profileStatus = "rejected";
@@ -94,6 +101,7 @@ export async function processVeriffWebhook(webhookData: any): Promise<void> {
     }
 
     // Update the user's profile status
+    console.log(`Updating user ${userId} profile status to ${profileStatus}`);
     await storage.updateUser(userId, { profileStatus });
   } catch (error) {
     console.error("Error processing Veriff webhook:", error);
@@ -137,9 +145,28 @@ export async function checkVeriffSessionStatus(
       const data = JSON.parse(responseText);
       if (data && data.decision) {
         console.log(`Verification status: ${data.decision}`);
+        
+        // If verification is successful and we have the vendorData (user ID),
+        // also update the verification method to KYC
+        if (data.decision === "success" && data.verification && data.verification.vendorData) {
+          try {
+            const userId = parseInt(data.verification.vendorData);
+            if (!isNaN(userId)) {
+              // Update user profileStatus and verificationMethod
+              await storage.updateUser(userId, {
+                profileStatus: "verified",
+                verificationMethod: "kyc"
+              });
+              console.log(`User ${userId} verified successfully via KYC (from status check)`);
+            }
+          } catch (updateError) {
+            console.error("Error updating user verification method:", updateError);
+          }
+        }
+        
         return data.decision;
       } else {
-        return data.decision;
+        return data.decision || "pending";
       }
     } catch (fetchError) {
       console.error("Error fetching from Veriff API:", fetchError);
