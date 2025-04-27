@@ -305,16 +305,17 @@ export default function BuyerDashboard() {
                     <span>
                       Status:{" "}
                       <span className="font-semibold">
-                        {user?.profileStatus === "verified"
+                        {user?.verificationMethod === "prequalification" ||
+                        user?.prequalificationValidated
                           ? "Verified"
                           : "Pending"}
                       </span>
                       {user?.profileStatus === "verified" && (
                         <span className="ml-2 text-xs bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">
-                          {user?.verificationMethod === "kyc" &&
+                          {user?.verificationMethod === "prequalification" &&
                           user?.prequalificationValidated
                             ? "Verified through both KYC and pre-qualification letter"
-                            : user?.verificationMethod === "kyc"
+                            : user?.verificationMethod === "prequalification"
                               ? "Verified through KYC"
                               : "Verified through pre-qualification letter"}
                         </span>
@@ -811,12 +812,7 @@ export default function BuyerDashboard() {
 
             <TabsContent value="viewingRequests" className="p-0">
               {/* Fetch and display viewing requests */}
-              {user && (
-                <ViewingRequestsList 
-                  userId={user.id} 
-                  role="buyer" 
-                />
-              )}
+              {user && <ViewingRequestsList userId={user.id} role="buyer" />}
             </TabsContent>
           </Tabs>
         </div>

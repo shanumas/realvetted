@@ -129,7 +129,7 @@ export function PrequalificationUpload({
     // Create FormData with the file
     const formData = new FormData();
     formData.append("file", selectedFile);
-    formData.append("verificationMethod", "prequalification");
+    //formData.append("verificationMethod", "prequalification");
 
     console.log(
       "Uploading file:",
