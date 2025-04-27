@@ -1653,7 +1653,7 @@ export function BRBCPdfViewer({
                       )}
                     </Button>
                     
-                    {!hasPreviewedOnce && !isPreviewing && (
+                    {!hasPreviewedOnce && !isPreviewing && !showAgreementTermsPage && (
                       <span className="text-xs text-amber-600 mt-1">
                         Please view preview at least once before submitting
                       </span>
