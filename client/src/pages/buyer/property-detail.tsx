@@ -416,11 +416,15 @@ export default function BuyerPropertyDetail() {
 
     // Disclosure form check removed
     // Submit viewing request directly instead
-    // Convert null to undefined for listingAgentEmail to satisfy type requirements
+    // Create a properly typed object for the mutation
     const mutationData = {
-      ...requestData,
-      listingAgentEmail: requestData.listingAgentEmail || undefined,
-      override: true,
+      date: requestData.date,
+      time: requestData.time,
+      endTime: requestData.endTime,
+      notes: requestData.notes,
+      // Explicitly convert null to undefined
+      listingAgentEmail: typeof requestData.listingAgentEmail === 'string' ? requestData.listingAgentEmail : undefined,
+      override: true
     };
     requestViewingMutation.mutate(mutationData);
   };
@@ -1063,11 +1067,19 @@ export default function BuyerPropertyDetail() {
             <AlertDialogAction
               onClick={() => {
                 if (pendingRequestData) {
-                  // Submit the request with override flag set to true
-                  requestViewingMutation.mutate({
-                    ...pendingRequestData,
-                    override: true,
-                  });
+                  // Create a properly typed object for the mutation
+                  const mutationData = {
+                    date: pendingRequestData.date,
+                    time: pendingRequestData.time,
+                    endTime: pendingRequestData.endTime,
+                    notes: pendingRequestData.notes,
+                    // Explicitly convert null to undefined
+                    listingAgentEmail: typeof pendingRequestData.listingAgentEmail === 'string' 
+                      ? pendingRequestData.listingAgentEmail 
+                      : undefined,
+                    override: true
+                  };
+                  requestViewingMutation.mutate(mutationData);
                 }
               }}
               className="bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-600"
