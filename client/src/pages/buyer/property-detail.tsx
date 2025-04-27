@@ -105,6 +105,7 @@ export default function BuyerPropertyDetail() {
     time: string;
     endTime: string;
     notes: string;
+    listingAgentEmail?: string;
   } | null>(null);
   const [existingRequestInfo, setExistingRequestInfo] = useState<{
     existingRequestId?: number;
@@ -190,6 +191,7 @@ export default function BuyerPropertyDetail() {
       endTime: string;
       notes: string;
       override?: boolean;
+      listingAgentEmail?: string;
     }) => {
       console.log("Requesting property viewing with data:", {
         propertyId,
@@ -414,10 +416,13 @@ export default function BuyerPropertyDetail() {
 
     // Disclosure form check removed
     // Submit viewing request directly instead
-    requestViewingMutation.mutate({
+    // Convert null to undefined for listingAgentEmail to satisfy type requirements
+    const mutationData = {
       ...requestData,
+      listingAgentEmail: requestData.listingAgentEmail || undefined,
       override: true,
-    });
+    };
+    requestViewingMutation.mutate(mutationData);
   };
 
   // Disclosure form related handlers removed
@@ -749,12 +754,7 @@ export default function BuyerPropertyDetail() {
                                   variant="link"
                                   size="sm"
                                   className="text-amber-700 p-0 h-auto font-medium underline"
-                                  onClick={() =>
-                                    window.open(
-                                      "/api/docs/brbc.pdf?fillable=true&prefill=buyer",
-                                      "_blank",
-                                    )
-                                  }
+                                  onClick={() => setIsBRBCPdfViewerOpen(true)}
                                 >
                                   Sign Representation Agreement
                                 </Button>
@@ -1077,6 +1077,22 @@ export default function BuyerPropertyDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* BRBC PDF Viewer */}
+      <BRBCPdfViewer
+        isOpen={isBRBCPdfViewerOpen}
+        onClose={() => setIsBRBCPdfViewerOpen(false)}
+        onSigned={() => {
+          // Refresh agreements after signing
+          queryClient.invalidateQueries({
+            queryKey: ["/api/buyer/agreements"],
+          });
+          toast({
+            title: "Agreement Signed",
+            description: "Your buyer representation agreement has been signed.",
+          });
+        }}
+      />
     </div>
   );
 }
