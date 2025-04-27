@@ -1,7 +1,8 @@
-import { WebSocketMessage, ChatMessage } from "@shared/types";
+import { WebSocketMessage, ChatMessage, SupportChatMessage } from "@shared/types";
 
-type MessageHandler = (msg: ChatMessage) => void;
+type MessageHandler = (msg: ChatMessage | SupportChatMessage) => void;
 type NotificationHandler = (data: any) => void;
+type SupportMessageHandler = (msg: SupportChatMessage) => void;
 type ConnectionHandler = () => void;
 
 class WebSocketClient {
@@ -65,6 +66,9 @@ class WebSocketClient {
         
         if (message.type === 'message') {
           console.log("Received chat message:", message.data);
+          this.messageHandlers.forEach(handler => handler(message.data));
+        } else if (message.type === 'support') {
+          console.log("Received support chat message:", message.data);
           this.messageHandlers.forEach(handler => handler(message.data));
         } else if (message.type === 'notification') {
           console.log("Received notification:", message.data);

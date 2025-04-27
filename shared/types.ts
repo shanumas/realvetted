@@ -36,6 +36,17 @@ export interface ChatMessage {
   propertyId: number;
 }
 
+export interface SupportChatMessage {
+  id: string | number;
+  sessionId: string;
+  senderId: number | null; // null for anonymous users
+  senderName: string;
+  content: string;
+  timestamp: Date | string;
+  isAdmin: boolean;
+  customerEmail?: string;
+}
+
 export interface WebSocketMessage {
   type:
     | "message"
@@ -44,7 +55,8 @@ export interface WebSocketMessage {
     | "claim_lead"
     | "ping"
     | "pong"
-    | "auth";
+    | "auth"
+    | "support";
   data: any;
 }
 
