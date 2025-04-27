@@ -83,11 +83,16 @@ function Router() {
   );
 }
 
+// Import support chat bubble
+import SupportChatBubble from "./components/support/support-chat-bubble";
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Router />
+        {/* Support chat bubble available on all pages */}
+        <SupportChatBubble />
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -12,6 +12,7 @@ import { extractPropertyFromUrl } from "./extraction";
 import {
   sendTourRequestEmail,
   sendPrequalificationApprovalEmail,
+  sendSupportChatNotification,
   getAllEmails,
   getSentEmailsForUser,
   getSentEmailsForEntity,
