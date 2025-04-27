@@ -56,6 +56,7 @@ export function BRBCPdfViewer({
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
+  const [termsAgreed, setTermsAgreed] = useState(false);
 
   // Calculate today's date and end date (90 days from today)
   const today = new Date();
@@ -852,6 +853,17 @@ export function BRBCPdfViewer({
         setActiveTab("buyer1-signature");
         restoreSignaturesOnTabLoad("buyer1-signature");
       }
+      return;
+    }
+    
+    // Check if the user has agreed to the terms
+    if (!termsAgreed) {
+      toast({
+        title: "Terms Agreement Required",
+        description:
+          "Please read and agree to the terms before submitting the agreement.",
+        variant: "destructive",
+      });
       return;
     }
 
