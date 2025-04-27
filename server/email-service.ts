@@ -4,6 +4,7 @@ import {
   ViewingRequest,
   Email,
   InsertEmail,
+  SupportMessage,
 } from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
@@ -29,7 +30,7 @@ export interface SentEmail {
     role: string;
   };
   relatedEntity: {
-    type: "viewing_request" | "property" | "agreement";
+    type: "viewing_request" | "property" | "agreement" | "support_chat";
     id: number;
   };
 }

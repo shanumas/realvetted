@@ -104,6 +104,54 @@ async function hashPassword(password: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 import { z } from "zod";
+import { SupportMessage, supportMessageSchema } from "@shared/schema";
+
+// Handler for support chat messages
+async function handleSupportChatMessage(message: any, client?: any): Promise<void> {
+  try {
+    // Skip if not a support chat message
+    if (message.type !== 'support') {
+      return;
+    }
+
+    // Validate the message
+    if (!message.sessionId || !message.content || !message.senderName) {
+      console.error('Invalid support message format:', message);
+      return;
+    }
+    
+    // Store the message in database
+    const newMessage = await storage.createSupportMessage({
+      sessionId: message.sessionId,
+      senderId: message.senderId || null,
+      senderName: message.senderName,
+      senderEmail: message.senderEmail || null,
+      content: message.content,
+      isAdmin: !!message.isAdmin,
+    });
+    
+    // Send new chat notification email
+    if (!message.isAdmin) {
+      // Only send notification for new customer messages (not admin replies)
+      // Also only send for first message in a session
+      const sessionMessages = await storage.getSupportMessagesBySession(message.sessionId);
+      if (sessionMessages.length <= 1) { // First message in session
+        // Send email notification
+        await sendSupportChatNotification(
+          message.senderName,
+          message.senderEmail || 'Anonymous',
+          message.content,
+          message.sessionId
+        );
+      }
+    }
+    
+    // Return the message to the sender and broadcast to admin users
+    return message;
+  } catch (error) {
+    console.error('Error handling support chat message:', error);
+  }
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up HTTP server
@@ -113,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { isAuthenticated, hasRole } = setupAuth(app);
 
   // Set up WebSocket server
-  const websocketServer = setupWebSocketServer(httpServer);
+  const websocketServer = setupWebSocketServer(httpServer, handleSupportChatMessage);
 
   // Set up static file serving for uploads
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
