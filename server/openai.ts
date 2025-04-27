@@ -1,11 +1,12 @@
 import OpenAI from "openai";
 import pdfParse from "pdf-parse";
+import fs from "fs";
 import {
   PropertyAIData,
   PropertyScraperResult,
-  Property,
-  User,
 } from "@shared/types";
+import { Property, User } from "@shared/schema";
+import { extractPdfText } from "./pdf-wrapper";
 
 // Initialize OpenAI API client
 const openai = new OpenAI({
