@@ -10,6 +10,7 @@ import {
   ViewingRequestWithParticipants,
 } from "@shared/types";
 import { initEmailJS, sendViewingRequestEmail } from "@/services/email-service";
+import { BRBCPdfViewer } from "@/components/brbc-pdf-viewer";
 
 // Define the Agreement interface for checking BRBC agreements
 interface Agreement {
@@ -109,6 +110,7 @@ export default function BuyerPropertyDetail() {
     existingRequestId?: number;
     existingRequestDate?: string;
   } | null>(null);
+  const [isBRBCPdfViewerOpen, setIsBRBCPdfViewerOpen] = useState<boolean>(false);
 
   const { toast } = useToast();
   const { user } = useAuth();
