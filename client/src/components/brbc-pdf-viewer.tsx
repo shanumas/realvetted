@@ -57,6 +57,7 @@ export function BRBCPdfViewer({
   const [hasSigned, setHasSigned] = useState(false);
   const [activeTab, setActiveTab] = useState("buyer1-signature");
   const [termsAgreed, setTermsAgreed] = useState(false);
+  const [showTermsDetails, setShowTermsDetails] = useState(false);
 
   // Calculate today's date and end date (90 days from today)
   const today = new Date();
@@ -249,6 +250,8 @@ export function BRBCPdfViewer({
       setPdfDoc(null);
       setPdfArrayBuffer(null);
       setFormFields({});
+      setTermsAgreed(false);
+      setShowTermsDetails(false);
 
       // First try to fetch existing agreement
       fetchExistingAgreement().then((found) => {
@@ -1308,59 +1311,108 @@ export function BRBCPdfViewer({
                   </Button>
                 ) : (
                   <>
-                    {/* Preview button - shows PDF with signatures without submitting */}
-                    <Button
-                      variant="outline"
-                      onClick={previewSignedPdf}
-                      disabled={isPreviewing || isSubmitting}
-                      className="mr-2"
-                    >
-                      {isPreviewing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Previewing...
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Preview
-                        </>
+                    <div className="flex flex-col items-start w-full mb-4">
+                      <div className="flex justify-between items-center w-full mb-2">
+                        <h3 className="text-sm font-semibold">Agreement Terms</h3>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="p-0 h-auto text-amber-700"
+                          onClick={() => setShowTermsDetails(!showTermsDetails)}
+                        >
+                          {showTermsDetails ? "Hide Details" : "Show Details"}
+                        </Button>
+                      </div>
+                      
+                      {showTermsDetails && (
+                        <div className="bg-amber-50 p-3 rounded-md mb-3 max-h-40 overflow-y-auto text-sm border border-amber-200 w-full">
+                          <div className="space-y-2">
+                            <p className="font-semibold">REALVetted - BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT and Disclosure Packet:</p>
+                            <p>This document serves as a full, line-by-line explanation of each mandatory disclosure form and agreement required when working with a real estate broker under California law.</p>
+                            <ol className="list-decimal pl-5 space-y-2">
+                              <li><strong>DISCLOSURE REGARDING REAL ESTATE AGENCY RELATIONSHIP (C.A.R. Form AD)</strong> - Informs the buyer of the legal relationship between them and the real estate agent or broker.</li>
+                              <li><strong>BUYER REPRESENTATION AND BROKER COMPENSATION AGREEMENT (C.A.R. Form BRBC)</strong> - Outlines the legal relationship, representation scope, and compensation terms between the buyer and the broker.</li>
+                              <li><strong>BROKER COMPENSATION ADVISORY (C.A.R. Form BCA, 7/24)</strong> - Explains how brokers are compensated and outlines recent legal changes affecting compensation practices.</li>
+                              <li><strong>BUYER'S INVESTIGATION ADVISORY (C.A.R. Form BIA)</strong> - Informs the buyer of their responsibility to investigate the property they are purchasing.</li>
+                              <li><strong>POSSIBLE REPRESENTATION OF MORE THAN ONE BUYER OR SELLER (C.A.R. Form PRBS)</strong> - Discloses that a broker may represent multiple clients simultaneously.</li>
+                              <li><strong>CALIFORNIA CONSUMER PRIVACY ACT (CCPA) ADVISORY</strong> - Informs consumers of their rights under the California Consumer Privacy Act.</li>
+                            </ol>
+                          </div>
+                        </div>
                       )}
-                    </Button>
+                      
+                      <div className="flex items-start mt-1 mb-3">
+                        <div className="flex h-5 items-center">
+                          <input
+                            id="terms-agree"
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            checked={termsAgreed}
+                            onChange={(e) => setTermsAgreed(e.target.checked)}
+                          />
+                        </div>
+                        <label htmlFor="terms-agree" className="ml-2 block text-sm text-gray-700">
+                          I have read and understand the Buyer Representation and Broker Compensation Agreement and all associated disclosures, and I agree to the terms outlined in these documents.
+                        </label>
+                      </div>
+                    </div>
 
-                    {/* Submit button - now shows confirmation dialog */}
-                    <Button
-                      onClick={() => {
-                        // Force a final check of all signatures before submission
-                        if (signatureRef.current) {
-                          setSignatureIsEmpty(signatureRef.current.isEmpty());
-                        }
-                        if (initialsRef.current) {
-                          setInitialsIsEmpty(initialsRef.current.isEmpty());
-                        }
+                    <div className="flex items-center">
+                      {/* Preview button - shows PDF with signatures without submitting */}
+                      <Button
+                        variant="outline"
+                        onClick={previewSignedPdf}
+                        disabled={isPreviewing || isSubmitting}
+                        className="mr-2"
+                      >
+                        {isPreviewing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Previewing...
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Preview
+                          </>
+                        )}
+                      </Button>
 
-                        // Use a short timeout to let state update before submitting
-                        setTimeout(() => {
-                          handleSubmitSignature();
-                        }, 50);
-                      }}
-                      disabled={
-                        isSubmitting ||
-                        isPreviewing ||
-                        (!savedSignatures.primary && signatureIsEmpty) ||
-                        (!savedSignatures.initials && initialsIsEmpty)
-                      }
-                      className="mr-2"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Submitting...
-                        </>
-                      ) : (
-                        "Submit Agreement"
-                      )}
-                    </Button>
+                      {/* Submit button - now shows confirmation dialog */}
+                      <Button
+                        onClick={() => {
+                          // Force a final check of all signatures before submission
+                          if (signatureRef.current) {
+                            setSignatureIsEmpty(signatureRef.current.isEmpty());
+                          }
+                          if (initialsRef.current) {
+                            setInitialsIsEmpty(initialsRef.current.isEmpty());
+                          }
+
+                          // Use a short timeout to let state update before submitting
+                          setTimeout(() => {
+                            handleSubmitSignature();
+                          }, 50);
+                        }}
+                        disabled={
+                          isSubmitting ||
+                          isPreviewing ||
+                          (!savedSignatures.primary && signatureIsEmpty) ||
+                          (!savedSignatures.initials && initialsIsEmpty) ||
+                          !termsAgreed
+                        }
+                        className="mr-2"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Submitting...
+                          </>
+                        ) : (
+                          "Submit Agreement"
+                        )}
+                      </Button>
+                    </div>
                   </>
                 )}
 
