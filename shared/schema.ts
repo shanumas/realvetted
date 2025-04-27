@@ -88,6 +88,25 @@ export const messages = pgTable("messages", {
   isRead: boolean("is_read").default(false),
 });
 
+// Support chat messages
+export const supportMessages = pgTable("support_messages", {
+  id: serial("id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  senderId: integer("sender_id"), // If null, message is from guest
+  senderName: text("sender_name").notNull(),
+  senderEmail: text("sender_email"),
+  content: text("content").notNull(),
+  timestamp: timestamp("timestamp").defaultNow(),
+  isRead: boolean("is_read").default(false),
+  isAdmin: boolean("is_admin").default(false), // true if sent by admin
+});
+
+// Support message schema
+export const supportMessageSchema = createInsertSchema(supportMessages).omit({
+  id: true,
+  timestamp: true,
+});
+
 // Agent leads
 export const agentLeads = pgTable("agent_leads", {
   id: serial("id").primaryKey(),
@@ -281,6 +300,8 @@ export type Property = typeof properties.$inferSelect;
 export type InsertProperty = z.infer<typeof propertySchema>;
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof messageSchema>;
+export type SupportMessage = typeof supportMessages.$inferSelect;
+export type InsertSupportMessage = z.infer<typeof supportMessageSchema>;
 export type AgentLead = typeof agentLeads.$inferSelect;
 export type InsertAgentLead = z.infer<typeof agentLeadSchema>;
 export type PropertyActivityLog = typeof propertyActivityLogs.$inferSelect;
