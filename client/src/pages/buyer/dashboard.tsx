@@ -305,8 +305,7 @@ export default function BuyerDashboard() {
                     <span>
                       Status:{" "}
                       <span className="font-semibold">
-                        {user?.verificationMethod === "prequalification" ||
-                        user?.prequalificationValidated
+                        {user?.profileStatus === "verified"
                           ? "Verified"
                           : "Pending"}
                       </span>
@@ -353,7 +352,7 @@ export default function BuyerDashboard() {
           <div className="relative rounded-lg">
             <div className="h-full bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col">
               <div className="flex items-center justify-between mb-2">
-                {user?.verificationMethod && (
+                {user?.profileStatus === "verified" && (
                   <div className="bg-green-100 px-1.5 py-0.5 rounded text-xs font-medium text-green-700 border border-green-200">
                     ✓ Verified
                   </div>

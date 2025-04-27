@@ -1,5 +1,5 @@
-import Veriff from '@veriff/js-sdk';
-import { apiRequest } from './queryClient';
+import Veriff from "@veriff/js-sdk";
+import { apiRequest } from "./queryClient";
 
 /**
  * Interface for the response from creating a Veriff session
@@ -15,15 +15,15 @@ interface VeriffSessionResponse {
  */
 export async function createVeriffSession(): Promise<VeriffSessionResponse> {
   try {
-    const response = await apiRequest('POST', '/api/veriff/create-session');
+    const response = await apiRequest("POST", "/api/veriff/create-session");
     if (!response.ok) {
-      throw new Error('Failed to create verification session');
+      throw new Error("Failed to create verification session");
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error creating Veriff session:', error);
+    console.error("Error creating Veriff session:", error);
     throw error;
   }
 }
@@ -35,22 +35,22 @@ export async function createVeriffSession(): Promise<VeriffSessionResponse> {
  */
 export function launchVeriff(
   sessionUrl: string,
-  onComplete: (status: 'completed' | 'canceled' | 'error') => void
+  onComplete: (status: "completed" | "canceled" | "error") => void,
 ): void {
   // Open Veriff in a new window
-  const veriffWindow = window.open(sessionUrl, '_blank');
-  
+  const veriffWindow = window.open(sessionUrl, "_blank");
+
   // Check if window opened successfully
   if (!veriffWindow) {
-    onComplete('error');
+    onComplete("error");
     return;
   }
-  
+
   // Check when the window is closed
   const checkInterval = setInterval(() => {
     if (veriffWindow.closed) {
       clearInterval(checkInterval);
-      onComplete('completed');
+      onComplete("completed");
     }
   }, 1000);
 }
@@ -64,47 +64,47 @@ export function launchVeriff(
 export function initVeriffSDK(
   sessionUrl: string,
   containerId: string,
-  onComplete: (status: 'completed' | 'canceled' | 'error') => void
+  onComplete: (status: "completed" | "canceled" | "error") => void,
 ): void {
   try {
     // Extract session ID from URL
     const url = new URL(sessionUrl);
-    const sessionId = url.pathname.split('/').pop() || '';
-    
+    const sessionId = url.pathname.split("/").pop() || "";
+
     if (!sessionId) {
-      throw new Error('Invalid session URL');
+      throw new Error("Invalid session URL");
     }
-    
+
     const veriff = Veriff({
-      host: 'https://magic.veriff.me',
+      host: "https://magic.veriff.me",
       sessionId,
       container: containerId,
       onSession: (err, response) => {
         if (err) {
-          console.error('Veriff session error:', err);
-          onComplete('error');
+          console.error("Veriff session error:", err);
+          onComplete("error");
           return;
         }
-        console.log('Veriff session started:', response);
-      }
+        console.log("Veriff session started:", response);
+      },
     });
-    
+
     veriff.mount({
       submitCallback: () => {
-        console.log('Verification submitted');
+        console.log("Verification submitted");
       },
       closeCallback: () => {
-        console.log('Verification closed');
-        onComplete('canceled');
+        console.log("Verification closed");
+        onComplete("canceled");
       },
       errorCallback: (error) => {
-        console.error('Verification error:', error);
-        onComplete('error');
-      }
+        console.error("Verification error:", error);
+        onComplete("error");
+      },
     });
   } catch (error) {
-    console.error('Error initializing Veriff SDK:', error);
-    onComplete('error');
+    console.error("Error initializing Veriff SDK:", error);
+    onComplete("error");
   }
 }
 
@@ -115,16 +115,17 @@ export function initVeriffSDK(
  */
 export async function checkVeriffStatus(sessionId: string): Promise<string> {
   try {
-    const response = await apiRequest('GET', `/api/veriff/status/${sessionId}`);
+    console.log("----------------Veriff status is being checked");
+    const response = await apiRequest("GET", `/api/veriff/status/${sessionId}`);
     if (!response.ok) {
-      throw new Error('Failed to check verification status');
+      throw new Error("Failed to check verification status");
     }
-    
+
     const data = await response.json();
     // Return decision field if present, otherwise fall back to status
     return data.decision || data.status;
   } catch (error) {
-    console.error('Error checking Veriff status:', error);
+    console.error("Error checking Veriff status:", error);
     throw error;
   }
 }

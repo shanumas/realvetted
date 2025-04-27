@@ -191,7 +191,7 @@ export default function BuyerKYC() {
                         </li>
                         <li className="flex items-start">
                           <Check className="h-4 w-4 text-green-500 mr-2 mt-0.5" />
-                          <span>Your webcam will be used for a quick live selfie</span>
+                          <span>Your webcam will be used for a quick live selfie</span>							2025-04-27 14:08:34.598
                         </li>
                       </ul>
                     </div>
