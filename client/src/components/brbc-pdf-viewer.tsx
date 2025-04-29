@@ -67,7 +67,8 @@ export function BRBCPdfViewer({
   const [activeTab, setActiveTab] = useState("buyer1-signature");
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [showTermsDetails, setShowTermsDetails] = useState(false);
-  const [showAgreementTermsPage, setShowAgreementTermsPage] = useState(true);
+  const [showKeyTermsSummaryPage, setShowKeyTermsSummaryPage] = useState(true);
+  const [showAgreementTermsPage, setShowAgreementTermsPage] = useState(false);
   const [hasPreviewedOnce, setHasPreviewedOnce] = useState(false);
 
   // Calculate today's date and end date (90 days from today)
@@ -266,14 +267,16 @@ export function BRBCPdfViewer({
       setHasPreviewedOnce(false);
 
       // For existing signed agreements, show them directly
-      // For new agreements, show the terms page first
+      // For new agreements, show the key terms summary page first
       fetchExistingAgreement().then((found) => {
         if (found) {
-          // If there's an existing agreement, show PDF directly and skip terms page
+          // If there's an existing agreement, show PDF directly and skip all intro pages
+          setShowKeyTermsSummaryPage(false);
           setShowAgreementTermsPage(false);
         } else {
-          // For new agreements, show terms page first
-          setShowAgreementTermsPage(true);
+          // For new agreements, show key terms summary page first
+          setShowKeyTermsSummaryPage(true);
+          setShowAgreementTermsPage(false);
           // Also load the blank template in the background
           fetchPdfData();
         }
@@ -305,6 +308,8 @@ export function BRBCPdfViewer({
       });
     }
   };
+  
+  // This function is defined later
 
   // Clear the signature canvas based on type
   const clearSignature = (
@@ -1025,14 +1030,16 @@ export function BRBCPdfViewer({
         )
       ) {
         // Reset the state
-        setShowAgreementTermsPage(true);
+        setShowKeyTermsSummaryPage(true);
+        setShowAgreementTermsPage(false);
         setTermsAgreed(false);
         setShowTermsDetails(false);
         onClose();
       }
     } else {
       // Reset the state
-      setShowAgreementTermsPage(true);
+      setShowKeyTermsSummaryPage(true);
+      setShowAgreementTermsPage(false);
       setTermsAgreed(false);
       setShowTermsDetails(false);
       // Otherwise just close
@@ -1050,25 +1057,66 @@ export function BRBCPdfViewer({
                 <FileText className="mr-2 h-5 w-5 text-primary" />
                 {existingAgreement
                   ? "Signed Buyer Representation Agreement"
-                  : showAgreementTermsPage
-                    ? "Agreement Terms & Disclosures"
-                    : "Buyer Representation Agreement"}
+                  : showKeyTermsSummaryPage
+                    ? "Key Agreement Terms"
+                    : showAgreementTermsPage
+                      ? "Agreement Terms & Disclosures"
+                      : "Buyer Representation Agreement"}
               </div>
             </DialogTitle>
             <DialogDescription>
               {hasSigned
                 ? "Your completed and signed buyer representation agreement."
-                : showAgreementTermsPage
-                  ? "Please review and accept the following terms before proceeding to the agreement."
-                  : isSigning
-                    ? "Please review the agreement and add your signature below."
-                    : "Please review and sign the agreement below to proceed with your property search."}
+                : showKeyTermsSummaryPage
+                  ? "Please review the key agreement terms before proceeding."
+                  : showAgreementTermsPage
+                    ? "Please review and accept the following terms before proceeding to the agreement."
+                    : isSigning
+                      ? "Please review the agreement and add your signature below."
+                      : "Please review and sign the agreement below to proceed with your property search."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
-            {/* Agreement Terms Page (shows first before PDF) */}
-            {showAgreementTermsPage ? (
+            {/* Key Terms Summary Page (shows first before Agreement Terms) */}
+            {showKeyTermsSummaryPage ? (
+              <div className="flex-grow p-6 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                      Key Agreement Terms
+                    </h2>
+                    <div style={{fontFamily: "Arial, sans-serif", fontSize: "16px", color: "#000"}}>
+                      <p>The following are the key terms of this Buyer Representation and Broker Compensation Agreement (BRBC) between you and the real estate brokerage/agent:</p>
+
+                      <p><strong>A(1)</strong> – The agreement is for a <strong>3-month period</strong>.<br />
+                      <strong>A(2)</strong> – It is an <strong>exclusive agreement</strong>, meaning you agree to work only with the named brokerage/agent during this time.<br />
+                      <strong>E(1)</strong> – <strong>Compensation of $5,900</strong> will be paid to the broker at <strong>closing</strong>.<br />
+                      <strong>E(3)</strong> – There is a <strong>Continuation Period of 180 days</strong>, which means the broker may still be entitled to compensation if you buy a property introduced during the agreement period, up to 180 days after the agreement ends.<br />
+                      <strong>F</strong> – Cancellation Rights: 1 day after receipt. You have the right to cancel this exclusive agreement by giving written notice. The contract will end 1 day after receipt.</p>
+
+                      <p>This agreement outlines the key terms of your relationship with your broker/agent, including their duties to you, how they're paid, and your rights as a buyer. Understanding these points ensures clarity and sets proper expectations for both sides.</p>
+
+                      <p>For a full description of the entire Buyer Representation and Broker Compensation Agreement, please see the attached document. For a video explanation, please <a href="https://www.youtube.com/watch?v=-Az2GY6bta4" target="_blank">click here</a>.</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 mt-8">
+                    <Button variant="outline" onClick={handleClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowKeyTermsSummaryPage(false);
+                        setShowAgreementTermsPage(true);
+                      }}
+                    >
+                      Agree
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : showAgreementTermsPage ? (
               <div className="flex-grow p-6 overflow-y-auto">
                 <div className="max-w-3xl mx-auto">
                   <div className="mb-6">
@@ -1317,7 +1365,10 @@ export function BRBCPdfViewer({
                       Cancel
                     </Button>
                     <Button
-                      onClick={() => setShowAgreementTermsPage(false)}
+                      onClick={() => {
+                        setShowAgreementTermsPage(false);
+                        setIsSigning(true);
+                      }}
                       disabled={!termsAgreed}
                     >
                       Continue to Agreement
