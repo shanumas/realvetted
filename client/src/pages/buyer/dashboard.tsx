@@ -315,10 +315,12 @@ export default function BuyerDashboard() {
                             // KYC verification
                             const hasKYC = user?.verificationMethod === "kyc";
                             // Pre-qualification verification
-                            const hasPreQual = user?.prequalificationValidated === true;
+                            const hasPreQual =
+                              user?.prequalificationValidated === true;
                             // Verification by pre-qualification only
-                            const preQualOnly = user?.verificationMethod === "prequalification";
-                            
+                            const preQualOnly =
+                              user?.verificationMethod === "prequalification";
+
                             if (hasKYC && hasPreQual) {
                               return "Verified through both KYC and pre-qualification";
                             } else if (hasKYC) {
@@ -389,7 +391,7 @@ export default function BuyerDashboard() {
                       ✓ Verified
                     </div>
                   )}
-                  
+
                   {/* Veriff logo */}
                   {!user?.verificationMethod && (
                     <div className="h-5 ml-1 flex items-center">
@@ -405,12 +407,14 @@ export default function BuyerDashboard() {
 
                 {user?.verificationMethod === "kyc" ? (
                   <div className="bg-green-50 text-green-700 text-[10px] p-1.5 rounded-md border border-green-100 mb-1">
-                    ✓ Identity verified successfully through our secure KYC process
+                    ✓ Identity verified successfully through our secure KYC
+                    process
                   </div>
                 ) : (
                   <>
                     <div className="text-[10px] text-gray-600 mb-2">
-                      Complete identity verification using official ID documents.
+                      Complete identity verification using official ID
+                      documents.
                     </div>
                     <Button
                       className="w-full py-1 px-2 h-auto text-[10px]"
@@ -435,7 +439,9 @@ export default function BuyerDashboard() {
               {/* Divider between verification options */}
               <div className="flex items-center justify-center mb-2">
                 <div className="border-t border-gray-200 flex-grow"></div>
-                <div className="mx-2 text-xs text-gray-500 font-medium">Choose one verification method</div>
+                <div className="mx-2 text-xs text-gray-500 font-medium">
+                  Choose one verification method
+                </div>
                 <div className="border-t border-gray-200 flex-grow"></div>
               </div>
 
@@ -450,15 +456,19 @@ export default function BuyerDashboard() {
                       Pre-qualification Letter
                     </h5>
                   </div>
-                  
+
                   {/* Status badge */}
                   {user?.prequalificationDocUrl && (
-                    <div className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                      user?.prequalificationValidated 
-                        ? "bg-green-100 text-green-700 border-green-200" 
-                        : "bg-amber-100 text-amber-700 border-amber-200"
-                    }`}>
-                      {user?.prequalificationValidated ? "✓ Verified" : "Pending"}
+                    <div
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                        user?.prequalificationValidated
+                          ? "bg-green-100 text-green-700 border-green-200"
+                          : "bg-amber-100 text-amber-700 border-amber-200"
+                      }`}
+                    >
+                      {user?.prequalificationValidated
+                        ? "✓ Verified"
+                        : "Pending"}
                     </div>
                   )}
                 </div>
@@ -493,7 +503,8 @@ export default function BuyerDashboard() {
                 ) : (
                   <>
                     <div className="text-[10px] text-gray-600 mb-2">
-                      Upload your pre-qualification letter to verify your buying power.
+                      Upload your pre-qualification letter to verify your buying
+                      power.
                     </div>
                     <Button
                       className="w-full py-1 px-2 h-auto text-[10px]"

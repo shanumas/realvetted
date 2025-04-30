@@ -111,7 +111,8 @@ export default function BuyerPropertyDetail() {
     existingRequestId?: number;
     existingRequestDate?: string;
   } | null>(null);
-  const [isBRBCPdfViewerOpen, setIsBRBCPdfViewerOpen] = useState<boolean>(false);
+  const [isBRBCPdfViewerOpen, setIsBRBCPdfViewerOpen] =
+    useState<boolean>(false);
 
   const { toast } = useToast();
   const { user } = useAuth();
@@ -423,8 +424,11 @@ export default function BuyerPropertyDetail() {
       endTime: requestData.endTime,
       notes: requestData.notes,
       // Explicitly convert null to undefined
-      listingAgentEmail: typeof requestData.listingAgentEmail === 'string' ? requestData.listingAgentEmail : undefined,
-      override: true
+      listingAgentEmail:
+        typeof requestData.listingAgentEmail === "string"
+          ? requestData.listingAgentEmail
+          : undefined,
+      override: true,
     };
     requestViewingMutation.mutate(mutationData);
   };
@@ -848,7 +852,11 @@ export default function BuyerPropertyDetail() {
             </Card>
 
             {/* Hidden div to maintain compatability with existing links */}
-            <div id="viewing-requests-section" className="hidden"></div>
+            <div
+              id="viewing-requests-section"
+              className="absolute -top-20"
+              aria-hidden="true"
+            ></div>
           </div>
         </div>
       </main>
@@ -1074,10 +1082,11 @@ export default function BuyerPropertyDetail() {
                     endTime: pendingRequestData.endTime,
                     notes: pendingRequestData.notes,
                     // Explicitly convert null to undefined
-                    listingAgentEmail: typeof pendingRequestData.listingAgentEmail === 'string' 
-                      ? pendingRequestData.listingAgentEmail 
-                      : undefined,
-                    override: true
+                    listingAgentEmail:
+                      typeof pendingRequestData.listingAgentEmail === "string"
+                        ? pendingRequestData.listingAgentEmail
+                        : undefined,
+                    override: true,
                   };
                   requestViewingMutation.mutate(mutationData);
                 }
