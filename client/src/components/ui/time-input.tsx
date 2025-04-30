@@ -65,7 +65,7 @@ export function TimeInput({
   return (
     <div className={cn("flex items-center", className)}>
       <div className="grid grid-cols-3 gap-1 items-center">
-        {/* Hour/Minute input and buttons */}
+        {/* Hours input and buttons */}
         <div className="flex flex-col items-center">
           <Button
             type="button"
@@ -79,15 +79,13 @@ export function TimeInput({
           </Button>
           <Input
             id={id}
-            className="text-center w-20 h-9"
-            value={`${displayHour12()}:${minutes.toString().padStart(2, "0")}`}
+            className="text-center w-14 h-9"
+            value={displayHour12()}
             disabled={disabled}
             onChange={(e) => {
-              const [hStr, mStr] = e.target.value.split(":");
-              const h = parseInt(hStr);
-              const m = parseInt(mStr);
-              if (!isNaN(h) && !isNaN(m)) {
-                updateTime(h, m, isPM);
+              const h = parseInt(e.target.value);
+              if (!isNaN(h)) {
+                updateTime(h, minutes, isPM);
               }
             }}
           />
@@ -115,8 +113,19 @@ export function TimeInput({
           >
             <ChevronUp className="h-4 w-4" />
           </Button>
-          <div className="h-9 flex items-center justify-center text-sm">
-            <span className="text-muted-foreground">min</span>
+          <div className="flex items-center h-9">
+            <Input
+              className="text-center w-14 h-9"
+              value={minutes.toString().padStart(2, "0")}
+              disabled={disabled}
+              onChange={(e) => {
+                const m = parseInt(e.target.value);
+                if (!isNaN(m)) {
+                  updateTime(hours, m, isPM);
+                }
+              }}
+            />
+            <span className="text-muted-foreground ml-2">min</span>
           </div>
           <Button
             type="button"
