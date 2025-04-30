@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { PropertyCard } from "@/components/property-card";
@@ -45,6 +45,7 @@ import {
 export default function BuyerDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [propertyToDelete, setPropertyToDelete] = useState<number | null>(null);
   const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
@@ -818,9 +819,7 @@ export default function BuyerDashboard() {
                                 size="sm"
                                 className="bg-green-50 text-green-600 hover:bg-green-100 w-full"
                                 onClick={() => {
-                                  // Use wouter's navigation instead of directly changing window.location
-                                  // which would cause a full page reload and lose authentication state
-                                  navigate(`/buyer/property/${property.id}#viewing-requests-section`);
+                                  setLocation(`/buyer/property/${property.id}#viewing-requests-section`);
                                 }}
                               >
                                 <Eye className="mr-2 h-4 w-4" />
