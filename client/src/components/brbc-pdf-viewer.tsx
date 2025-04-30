@@ -308,7 +308,7 @@ export function BRBCPdfViewer({
       });
     }
   };
-  
+
   // This function is defined later
 
   // Clear the signature canvas based on type
@@ -1086,21 +1086,67 @@ export function BRBCPdfViewer({
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">
                       Key Agreement Terms
                     </h2>
-                    <div style={{fontFamily: "Arial, sans-serif", fontSize: "16px", color: "#000"}}>
-                      <p>The following are the key terms of this Buyer Representation and Broker Compensation Agreement (BRBC) between you and the real estate brokerage/agent:</p>
+                    <div
+                      style={{
+                        fontFamily: "Arial, sans-serif",
+                        fontSize: "16px",
+                        color: "#000",
+                      }}
+                    >
+                      <p>
+                        The following are the key terms of this Buyer
+                        Representation and Broker Compensation Agreement (BRBC)
+                        between you and the real estate brokerage/agent:
+                      </p>
 
-                      <p><strong>A(1)</strong> – The agreement is for a <strong>3-month period</strong>.<br />
-                      <strong>A(2)</strong> – It is an <strong>exclusive agreement</strong>, meaning you agree to work only with the named brokerage/agent during this time.<br />
-                      <strong>E(1)</strong> – <strong>Compensation of $5,900</strong> will be paid to the broker at <strong>closing</strong>.<br />
-                      <strong>E(3)</strong> – There is a <strong>Continuation Period of 180 days</strong>, which means the broker may still be entitled to compensation if you buy a property introduced during the agreement period, up to 180 days after the agreement ends.<br />
-                      <strong>F</strong> – Cancellation Rights: 1 day after receipt. You have the right to cancel this exclusive agreement by giving written notice. The contract will end 1 day after receipt.</p>
+                      <p>
+                        <strong>A(1)</strong> – The agreement is for a{" "}
+                        <strong>3-month period</strong>.<br />
+                        <strong>A(2)</strong> – It is an{" "}
+                        <strong>exclusive agreement</strong>, meaning you agree
+                        to work only with the named brokerage/agent during this
+                        time.
+                        <br />
+                        <strong>E(1)</strong> –{" "}
+                        <strong>Compensation of $5,900</strong> will be paid to
+                        the broker at <strong>closing</strong>.<br />
+                        <strong>E(3)</strong> – There is a{" "}
+                        <strong>Continuation Period of 180 days</strong>, which
+                        means the broker may still be entitled to compensation
+                        if you buy a property introduced during the agreement
+                        period, up to 180 days after the agreement ends.
+                        <br />
+                        <strong>F</strong> – Cancellation Rights: 1 day after
+                        receipt. You have the right to cancel this exclusive
+                        agreement by giving written notice. The contract will
+                        end 1 day after receipt.
+                      </p>
 
-                      <p>This agreement outlines the key terms of your relationship with your broker/agent, including their duties to you, how they're paid, and your rights as a buyer. Understanding these points ensures clarity and sets proper expectations for both sides.</p>
+                      <p>
+                        This agreement outlines the key terms of your
+                        relationship with your broker/agent, including their
+                        duties to you, how they're paid, and your rights as a
+                        buyer. Understanding these points ensures clarity and
+                        sets proper expectations for both sides.
+                      </p>
 
-                      <p>For a full description of the entire Buyer Representation and Broker Compensation Agreement, please see the attached document. For a video explanation, please <a href="https://www.youtube.com/watch?v=-Az2GY6bta4" target="_blank">click here</a>.</p>
+                      <p>
+                        For a full description of the entire Buyer
+                        Representation and Broker Compensation Agreement, please
+                        see the attached document. For a video explanation,
+                        please{" "}
+                        <a
+                          href="https://www.youtube.com/watch?v=-Az2GY6bta4"
+                          target="_blank"
+                          style={{ color: "blue", textDecoration: "underline" }}
+                        >
+                          click here
+                        </a>
+                        .
+                      </p>
                     </div>
                   </div>
-                  
+
                   <div className="flex justify-end space-x-3 mt-8">
                     <Button variant="outline" onClick={handleClose}>
                       Cancel
@@ -1196,27 +1242,7 @@ export function BRBCPdfViewer({
                         </ol>
                       </div>
 
-                      <div className="mt-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowTermsDetails(!showTermsDetails)}
-                          className="flex items-center"
-                        >
-                          {showTermsDetails ? (
-                            <>
-                              <ChevronUp className="mr-1 h-4 w-4" />
-                              Hide Detailed Information
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="mr-1 h-4 w-4" />
-                              Show Detailed Information
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      {showTermsDetails && (
+                      {true && (
                         <div className="mt-4 border-t border-gray-200 pt-4 text-sm text-gray-700 space-y-4">
                           <div>
                             <h5 className="font-semibold mb-1">
@@ -1400,7 +1426,7 @@ export function BRBCPdfViewer({
               </div>
             )}
             {/* Signature Panel (only visible when signing) */}
-            {!showAgreementTermsPage && (
+            {!showKeyTermsSummaryPage && !showAgreementTermsPage && (
               <div className="w-full md:w-1/3 border-l border-gray-200 flex flex-col">
                 <Tabs
                   value={activeTab}
@@ -1416,7 +1442,7 @@ export function BRBCPdfViewer({
                   className="flex-grow flex flex-col"
                 >
                   {/* Main tabs for Buyer 1 and Buyer 2 */}
-                  <TabsList className="w-full grid grid-cols-2 mb-2">
+                  <TabsList className="w-full grid grid-cols-2">
                     <TabsTrigger
                       value="buyer1-signature"
                       className="flex items-center"
@@ -1606,7 +1632,7 @@ export function BRBCPdfViewer({
                     </div>
                   </TabsContent>
 
-                  <div className="mt-2 flex justify-end items-center">
+                  <div className="flex justify-end items-center">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1644,6 +1670,7 @@ export function BRBCPdfViewer({
                 Successfully signed
               </div>
             ) : (
+              !showKeyTermsSummaryPage &&
               !showAgreementTermsPage && (
                 <div className="flex-1 flex items-center">
                   <div className="flex items-center">
