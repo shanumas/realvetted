@@ -29,6 +29,7 @@ import { ChatWindow } from "@/components/chat/chat-window";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TimeInput } from "@/components/ui/time-input";
 // Removed disclosure form imports
 import {
   Loader2,
@@ -898,12 +899,11 @@ export default function BuyerPropertyDetail() {
                 Start Time
               </label>
               <div className="col-span-3">
-                <input
-                  type="time"
+                <TimeInput
                   id="viewingTime"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={viewingTime}
-                  onChange={(e) => setViewingTime(e.target.value)}
+                  onChange={setViewingTime}
+                  className="w-full"
                 />
               </div>
             </div>
@@ -915,12 +915,11 @@ export default function BuyerPropertyDetail() {
                 End Time
               </label>
               <div className="col-span-3">
-                <input
-                  type="time"
+                <TimeInput
                   id="viewingEndTime"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   value={viewingEndTime}
-                  onChange={(e) => setViewingEndTime(e.target.value)}
+                  onChange={setViewingEndTime}
+                  className="w-full"
                 />
               </div>
             </div>
