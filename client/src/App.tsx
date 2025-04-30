@@ -103,53 +103,67 @@ function HomePage() {
   const { user, isLoading } = useAuth();
   const [, setLocation] = useLocation();
   
-  // Effect to redirect based on auth status and role
+  // Clear stale session data when landing on home page
   useEffect(() => {
-    if (!isLoading && user) {
-      // Try to restore the last visited location from localStorage
-      const lastLocation = localStorage.getItem("lastLocation");
-      
-      // Only redirect if there's no saved location or the saved location is the root/auth page
-      if (!lastLocation || lastLocation === '/' || lastLocation === '/auth' || lastLocation === '/buyer/kyc') {
-        // Default redirection based on role and verification status
-        if (user.role === "buyer") {
-          // Buyers go directly to dashboard regardless of verification status
-          // This allows tracking of buyer journey without requiring KYC
-          setLocation("/buyer/dashboard");
-        } else if (user.role === "agent" && user.profileStatus !== "verified") {
+    if (!user) {
+      localStorage.removeItem("lastLocation");
+    }
+  }, [user]);
+  
+  // Handle redirections based on auth status
+  useEffect(() => {
+    if (isLoading) return; // Wait until loading finishes
+    
+    if (!user) {
+      // If not authenticated, redirect to auth page
+      setLocation("/auth");
+      return;
+    }
+    
+    // For authenticated users, determine the appropriate redirect
+    const lastLocation = localStorage.getItem("lastLocation");
+    const isDefaultPath = !lastLocation || 
+                          lastLocation === '/' || 
+                          lastLocation === '/auth' || 
+                          lastLocation.includes('/kyc');
+    
+    // Only redirect if there's no valid saved location
+    if (isDefaultPath) {
+      // Default redirection based on role and verification status
+      if (user.role === "buyer") {
+        setLocation("/buyer/dashboard");
+      } else if (user.role === "seller") {
+        setLocation("/seller/dashboard");
+      } else if (user.role === "admin") {
+        setLocation("/admin/dashboard");
+      } else if (user.role === "agent") {
+        if (user.profileStatus !== "verified") {
           setLocation("/agent/kyc");
-        } else if (user.role === "agent" && user.profileStatus === "verified") {
-          // Check if agent has signed the referral agreement
+        } else {
+          // For verified agents, check if they've signed the referral agreement
           const checkReferralAgreement = async () => {
             try {
               const response = await fetch('/api/agreements/agent-referral');
               const data = await response.json();
               
               if (!data.data) {
-                // No referral agreement found, redirect to sign
                 setLocation("/agent/referral-agreement");
               } else {
-                // Agreement exists, go to dashboard
                 setLocation("/agent/dashboard");
               }
             } catch (error) {
               console.error("Error checking referral agreement:", error);
-              // Default to dashboard
               setLocation("/agent/dashboard");
             }
           };
           
           checkReferralAgreement();
-        } else if (user.role === "seller") {
-          setLocation("/seller/dashboard");
-        } else if (user.role === "admin") {
-          setLocation("/admin/dashboard");
         }
-      } else {
-        // Restore the last visited location
-        console.log("Restoring last location:", lastLocation);
-        setLocation(lastLocation);
       }
+    } else {
+      // Restore the last visited location
+      console.log("Restoring last location:", lastLocation);
+      setLocation(lastLocation);
     }
   }, [user, isLoading, setLocation]);
   
@@ -161,7 +175,7 @@ function HomePage() {
     );
   }
   
-  // If not logged in or still loading, show the auth page
+  // If not logged in, show the auth page
   if (!user) {
     return <AuthPage />;
   }

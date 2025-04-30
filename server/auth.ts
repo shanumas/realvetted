@@ -100,6 +100,12 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     try {
       const user = await storage.getUser(id);
+      
+      // Convert dateOfBirth to a Date object if it exists and is a string
+      if (user && user.dateOfBirth && typeof user.dateOfBirth === 'string') {
+        user.dateOfBirth = new Date(user.dateOfBirth);
+      }
+      
       done(null, user);
     } catch (err) {
       done(err);
@@ -199,6 +205,9 @@ export function setupAuth(app: Express) {
 
   // Logout route
   app.post("/api/auth/logout", (req, res) => {
+    // Store session ID for later destruction
+    const sessionID = req.session.id;
+    
     req.logout((err) => {
       if (err) {
         return res.status(500).json({ 
@@ -206,7 +215,27 @@ export function setupAuth(app: Express) {
           error: "Logout failed" 
         });
       }
-      res.json({ success: true });
+      
+      // Regenerate the session to ensure clean state
+      req.session.regenerate((regenerateErr) => {
+        if (regenerateErr) {
+          console.error("Error regenerating session:", regenerateErr);
+        }
+        
+        // Destroy the old session completely
+        if (sessionID && storage.sessionStore) {
+          storage.sessionStore.destroy(sessionID, (destroyErr) => {
+            if (destroyErr) {
+              console.error("Error destroying session:", destroyErr);
+            }
+          });
+        }
+        
+        // Clear all session cookies
+        res.clearCookie('connect.sid');
+        
+        res.json({ success: true });
+      });
     });
   });
 
