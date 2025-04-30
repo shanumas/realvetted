@@ -51,7 +51,6 @@ export async function extractPropertyWithPuppeteer(
       }
       //RIP
       console.log("-----Extracted Email: " + email);
-      data.listingAgentEmail = "shanumas@gmail.com";
     }
 
     console.log("Complete data " + JSON.stringify(data));
