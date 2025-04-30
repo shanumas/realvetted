@@ -818,7 +818,9 @@ export default function BuyerDashboard() {
                                 size="sm"
                                 className="bg-green-50 text-green-600 hover:bg-green-100 w-full"
                                 onClick={() => {
-                                  window.location.href = `/buyer/property/${property.id}#viewing-requests-section`;
+                                  // Use wouter's navigation instead of directly changing window.location
+                                  // which would cause a full page reload and lose authentication state
+                                  navigate(`/buyer/property/${property.id}#viewing-requests-section`);
                                 }}
                               >
                                 <Eye className="mr-2 h-4 w-4" />
