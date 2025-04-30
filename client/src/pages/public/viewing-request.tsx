@@ -120,6 +120,7 @@ export default function PublicViewingRequest() {
       const requestedTime = new Date(data.viewingRequest.requestedDate);
       const requestedEndTime = new Date(data.viewingRequest.requestedEndDate);
       
+      // Still using 24-hour format for internal storage
       setStartTime(format(requestedTime, "HH:mm"));
       setEndTime(format(requestedEndTime, "HH:mm"));
     }

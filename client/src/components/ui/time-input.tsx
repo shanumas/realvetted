@@ -35,7 +35,7 @@ export function TimeInput({ id, value, onChange, className, disabled }: TimeInpu
     // Ensure minutes are between 0-59
     const validMinutes = Math.max(0, Math.min(59, newMinutes));
     
-    // Format as HH:MM
+    // Format as HH:MM (still using 24-hour format for internal storage)
     const formattedHours = validHours.toString().padStart(2, "0");
     const formattedMinutes = validMinutes.toString().padStart(2, "0");
     
@@ -64,7 +64,14 @@ export function TimeInput({ id, value, onChange, className, disabled }: TimeInpu
           </Button>
           <Input
             id={id}
-            value={hours.toString().padStart(2, "0") + ":" + minutes.toString().padStart(2, "0")}
+            value={
+              (hours === 0 
+                ? "12" 
+                : hours > 12 
+                  ? (hours - 12).toString().padStart(2, "0") 
+                  : hours.toString().padStart(2, "0")
+              ) + ":" + minutes.toString().padStart(2, "0")
+            }
             onChange={(e) => {
               try {
                 const [h, m] = e.target.value.split(":").map(Number);
