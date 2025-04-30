@@ -42,12 +42,20 @@ export async function extractPropertyWithPuppeteer(
     data.propertyUrl = originalUrl;
 
     if (description) {
-      const email = await findAgentEmail(description);
+      const { email, phone } = await findAgentEmail(description);
+      //Fallback email is Uma's email
       if (email) {
         data.listingAgentEmail = email;
       } else {
         data.listingAgentEmail =
           process.env.LISTING_AGENT_FALLBACK ?? "shanumas@gmail.com";
+      }
+      //Fallback phone is Randy's phone
+      if (phone) {
+        data.listingAgentPhone = phone;
+      } else {
+        data.listingAgentPhone =
+          process.env.LISTING_AGENT_FALLBACK_PHONE ?? "(828) 678-0070";
       }
       //RIP
       console.log("-----Extracted Email: " + email);
@@ -392,7 +400,9 @@ async function prepPage(page: Page) {
   });
 }
 
-export async function findAgentEmail(allDetails: string): Promise<string> {
+export async function findAgentEmail(
+  allDetails: string,
+): Promise<{ email: string; phone: string }> {
   try {
     const realtorDetailsOnly = (
       allDetails.match(/Listed by\s*([\s\S]*?)(?=Listed by|$)/i)?.[1] || ""
@@ -404,7 +414,7 @@ export async function findAgentEmail(allDetails: string): Promise<string> {
     const serpRes = await axios.get("https://serpapi.com/search.json", {
       params: {
         q: searchQuery,
-        api_key: process.env.SERPAPI_KEY, // store in .env or config
+        api_key: process.env.SERPAPI_KEY,
         engine: "google",
         num: 2,
       },
@@ -416,20 +426,25 @@ export async function findAgentEmail(allDetails: string): Promise<string> {
       JSON.stringify(results),
     );
 
+    let phone = "";
     for (const result of results.slice(0, 2)) {
       try {
         const text = result.snippet || "";
         console.log("🔍 Searching for email in: " + text);
         const match = text.match(/[\w.+-]+@[\w.-]+\.\w{2,}/);
-        if (match) return match[0];
+        const phoneMatch = text.match(
+          /(?:\+?1\s*[-.\s]?)?(?:\(?\d{3}\)?[-.\s]?)\d{3}[-.\s]?\d{4}/,
+        );
+        if (phoneMatch) phone = phoneMatch[0];
+        if (match) return { email: match[0], phone };
       } catch (err) {
         console.warn(`❌ Failed to fetch or parse ${result.link}:`, err);
       }
     }
 
-    return "";
+    return { email: "", phone };
   } catch (err) {
     console.error("🔴 SerpAPI email lookup failed:", err);
-    return "";
+    return { email: "", phone: "" };
   }
 }

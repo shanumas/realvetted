@@ -107,6 +107,7 @@ export default function BuyerPropertyDetail() {
     endTime: string;
     notes: string;
     listingAgentEmail?: string;
+    listingAgentPhone?: string;
   } | null>(null);
   const [existingRequestInfo, setExistingRequestInfo] = useState<{
     existingRequestId?: number;
@@ -194,6 +195,7 @@ export default function BuyerPropertyDetail() {
       notes: string;
       override?: boolean;
       listingAgentEmail?: string;
+      listingAgentPhone?: string;
     }) => {
       console.log("Requesting property viewing with data:", {
         propertyId,
@@ -214,6 +216,7 @@ export default function BuyerPropertyDetail() {
         notes: data.notes,
         override: data.override || false,
         listingAgentEmail: data.listingAgentEmail, // Include agent email if available
+        listingAgentPhone: data.listingAgentPhone, // Include agent email if available
       };
 
       console.log("Sending viewing request payload:", payload);
@@ -407,6 +410,7 @@ export default function BuyerPropertyDetail() {
       endTime: viewingEndTime,
       notes: viewingNotes,
       listingAgentEmail: property.listingAgentEmail,
+      listingAgentPhone: property.listingAgentPhone,
     };
 
     console.log(" property.listingAgentEmail :", property.listingAgentEmail);
@@ -428,6 +432,10 @@ export default function BuyerPropertyDetail() {
       listingAgentEmail:
         typeof requestData.listingAgentEmail === "string"
           ? requestData.listingAgentEmail
+          : undefined,
+      listingAgentPhone:
+        typeof requestData.listingAgentPhone === "string"
+          ? requestData.listingAgentPhone
           : undefined,
       override: true,
     };
@@ -595,7 +603,7 @@ export default function BuyerPropertyDetail() {
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <a
-                          href={`mailto:${property.listingAgentEmail || property.sellerEmail}`}
+                          href={`mailto:${property.listingAgentEmail}`}
                           className="text-blue-600 hover:underline"
                         >
                           {property.listingAgentEmail}
@@ -609,7 +617,7 @@ export default function BuyerPropertyDetail() {
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
                         <a
-                          href={`tel:${property.listingAgentPhone || property.sellerPhone}`}
+                          href={`tel:${property.listingAgentPhone}`}
                           className="text-blue-600 hover:underline"
                         >
                           {property.listingAgentPhone}
@@ -1084,6 +1092,10 @@ export default function BuyerPropertyDetail() {
                     listingAgentEmail:
                       typeof pendingRequestData.listingAgentEmail === "string"
                         ? pendingRequestData.listingAgentEmail
+                        : undefined,
+                    listingAgentPhone:
+                      typeof pendingRequestData.listingAgentPhone === "string"
+                        ? pendingRequestData.listingAgentPhone
                         : undefined,
                     override: true,
                   };
