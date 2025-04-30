@@ -187,8 +187,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear user data from query client cache
       queryClient.setQueryData(["/api/auth/user"], null);
       
-      // Clear last location from localStorage to ensure clean session
+      // Invalidate all queries to ensure clean state
+      queryClient.invalidateQueries();
+      
+      // Reset the query client completely to ensure no stale data persists
+      queryClient.clear();
+      
+      // Clear all localStorage items to ensure clean session
       localStorage.removeItem("lastLocation");
+      
+      // Additional cleanup for any other stored items
+      localStorage.removeItem("veriffSessionId");
+      
+      // Disconnect WebSocket
+      websocketClient.disconnect();
       
       // Redirect to auth page
       setLocation("/auth");
