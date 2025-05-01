@@ -183,7 +183,7 @@ export function PropertyViewingRequestsList({
     if (activeTab === "pending") {
       return request.status === "pending";
     } else if (activeTab === "approved") {
-      return request.status === "approved";
+      return request.status === "approved" || request.status === "accepted" || request.status === "rescheduled";
     } else if (activeTab === "rejected") {
       return request.status === "rejected";
     } else if (activeTab === "completed") {
@@ -249,14 +249,16 @@ export function PropertyViewingRequestsList({
                         variant={
                           request.status === "pending"
                             ? "outline"
-                            : request.status === "approved"
+                            : request.status === "approved" || request.status === "accepted" || request.status === "rescheduled"
                             ? "success"
                             : request.status === "rejected"
                             ? "destructive"
                             : "secondary"
                         }
                       >
-                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        {request.status === "accepted" || request.status === "rescheduled" 
+                          ? "Approved"
+                          : request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                       </Badge>
                     </div>
 
