@@ -64,8 +64,25 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
             }, 5000);
           }
           
-          // Refresh viewing requests data
-          refetch();
+          // Specifically handle viewing request status updates
+          if (data.type === 'property_update' && 
+              data.data.action === 'viewing_request_updated' && 
+              data.data.viewingRequestId) {
+            console.log("Invalidating viewing requests queries due to status update:", data.data.status);
+            
+            // Invalidate the viewing requests endpoint
+            queryClient.invalidateQueries({ queryKey: [endpoint] });
+            
+            // If we have a property ID, invalidate property-specific viewing requests too
+            if (data.data.propertyId) {
+              queryClient.invalidateQueries({ 
+                queryKey: [`/api/properties/${data.data.propertyId}/viewing-requests`] 
+              });
+            }
+          } else {
+            // For other types of updates, just do a general refetch
+            refetch();
+          }
         }
       } catch (e) {
         console.error("Error processing WebSocket message:", e);
@@ -79,7 +96,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
     return () => {
       window.removeEventListener('message', handleWebSocketMessage);
     };
-  }, [refetch]);
+  }, [refetch, endpoint]);
 
   // Filter requests based on active tab
   const filteredRequests = viewingRequests?.filter(request => {

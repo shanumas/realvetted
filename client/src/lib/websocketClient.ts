@@ -33,7 +33,7 @@ class WebSocketClient {
     this.isConnecting = true;
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const path = '/websocket';
+    const path = '/ws';
     const url = `${protocol}://${window.location.host}${path}`;
 
     try {
@@ -123,6 +123,18 @@ class WebSocketClient {
       this.ws.close();
       this.ws = null;
       this.userId = null;
+    }
+  }
+  
+  public setUserId(userId: number) {
+    this.userId = userId;
+    
+    // If already connected, just authenticate with the new userId
+    if (this.isConnected()) {
+      this.authenticate();
+    } else {
+      // Otherwise, connect with the new userId
+      this.connect(userId, this.handlers);
     }
   }
 
