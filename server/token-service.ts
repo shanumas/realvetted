@@ -67,7 +67,7 @@ export async function getPublicViewingRequestLink(
  */
 function createPublicLinkFromToken(token: string): string {
   const baseUrl = process.env.PUBLIC_URL || `${process.env.REPL_SLUG}.replit.dev`;
-  return `https://${baseUrl}/public/viewing-request/${token}`;
+  return `${baseUrl}public/viewing-request/${token}`;
 }
 
 /**
