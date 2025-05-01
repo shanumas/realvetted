@@ -556,7 +556,12 @@ export default function BuyerPropertyDetail() {
                         <Home className="mr-2 h-4 w-4" /> Price
                       </dt>
                       <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                        {property.price}
+                        $
+                        {property?.price
+                          ? property.price
+                              .toLocaleString("en-US")
+                              .replace(/,/g, " ")
+                          : ""}
                       </dd>
                     </div>
                     {property.propertyUrl && (
@@ -571,7 +576,7 @@ export default function BuyerPropertyDetail() {
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline"
                           >
-                            View original listing
+                            {property.propertyUrl}
                           </a>
                         </dd>
                       </div>

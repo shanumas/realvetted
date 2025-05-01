@@ -81,6 +81,7 @@ export function AddPropertyModal({
   // Add property mutation
   const addPropertyMutation = useMutation({
     mutationFn: async (data: PropertyAIData) => {
+      console.log("Property Data received at Mutation function: ", data);
       const response = await apiRequest("POST", "/api/properties", data);
       return response.json();
     },

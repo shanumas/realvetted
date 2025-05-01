@@ -78,9 +78,13 @@ export interface IStorage {
   getEmailsByRole(role: string): Promise<Email[]>;
   getEmailsByRelatedEntity(
     entityType: string,
-    entityId: number
+    entityId: number,
   ): Promise<Email[]>;
-  updateEmailStatus(id: number, status: string, errorMessage?: string): Promise<Email>;
+  updateEmailStatus(
+    id: number,
+    status: string,
+    errorMessage?: string,
+  ): Promise<Email>;
 
   // Message methods
   getMessage(id: number): Promise<Message | undefined>;
@@ -145,17 +149,22 @@ export interface IStorage {
   createViewingToken(tokenData: InsertViewingToken): Promise<ViewingToken>;
   getViewingTokenByToken(token: string): Promise<ViewingToken | undefined>;
   getViewingTokensByRequestId(requestId: number): Promise<ViewingToken[]>;
-  updateViewingToken(id: number, data: Partial<ViewingToken>): Promise<ViewingToken>;
+  updateViewingToken(
+    id: number,
+    data: Partial<ViewingToken>,
+  ): Promise<ViewingToken>;
   invalidateViewingToken(token: string): Promise<ViewingToken>;
-  
+
   // Support chat methods
   getSupportMessage(id: number): Promise<SupportMessage | undefined>;
   getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]>;
   createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage>;
   markSupportMessageAsRead(id: number): Promise<SupportMessage>;
   getUnreadSupportMessageCount(): Promise<number>;
-  getActiveSupportSessions(): Promise<{sessionId: string, lastMessage: Date, unreadCount: number}[]>;
-  
+  getActiveSupportSessions(): Promise<
+    { sessionId: string; lastMessage: Date; unreadCount: number }[]
+  >;
+
   // Session store
   sessionStore: session.Store;
 }
@@ -310,6 +319,10 @@ export class PgStorage implements IStorage {
           imageUrls: properties.imageUrls,
           emailSent: properties.emailSent,
           listingAgentEmail: properties.listingAgentEmail,
+          listingAgentName: properties.listingAgentName,
+          listingAgentPhone: properties.listingAgentPhone,
+          listingAgentCompany: properties.listingAgentCompany,
+          listingAgentLicenseNo: properties.listingAgentLicenseNo,
         })
         .from(properties)
         .where(eq(properties.id, id));
@@ -1298,28 +1311,19 @@ export class PgStorage implements IStorage {
 
   // Email methods
   async createEmail(emailData: InsertEmail): Promise<Email> {
-    const result = await this.db
-      .insert(emails)
-      .values(emailData)
-      .returning();
+    const result = await this.db.insert(emails).values(emailData).returning();
 
     return result[0];
   }
 
   async getEmail(id: number): Promise<Email | undefined> {
-    const result = await this.db
-      .select()
-      .from(emails)
-      .where(eq(emails.id, id));
-    
+    const result = await this.db.select().from(emails).where(eq(emails.id, id));
+
     return result[0];
   }
 
   async getAllEmails(): Promise<Email[]> {
-    return await this.db
-      .select()
-      .from(emails)
-      .orderBy(desc(emails.timestamp));
+    return await this.db.select().from(emails).orderBy(desc(emails.timestamp));
   }
 
   async getEmailsByUser(userId: number): Promise<Email[]> {
@@ -1329,7 +1333,7 @@ export class PgStorage implements IStorage {
       .where(eq(emails.sentById, userId))
       .orderBy(desc(emails.timestamp));
   }
-  
+
   // Get emails sent by a specific role (e.g., all buyer emails)
   async getEmailsByRole(role: string): Promise<Email[]> {
     return await this.db
@@ -1341,7 +1345,7 @@ export class PgStorage implements IStorage {
 
   async getEmailsByRelatedEntity(
     entityType: string,
-    entityId: number
+    entityId: number,
   ): Promise<Email[]> {
     return await this.db
       .select()
@@ -1349,22 +1353,22 @@ export class PgStorage implements IStorage {
       .where(
         and(
           eq(emails.relatedEntityType, entityType),
-          eq(emails.relatedEntityId, entityId)
-        )
+          eq(emails.relatedEntityId, entityId),
+        ),
       )
       .orderBy(desc(emails.timestamp));
   }
 
   async updateEmailStatus(
-    id: number, 
-    status: string, 
-    errorMessage?: string
+    id: number,
+    status: string,
+    errorMessage?: string,
   ): Promise<Email> {
     const result = await this.db
       .update(emails)
       .set({
         status: status,
-        errorMessage: errorMessage || null
+        errorMessage: errorMessage || null,
       })
       .where(eq(emails.id, id))
       .returning();
@@ -1377,7 +1381,9 @@ export class PgStorage implements IStorage {
   }
 
   // Viewing token methods
-  async createViewingToken(tokenData: InsertViewingToken): Promise<ViewingToken> {
+  async createViewingToken(
+    tokenData: InsertViewingToken,
+  ): Promise<ViewingToken> {
     const result = await this.db
       .insert(viewingTokens)
       .values({
@@ -1392,23 +1398,30 @@ export class PgStorage implements IStorage {
     return result[0];
   }
 
-  async getViewingTokenByToken(token: string): Promise<ViewingToken | undefined> {
+  async getViewingTokenByToken(
+    token: string,
+  ): Promise<ViewingToken | undefined> {
     const result = await this.db
       .select()
       .from(viewingTokens)
       .where(eq(viewingTokens.token, token));
-    
+
     return result[0];
   }
 
-  async getViewingTokensByRequestId(requestId: number): Promise<ViewingToken[]> {
+  async getViewingTokensByRequestId(
+    requestId: number,
+  ): Promise<ViewingToken[]> {
     return await this.db
       .select()
       .from(viewingTokens)
       .where(eq(viewingTokens.viewingRequestId, requestId));
   }
 
-  async updateViewingToken(id: number, data: Partial<ViewingToken>): Promise<ViewingToken> {
+  async updateViewingToken(
+    id: number,
+    data: Partial<ViewingToken>,
+  ): Promise<ViewingToken> {
     const result = await this.db
       .update(viewingTokens)
       .set({
@@ -1455,7 +1468,9 @@ export class PgStorage implements IStorage {
     return result[0];
   }
 
-  async getSupportMessagesBySession(sessionId: string): Promise<SupportMessage[]> {
+  async getSupportMessagesBySession(
+    sessionId: string,
+  ): Promise<SupportMessage[]> {
     return await this.db
       .select()
       .from(supportMessages)
@@ -1463,7 +1478,9 @@ export class PgStorage implements IStorage {
       .orderBy(supportMessages.timestamp);
   }
 
-  async createSupportMessage(message: InsertSupportMessage): Promise<SupportMessage> {
+  async createSupportMessage(
+    message: InsertSupportMessage,
+  ): Promise<SupportMessage> {
     const result = await this.db
       .insert(supportMessages)
       .values(message)
@@ -1489,20 +1506,22 @@ export class PgStorage implements IStorage {
     // Count all unread messages that are not from admin (i.e., from users)
     const result = await this.db
       .select({
-        count: this.db.fn.count(supportMessages.id)
+        count: this.db.fn.count(supportMessages.id),
       })
       .from(supportMessages)
       .where(
         and(
           eq(supportMessages.isRead, false),
-          eq(supportMessages.isAdmin, false)
-        )
+          eq(supportMessages.isAdmin, false),
+        ),
       );
-    
+
     return Number(result[0]?.count) || 0;
   }
 
-  async getActiveSupportSessions(): Promise<{sessionId: string, lastMessage: Date, unreadCount: number}[]> {
+  async getActiveSupportSessions(): Promise<
+    { sessionId: string; lastMessage: Date; unreadCount: number }[]
+  > {
     // Raw query to get all active sessions with the time of last message and count of unread messages
     const result = await this.pool.query(`
       SELECT 
@@ -1513,7 +1532,7 @@ export class PgStorage implements IStorage {
       GROUP BY session_id
       ORDER BY MAX(timestamp) DESC
     `);
-    
+
     return result.rows;
   }
 }
