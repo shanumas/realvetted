@@ -162,6 +162,10 @@ export function PropertyViewingRequestsList({
     setConfirmAction(null);
   };
 
+  // Log all viewing requests received (for debugging)
+  console.log('All viewing requests:', viewingRequests);
+
+  // Modified to show all pending requests in tab "pending" and all other requests in their respective tabs
   const filteredViewingRequests = viewingRequests.filter((request) => {
     if (activeTab === "pending") {
       return request.status === "pending";
@@ -174,6 +178,9 @@ export function PropertyViewingRequestsList({
     }
     return true;
   });
+  
+  // Log filtered viewing requests (for debugging)
+  console.log('Filtered viewing requests for tab', activeTab, ':', filteredViewingRequests);
 
   return (
     <div>
