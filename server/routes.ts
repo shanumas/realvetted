@@ -108,19 +108,22 @@ import { z } from "zod";
 import { SupportMessage, supportMessageSchema } from "@shared/schema";
 
 // Handler for support chat messages
-async function handleSupportChatMessage(message: any, client?: any): Promise<void> {
+async function handleSupportChatMessage(
+  message: any,
+  client?: any,
+): Promise<void> {
   try {
     // Skip if not a support chat message
-    if (message.type !== 'support') {
+    if (message.type !== "support") {
       return;
     }
 
     // Validate the message
     if (!message.sessionId || !message.content || !message.senderName) {
-      console.error('Invalid support message format:', message);
+      console.error("Invalid support message format:", message);
       return;
     }
-    
+
     // Store the message in database
     const newMessage = await storage.createSupportMessage({
       sessionId: message.sessionId,
@@ -130,27 +133,30 @@ async function handleSupportChatMessage(message: any, client?: any): Promise<voi
       content: message.content,
       isAdmin: !!message.isAdmin,
     });
-    
+
     // Send new chat notification email
     if (!message.isAdmin) {
       // Only send notification for new customer messages (not admin replies)
       // Also only send for first message in a session
-      const sessionMessages = await storage.getSupportMessagesBySession(message.sessionId);
-      if (sessionMessages.length <= 1) { // First message in session
+      const sessionMessages = await storage.getSupportMessagesBySession(
+        message.sessionId,
+      );
+      if (sessionMessages.length <= 1) {
+        // First message in session
         // Send email notification
         await sendSupportChatNotification(
           message.senderName,
-          message.senderEmail || 'Anonymous',
+          message.senderEmail || "Anonymous",
           message.content,
-          message.sessionId
+          message.sessionId,
         );
       }
     }
-    
+
     // Return the message to the sender and broadcast to admin users
     return message;
   } catch (error) {
-    console.error('Error handling support chat message:', error);
+    console.error("Error handling support chat message:", error);
   }
 }
 
@@ -162,7 +168,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { isAuthenticated, hasRole } = setupAuth(app);
 
   // Set up WebSocket server
-  const websocketServer = setupWebSocketServer(httpServer, handleSupportChatMessage);
+  const websocketServer = setupWebSocketServer(
+    httpServer,
+    handleSupportChatMessage,
+  );
 
   // Set up static file serving for uploads
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -498,7 +507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (validationResult.validated) {
             // Check if user also has KYC verification
             const hasKYC = user.verificationMethod === "kyc";
-            
+
             // Success - update user record with validation information
             await storage.updateUser(req.user!.id, {
               prequalificationValidated: true,
@@ -5515,6 +5524,8 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               publicViewingLink,
             };
 
+            console.log("-------------publicViewingLink:" + publicViewingLink);
+
             // Send the email notification with public link
             await sendTourRequestEmail(
               viewingRequestWithLink, // Use the enhanced object with public link
@@ -5523,6 +5534,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
               agent,
               listingAgentEmail,
               listingAgentName,
+              publicViewingLink,
             );
 
             console.log(

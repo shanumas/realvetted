@@ -54,6 +54,7 @@ export async function sendTourRequestEmail(
   agent: User | undefined,
   listingAgentEmail: string,
   listingAgentName: string,
+  publicViewingLink: string,
 ): Promise<SentEmail> {
   // Format the date and time for the email
   const requestDate = new Date(viewingRequest.requestedDate);
@@ -130,6 +131,7 @@ BODY: ""
         property_address: property.address,
         requested_date_time: formattedDateTime,
         listing_agent_name: listingAgentName || "Listing Agent",
+        calenderLink: publicViewingLink,
       },
     );
 
@@ -451,11 +453,11 @@ export async function sendSupportChatNotification(
   customerName: string,
   customerEmail: string,
   initialMessage: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<Email | null> {
   // Admin email that will receive notifications
   const adminEmail = "shanumas@gmail.com";
-  
+
   // Prepare email content
   const subject = `New Customer Support Chat - ${customerName}`;
   const body = `
@@ -498,7 +500,7 @@ ${body}
         from_name: "REALVetted Support System",
         subject: subject,
         message: body,
-      }
+      },
     );
 
     console.log("Support chat notification email sent successfully:", response);
@@ -520,7 +522,10 @@ ${body}
       });
       return newEmail;
     } catch (error) {
-      console.error("Error storing support chat notification email in database:", error);
+      console.error(
+        "Error storing support chat notification email in database:",
+        error,
+      );
       return null;
     }
   } catch (error) {
