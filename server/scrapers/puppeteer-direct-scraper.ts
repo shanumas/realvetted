@@ -43,49 +43,22 @@ export async function extractPropertyWithPuppeteer(
 
     if (description) {
       const { email, phone } = await findAgentEmail(description);
-      
-      // Set default values for all listing agent fields if they weren't extracted by GPT
-      
-      // For the listing agent name
-      if (!data.listingAgentName || data.listingAgentName === "") {
-        data.listingAgentName = "REDFIN";
-      }
-      
-      // For the listing agent company
-      if (!data.listingAgentCompany || data.listingAgentCompany === "") {
-        data.listingAgentCompany = "Redfin Corporation";
-      }
-      
-      // For the listing agent license
-      if (!data.listingAgentLicenseNo || data.listingAgentLicenseNo === "") {
-        data.listingAgentLicenseNo = "01521930";
-      }
-      
-      // For the listing agent email (with fallback)
+      //Fallback email is Uma's email
       if (email) {
         data.listingAgentEmail = email;
       } else {
         data.listingAgentEmail =
           process.env.LISTING_AGENT_FALLBACK ?? "shanumas@gmail.com";
       }
-      
-      // For the listing agent phone (with fallback)
+      //Fallback phone is Randy's phone
       if (phone) {
         data.listingAgentPhone = phone;
       } else {
         data.listingAgentPhone =
           process.env.LISTING_AGENT_FALLBACK_PHONE ?? "(828) 678-0070";
       }
-      
+      //RIP
       console.log("-----Extracted Email: " + email);
-      console.log("-----Listing Agent Data: " + 
-        JSON.stringify({
-          name: data.listingAgentName,
-          company: data.listingAgentCompany,
-          phone: data.listingAgentPhone,
-          license: data.listingAgentLicenseNo
-        })
-      );
     }
 
     console.log("Complete data " + JSON.stringify(data));
@@ -164,11 +137,11 @@ const EMPTY_PROPERTY: PropertyAIData = {
   bathrooms: "",
   price: "",
   description: "",
-  listingAgentName: "REDFIN",
-  listingAgentPhone: process.env.LISTING_AGENT_FALLBACK_PHONE ?? "(828) 678-0070",
-  listingAgentEmail: process.env.LISTING_AGENT_FALLBACK ?? "shanumas@gmail.com",
-  listingAgentCompany: "Redfin Corporation",
-  listingAgentLicenseNo: "01521930",
+  listingAgentName: "",
+  listingAgentPhone: "",
+  listingAgentEmail: "",
+  listingAgentCompany: "",
+  listingAgentLicenseNo: "",
   propertyUrl: "",
 };
 
