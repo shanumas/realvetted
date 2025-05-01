@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useQueryClient, QueryKey } from "@tanstack/react-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
@@ -461,8 +462,23 @@ export default function BuyerPropertyDetail() {
     useQuery<ViewingRequestWithParticipants[]>({
       queryKey: [`/api/properties/${propertyId}/viewing-requests`],
       queryFn: getQueryFn({ on401: "throw" }),
-      enabled: !!propertyId, // Only run query if propertyId is valid
+      enabled: !!propertyId // Only run query if propertyId is valid
     });
+    
+  // Add debug logging for viewing requests without affecting the query itself
+  React.useEffect(() => {
+    if (viewingRequests && viewingRequests.length > 0) {
+      console.log('Viewing requests loaded successfully in property-detail:', viewingRequests);
+      console.log('Number of viewing requests:', viewingRequests.length);
+      
+      // Log the status of each request
+      viewingRequests.forEach((request, i) => {
+        console.log(`Request #${i+1} (ID: ${request.id}) - Status: ${request.status}, Date: ${new Date(request.requestedDate).toLocaleString()}`);
+      });
+    } else if (viewingRequests) {
+      console.log('No viewing requests found for property', propertyId);
+    }
+  }, [viewingRequests, propertyId]);
 
   if (isLoading) {
     return (

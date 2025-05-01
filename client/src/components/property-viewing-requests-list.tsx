@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { getQueryFn, apiRequest } from "@/lib/queryClient";
@@ -69,6 +69,19 @@ export function PropertyViewingRequestsList({
 
   // Use provided viewingRequests if available, otherwise use fetched data
   const viewingRequests = providedViewingRequests || fetchedViewingRequests || [];
+  
+  // Enhanced debugging for property viewing requests
+  React.useEffect(() => {
+    if (providedViewingRequests) {
+      console.log('PropertyViewingRequestsList received direct viewingRequests prop:', providedViewingRequests);
+      console.log('PropertyViewingRequestsList received propertyId:', propertyId);
+      console.log('PropertyViewingRequestsList received viewAs:', viewAs);
+    } else if (fetchedViewingRequests) {
+      console.log('PropertyViewingRequestsList using fetched data:', fetchedViewingRequests);
+    } else {
+      console.log('PropertyViewingRequestsList has no viewing requests data');
+    }
+  }, [providedViewingRequests, fetchedViewingRequests, propertyId, viewAs]);
 
   const handleViewingAction = async (requestId: number, status: string) => {
     try {
