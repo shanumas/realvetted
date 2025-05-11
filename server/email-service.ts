@@ -123,7 +123,7 @@ BODY: ""
         cc_email: cc.join(", "), // Include buyer's agent in CC
 
         brbc_document: "", // Not applicable for tour requests
-        prequalification_document: "", // Not applicable for tour requests
+        prequalification_document: buyer.prequalificationDocUrl || "", // Not applicable for tour requests
 
         buyer_name: buyer.firstName + " " + buyer.lastName,
         buyer_phone: buyer.phone,
