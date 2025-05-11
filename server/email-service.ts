@@ -5,6 +5,7 @@ import {
   Email,
   InsertEmail,
   SupportMessage,
+  Agreement,
 } from "@shared/schema";
 import { storage } from "./storage";
 import fs from "fs";
@@ -249,9 +250,9 @@ BODY: ""
   let brbcURL = "";
   try {
     // Get the latest global BRBC agreement for this buyer
-    const buyerAgreements = await storage.getAgreementsByBuyerId(buyer.id);
+    const buyerAgreements = await storage.getAgreementsByBuyer(buyer.id);
     const brbcAgreement = buyerAgreements.find(
-      (agreement) => agreement.type === "global_brbc" && agreement.documentUrl
+      (agreement: Agreement) => agreement.type === "global_brbc" && agreement.documentUrl
     );
     
     if (brbcAgreement && brbcAgreement.documentUrl) {
@@ -288,8 +289,8 @@ BODY: ""
         to_email: to.join(", "),
         cc_email: cc.join(", "), // Include buyer's agent in CC
 
-        brbc_document: brbcURL || "", // Not applicable for tour requests
-        prequalification_document: fullPreQualUrl || "", // Not applicable for tour requests
+        brbc_document: fullBrbcUrl || "", // Include BRBC document if available
+        prequalification_document: fullPreQualUrl || "", // Include prequalification document if available
 
         buyer_name: buyer.firstName + " " + buyer.lastName,
         buyer_phone: buyer.phone,
@@ -300,6 +301,13 @@ BODY: ""
         calenderLink: publicViewingLink,
       },
     );
+    
+    // Log BRBC URL information for debugging
+    if (fullBrbcUrl) {
+      console.log(`Sent tour request email with BRBC document: ${fullBrbcUrl}`);
+    } else {
+      console.log("No BRBC document included in tour request email");
+    }
 
     console.log("Email sent successfully:", response);
   } catch (error) {
