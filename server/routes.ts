@@ -13,6 +13,7 @@ import {
   sendTourRequestEmail,
   sendPrequalificationApprovalEmail,
   sendSupportChatNotification,
+  sendSignedBrbcToBuyer,
   getAllEmails,
   getSentEmailsForUser,
   getSentEmailsForEntity,
@@ -6844,6 +6845,26 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           isGlobal: true, // This is a global agreement
           documentUrl: documentUrl,
         });
+
+        // Send the signed BRBC document to buyer via email
+        try {
+          // Get the complete buyer information
+          const buyer = await storage.getUser(buyerId);
+          
+          if (buyer) {
+            // Get agent information
+            const agent = defaultAgent ? await storage.getUser(defaultAgent.id) : undefined;
+            
+            // Send email with the signed document to the buyer
+            await sendSignedBrbcToBuyer(buyer, documentUrl, agent);
+            console.log(`Sent signed BRBC document to buyer ${buyer.email}`);
+          } else {
+            console.error(`Could not find buyer with ID ${buyerId} to send BRBC email`);
+          }
+        } catch (emailError) {
+          // Log error but don't fail the request if email sending fails
+          console.error("Error sending BRBC email to buyer:", emailError);
+        }
 
         res.json({
           success: true,

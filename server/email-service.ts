@@ -442,6 +442,136 @@ ${body}
 }
 
 /**
+ * Send signed BRBC agreement to buyer via email
+ * @param buyer The buyer user object
+ * @param documentUrl URL to the signed BRBC document
+ * @param agent Optional agent user object
+ * @returns The sent email record
+ */
+export async function sendSignedBrbcToBuyer(
+  buyer: User,
+  documentUrl: string,
+  agent?: User
+): Promise<SentEmail> {
+  // Prepare recipient email - this will be the buyer's email
+  const to = [buyer.email];
+  
+  // Format buyer's name
+  const buyerName = `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email;
+  
+  // Format agent's name if available
+  const agentName = agent 
+    ? `${agent.firstName || ''} ${agent.lastName || ''}`.trim() 
+    : 'your agent';
+
+  // Construct the email subject
+  const subject = `Your Signed Buyer Representation Agreement`;
+
+  // Construct the email body
+  let body = `
+Dear ${buyerName},
+
+Thank you for signing your Buyer Representation Agreement with REALVetted. This document establishes your official relationship with ${agentName}.
+
+We've attached a copy of your signed agreement for your records. Please save this document for future reference.
+
+Key Points to Remember:
+- This agreement is valid for 90 days
+- Your agent will represent your interests in the home buying process
+- All property viewings and inquiries should be coordinated through your agent
+
+If you have any questions about this agreement or need assistance with your property search, please contact us at support@realvetted.com.
+
+Thank you for choosing REALVetted for your real estate needs.
+
+Best regards,
+The REALVetted Team
+`;
+
+  // Log email details for debugging
+  console.log(`
+======= SIGNED BRBC EMAIL TO BUYER =======
+TO: ${to.join(", ")}
+SUBJECT: ${subject}
+DOCUMENT: ${documentUrl}
+======= END EMAIL =======
+  `);
+
+  try {
+    // Prepare the full document URL (ensure it starts with http or https)
+    let fullDocumentUrl = documentUrl;
+    if (!documentUrl.startsWith('http')) {
+      // Create a full URL to the document
+      const baseUrl = process.env.BASE_URL || 'https://realvetted.com';
+      fullDocumentUrl = `${baseUrl}${documentUrl.startsWith('/') ? '' : '/'}${documentUrl}`;
+    }
+
+    // Send email using EmailJS with the credentials provided
+    const response = await emailjs.send(
+      "service_z8eslzt", // Service ID from the provided credentials
+      "template_4bptn9b", // Template ID from the provided credentials
+      {
+        to_email: to.join(", "),
+        cc_email: "", // No CC recipients for BRBC emails
+        from_name: "REALVetted",
+        subject: subject,
+        message: body,
+        brbc_document: fullDocumentUrl, // Include the BRBC document URL
+        prequalification_document: "", // Not applicable for BRBC emails
+      },
+    );
+
+    console.log("BRBC document email sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending BRBC document email with EmailJS:", error);
+  }
+
+  // Create a sent email record
+  const emailId = generateUUID();
+
+  // For legacy compatibility
+  const sentEmail: SentEmail = {
+    id: emailId,
+    to,
+    cc: [],
+    subject,
+    body,
+    timestamp: new Date(),
+    sentBy: {
+      id: buyer.id,
+      role: "buyer",
+    },
+    relatedEntity: {
+      type: "agreement",
+      id: buyer.id,
+    },
+  };
+
+  // Store the email in the database
+  try {
+    await storage.createEmail({
+      externalId: emailId,
+      to,
+      cc: [],
+      subject,
+      body,
+      status: "sent",
+      sentById: buyer.id,
+      sentByRole: "buyer",
+      relatedEntityType: "agreement",
+      relatedEntityId: buyer.id,
+    });
+  } catch (error) {
+    console.error("Error storing BRBC email in database:", error);
+  }
+
+  // Also keep for legacy compatibility
+  sentEmails.push(sentEmail);
+
+  return sentEmail;
+}
+
+/**
  * Send notification email when a new support chat session starts
  * @param customerName Name of the customer who started the chat
  * @param customerEmail Email of the customer (if provided)
