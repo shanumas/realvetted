@@ -6558,6 +6558,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
 
   // API Endpoint to create a global BRBC agreement between a buyer and agent
   app.post("/api/global-brbc", isAuthenticated, async (req, res) => {
+    console.log("-----Global BRBC request body:");
     try {
       const { agentId, signatureData, details } = req.body;
 
@@ -6619,92 +6620,13 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
 
-  // API Endpoint for signing BRBC form from the new integrated viewer
-  app.post(
-    "/api/buyer/agreements/sign-brbc",
-    isAuthenticated,
-    hasRole(["buyer"]),
-    async (req, res) => {
-      try {
-        const { signatureData, agreementType } = req.body;
-
-        if (!signatureData) {
-          return res.status(400).json({ error: "Signature is required" });
-        }
-
-        if (agreementType !== "global_brbc") {
-          return res.status(400).json({ error: "Invalid agreement type" });
-        }
-
-        // Find the first available agent
-        const agents = await storage.getUsersByRole("agent");
-
-        if (!agents || agents.length === 0) {
-          return res.status(404).json({
-            success: false,
-            error: "No agents available in the system",
-          });
-        }
-
-        // Use the first agent as a default
-        const defaultAgent = agents[0];
-
-        // Generate a prefilled BRBC PDF
-        const buyerName =
-          `${req.user!.firstName || ""} ${req.user!.lastName || ""}`.trim() ||
-          req.user!.email;
-        let pdfBuffer = await fillBrbcForm(buyerName);
-
-        // Add the signature to the PDF
-        pdfBuffer = await addSignatureToPdf(pdfBuffer, signatureData, "sign1");
-
-        // Create upload directory if it doesn't exist
-        const agreementsDir = path.join(process.cwd(), "uploads", "agreements");
-        await fs.promises.mkdir(agreementsDir, { recursive: true });
-
-        // Generate a unique filename for the signed document
-        const timestamp = Date.now();
-        const filename = `brbc_${req.user!.id}_${timestamp}.pdf`;
-        const filePath = path.join(agreementsDir, filename);
-
-        // Save the signed document
-        fs.writeFileSync(filePath, pdfBuffer);
-
-        // Document URL relative to uploads directory
-        const documentUrl = `/uploads/agreements/${filename}`;
-
-        // Create agreement record in database
-        const agreement = await storage.createAgreement({
-          agentId: defaultAgent.id,
-          buyerId: req.user!.id,
-          type: "global_brbc",
-          agreementText: JSON.stringify({}),
-          buyerSignature: signatureData,
-          date: new Date(),
-          status: "signed_by_buyer",
-          isGlobal: true,
-          documentUrl: documentUrl,
-        });
-
-        return res.json({
-          success: true,
-          agreement,
-        });
-      } catch (error) {
-        console.error("Error signing BRBC form:", error);
-        return res.status(500).json({
-          error: "Failed to sign agreement",
-        });
-      }
-    },
-  );
-
   // API Endpoint to save a BRBC PDF with signature (with multiple signature fields support)
   app.post(
     "/api/global-brbc/pdf-signature",
     isAuthenticated,
     hasRole(["buyer"]),
     async (req, res) => {
+      console.log("-----Pdf-signature request body:");
       try {
         const {
           signatureData, // Main signature for sign1 field
@@ -6850,16 +6772,26 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         try {
           // Get the complete buyer information
           const buyer = await storage.getUser(buyerId);
-          
+          console.log("--------Lets send brbc to buyer: Buyer data:", buyer);
+
           if (buyer) {
             // Get agent information
-            const agent = defaultAgent ? await storage.getUser(defaultAgent.id) : undefined;
-            
+            console.log(
+              "--------Lets send brbc to buyer: Buyer exists:",
+              buyer,
+            );
+
+            const agent = defaultAgent
+              ? await storage.getUser(defaultAgent.id)
+              : undefined;
+
             // Send email with the signed document to the buyer
             await sendSignedBrbcToBuyer(buyer, documentUrl, agent);
             console.log(`Sent signed BRBC document to buyer ${buyer.email}`);
           } else {
-            console.error(`Could not find buyer with ID ${buyerId} to send BRBC email`);
+            console.error(
+              `Could not find buyer with ID ${buyerId} to send BRBC email`,
+            );
           }
         } catch (emailError) {
           // Log error but don't fail the request if email sending fails

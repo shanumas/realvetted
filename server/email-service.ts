@@ -38,6 +38,139 @@ export interface SentEmail {
 // For legacy compatibility until full migration - don't use this directly anymore
 const sentEmails: SentEmail[] = [];
 
+export async function sendSignedBrbcToBuyer(
+  buyer: User,
+  documentUrl: string,
+  agent?: User,
+): Promise<SentEmail> {
+  console.log("--------Lets send brbc to buyer: Inside the sending function :");
+
+  // Prepare recipient email - this will be the buyer's email
+  const to = [buyer.email];
+
+  // Format buyer's name
+  const buyerName =
+    `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || buyer.email;
+
+  // Format agent's name if available
+  const agentName = agent
+    ? `${agent.firstName || ""} ${agent.lastName || ""}`.trim()
+    : "your agent";
+
+  // Construct the email subject
+  const subject = `Your Signed Buyer Representation Agreement`;
+
+  // Construct the email body
+  let body = `
+Dear ${buyerName},
+
+Thank you for signing your Buyer Representation Agreement with REALVetted. This document establishes your official relationship with ${agentName}.
+
+We've attached a copy of your signed agreement for your records. Please save this document for future reference.
+
+Key Points to Remember:
+- This agreement is valid for 90 days
+- Your agent will represent your interests in the home buying process
+- All property viewings and inquiries should be coordinated through your agent
+
+If you have any questions about this agreement or need assistance with your property search, please contact us at support@realvetted.com.
+
+Thank you for choosing REALVetted for your real estate needs.
+
+Best regards,
+The REALVetted Team
+`;
+
+  // Log email details for debugging
+  console.log(`
+======= SIGNED BRBC EMAIL TO BUYER =======
+TO: ${to.join(", ")}
+SUBJECT: ${subject}
+DOCUMENT: ${documentUrl}
+======= END EMAIL =======
+  `);
+
+  try {
+    // Prepare the full document URL (ensure it starts with http or https)
+    console.log(
+      "--------Lets send brbc to buyer: Inside the sending function 1:",
+      documentUrl,
+    );
+    let fullDocumentUrl = documentUrl;
+    if (!documentUrl.startsWith("http")) {
+      // Create a full URL to the document
+      console.log(
+        "--------Lets send brbc to buyer: Inside the sending function 2:",
+        documentUrl,
+      );
+      const baseUrl = process.env.PUBLIC_URL || "https://realvetted.replit.app";
+      const cleanedDocumentUrl = documentUrl.replace(/^\/+/, ""); // removes leading slashes
+      fullDocumentUrl = `${baseUrl}/${cleanedDocumentUrl}`;
+    }
+
+    console.log("--------Full documet URL:", fullDocumentUrl);
+
+    // Send email using EmailJS with the credentials provided
+    const response = await emailjs.send(
+      "service_z8eslzt", // Service ID from the provided credentials
+      "template_viismmd", // Template ID from the provided credentials
+      {
+        buyer_name: buyerName,
+        buyer_email: to.join(", "),
+        brbc: fullDocumentUrl, // Include the BRBC document URL
+      },
+    );
+
+    console.log("BRBC document email sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending BRBC document email with EmailJS:", error);
+  }
+
+  // Create a sent email record
+  const emailId = generateUUID();
+
+  // For legacy compatibility
+  const sentEmail: SentEmail = {
+    id: emailId,
+    to,
+    cc: [],
+    subject,
+    body,
+    timestamp: new Date(),
+    sentBy: {
+      id: buyer.id,
+      role: "buyer",
+    },
+    relatedEntity: {
+      type: "agreement",
+      id: buyer.id,
+    },
+  };
+
+  // Store the email in the database
+  try {
+    await storage.createEmail({
+      externalId: emailId,
+      to,
+      cc: [],
+      subject,
+      body,
+      status: "sent",
+      sentById: buyer.id,
+      sentByRole: "buyer",
+      relatedEntityType: "agreement",
+      relatedEntityId: buyer.id,
+    });
+  } catch (error) {
+    console.error("Error storing BRBC email in database:", error);
+  }
+
+  // Also keep for legacy compatibility
+  sentEmails.push(sentEmail);
+
+  return sentEmail;
+}
+
 /**
  * Send a property tour request email notification
  * @param viewingRequest The viewing request object
@@ -110,6 +243,39 @@ BODY: ""
   `);
 
   // EmailJS is already initialized with keys at the top of the file
+  const preQualURL = buyer.prequalificationDocUrl || "";
+  
+  // Get the buyer's BRBC agreement if it exists
+  let brbcURL = "";
+  try {
+    // Get the latest global BRBC agreement for this buyer
+    const buyerAgreements = await storage.getAgreementsByBuyerId(buyer.id);
+    const brbcAgreement = buyerAgreements.find(
+      (agreement) => agreement.type === "global_brbc" && agreement.documentUrl
+    );
+    
+    if (brbcAgreement && brbcAgreement.documentUrl) {
+      brbcURL = brbcAgreement.documentUrl;
+      console.log(`Found BRBC agreement for buyer ${buyer.id}: ${brbcURL}`);
+    } else {
+      console.log(`No BRBC agreement found for buyer ${buyer.id}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching BRBC agreement for buyer ${buyer.id}:`, error);
+  }
+
+  const baseUrl = process.env.PUBLIC_URL || "https://realvetted.replit.app";
+
+  const cleanedPreQualUrl = preQualURL.replace(/^\/+/, ""); // removes leading slashes
+  const fullPreQualUrl = `${baseUrl}/${cleanedPreQualUrl}`;
+  
+  // Also prepare the full BRBC URL if it exists
+  let fullBrbcUrl = "";
+  if (brbcURL) {
+    const cleanedBrbcUrl = brbcURL.replace(/^\/+/, ""); // removes leading slashes
+    fullBrbcUrl = `${baseUrl}/${cleanedBrbcUrl}`;
+    console.log(`Full BRBC URL: ${fullBrbcUrl}`);
+  }
 
   try {
     // Prepare the message content
@@ -122,8 +288,8 @@ BODY: ""
         to_email: to.join(", "),
         cc_email: cc.join(", "), // Include buyer's agent in CC
 
-        brbc_document: "", // Not applicable for tour requests
-        prequalification_document: buyer.prequalificationDocUrl || "", // Not applicable for tour requests
+        brbc_document: brbcURL || "", // Not applicable for tour requests
+        prequalification_document: fullPreQualUrl || "", // Not applicable for tour requests
 
         buyer_name: buyer.firstName + " " + buyer.lastName,
         buyer_phone: buyer.phone,
@@ -433,136 +599,6 @@ ${body}
     });
   } catch (error) {
     console.error("Error storing email in database:", error);
-  }
-
-  // Also keep for legacy compatibility
-  sentEmails.push(sentEmail);
-
-  return sentEmail;
-}
-
-/**
- * Send signed BRBC agreement to buyer via email
- * @param buyer The buyer user object
- * @param documentUrl URL to the signed BRBC document
- * @param agent Optional agent user object
- * @returns The sent email record
- */
-export async function sendSignedBrbcToBuyer(
-  buyer: User,
-  documentUrl: string,
-  agent?: User
-): Promise<SentEmail> {
-  // Prepare recipient email - this will be the buyer's email
-  const to = [buyer.email];
-  
-  // Format buyer's name
-  const buyerName = `${buyer.firstName || ''} ${buyer.lastName || ''}`.trim() || buyer.email;
-  
-  // Format agent's name if available
-  const agentName = agent 
-    ? `${agent.firstName || ''} ${agent.lastName || ''}`.trim() 
-    : 'your agent';
-
-  // Construct the email subject
-  const subject = `Your Signed Buyer Representation Agreement`;
-
-  // Construct the email body
-  let body = `
-Dear ${buyerName},
-
-Thank you for signing your Buyer Representation Agreement with REALVetted. This document establishes your official relationship with ${agentName}.
-
-We've attached a copy of your signed agreement for your records. Please save this document for future reference.
-
-Key Points to Remember:
-- This agreement is valid for 90 days
-- Your agent will represent your interests in the home buying process
-- All property viewings and inquiries should be coordinated through your agent
-
-If you have any questions about this agreement or need assistance with your property search, please contact us at support@realvetted.com.
-
-Thank you for choosing REALVetted for your real estate needs.
-
-Best regards,
-The REALVetted Team
-`;
-
-  // Log email details for debugging
-  console.log(`
-======= SIGNED BRBC EMAIL TO BUYER =======
-TO: ${to.join(", ")}
-SUBJECT: ${subject}
-DOCUMENT: ${documentUrl}
-======= END EMAIL =======
-  `);
-
-  try {
-    // Prepare the full document URL (ensure it starts with http or https)
-    let fullDocumentUrl = documentUrl;
-    if (!documentUrl.startsWith('http')) {
-      // Create a full URL to the document
-      const baseUrl = process.env.BASE_URL || 'https://realvetted.com';
-      fullDocumentUrl = `${baseUrl}${documentUrl.startsWith('/') ? '' : '/'}${documentUrl}`;
-    }
-
-    // Send email using EmailJS with the credentials provided
-    const response = await emailjs.send(
-      "service_z8eslzt", // Service ID from the provided credentials
-      "template_4bptn9b", // Template ID from the provided credentials
-      {
-        to_email: to.join(", "),
-        cc_email: "", // No CC recipients for BRBC emails
-        from_name: "REALVetted",
-        subject: subject,
-        message: body,
-        brbc_document: fullDocumentUrl, // Include the BRBC document URL
-        prequalification_document: "", // Not applicable for BRBC emails
-      },
-    );
-
-    console.log("BRBC document email sent successfully:", response);
-  } catch (error) {
-    console.error("Error sending BRBC document email with EmailJS:", error);
-  }
-
-  // Create a sent email record
-  const emailId = generateUUID();
-
-  // For legacy compatibility
-  const sentEmail: SentEmail = {
-    id: emailId,
-    to,
-    cc: [],
-    subject,
-    body,
-    timestamp: new Date(),
-    sentBy: {
-      id: buyer.id,
-      role: "buyer",
-    },
-    relatedEntity: {
-      type: "agreement",
-      id: buyer.id,
-    },
-  };
-
-  // Store the email in the database
-  try {
-    await storage.createEmail({
-      externalId: emailId,
-      to,
-      cc: [],
-      subject,
-      body,
-      status: "sent",
-      sentById: buyer.id,
-      sentByRole: "buyer",
-      relatedEntityType: "agreement",
-      relatedEntityId: buyer.id,
-    });
-  } catch (error) {
-    console.error("Error storing BRBC email in database:", error);
   }
 
   // Also keep for legacy compatibility
