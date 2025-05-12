@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { formatCaliforniaTime } from "@/lib/date-utils";
+import { formatCaliforniaTime, createCaliforniaDate } from "@/lib/date-utils";
 import { Loader2, CalendarIcon, Clock, Home, DollarSign, BedDouble, Bath, SquareCode, User, Check, X, Calendar as CalendarIcon2, Clock1 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -320,15 +320,17 @@ export default function PublicViewingRequest() {
   const requestedDate = new Date(viewingRequest.requestedDate);
   const requestedEndDate = new Date(viewingRequest.requestedEndDate);
   
-  const formattedRequestedDate = format(requestedDate, "EEEE, MMMM d, yyyy");
-  const formattedRequestedTime = `${format(requestedDate, "h:mm a")} - ${format(requestedEndDate, "h:mm a")}`;
+  const formattedRequestedDate = formatCaliforniaTime(viewingRequest.requestedDate.toString(), "EEEE, MMMM d, yyyy");
+  const formattedRequestedTime = `${formatCaliforniaTime(viewingRequest.requestedDate.toString(), "h:mm a")} - ${formatCaliforniaTime(viewingRequest.requestedEndDate.toString(), "h:mm a")}`;
   
   const confirmedDate = viewingRequest.confirmedDate ? new Date(viewingRequest.confirmedDate) : null;
   const confirmedEndDate = viewingRequest.confirmedEndDate ? new Date(viewingRequest.confirmedEndDate) : null;
   
-  const formattedConfirmedDate = confirmedDate ? format(confirmedDate, "EEEE, MMMM d, yyyy") : null;
-  const formattedConfirmedTime = confirmedDate && confirmedEndDate 
-    ? `${format(confirmedDate, "h:mm a")} - ${format(confirmedEndDate, "h:mm a")}`
+  const formattedConfirmedDate = viewingRequest.confirmedDate 
+    ? formatCaliforniaTime(viewingRequest.confirmedDate.toString(), "EEEE, MMMM d, yyyy") 
+    : null;
+  const formattedConfirmedTime = viewingRequest.confirmedDate && viewingRequest.confirmedEndDate 
+    ? `${formatCaliforniaTime(viewingRequest.confirmedDate.toString(), "h:mm a")} - ${formatCaliforniaTime(viewingRequest.confirmedEndDate.toString(), "h:mm a")}`
     : null;
   
   // Determine if the viewing request can be acted upon
