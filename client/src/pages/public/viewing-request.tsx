@@ -229,15 +229,14 @@ export default function PublicViewingRequest() {
       return;
     }
 
-    // Create date objects with the selected date and time
-    const confirmedDate = new Date(selectedDate);
+    // Create date objects with the selected date and time in California timezone
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
     
-    confirmedDate.setHours(startHours, startMinutes, 0, 0);
-    
-    const confirmedEndDate = new Date(selectedDate);
-    confirmedEndDate.setHours(endHours, endMinutes, 0, 0);
+    // Use our helper to create dates in California timezone
+    // We already checked if selectedDate exists, but add the non-null assertion to satisfy TypeScript
+    const confirmedDateStr = createCaliforniaDate(selectedDate!, startHours, startMinutes);
+    const confirmedEndDateStr = createCaliforniaDate(selectedDate!, endHours, endMinutes);
 
     try {
       setIsSubmitting(true);
@@ -248,8 +247,8 @@ export default function PublicViewingRequest() {
         },
         body: JSON.stringify({
           status: "rescheduled",
-          confirmedDate: confirmedDate.toISOString(),
-          confirmedEndDate: confirmedEndDate.toISOString(),
+          confirmedDate: confirmedDateStr,
+          confirmedEndDate: confirmedEndDateStr,
           responseMessage,
         }),
       });

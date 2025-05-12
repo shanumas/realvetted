@@ -431,7 +431,7 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
         ))}
       </Tabs>
       
-      {/* Chat Dialog */}
+      {/* Chat Dialog Section */}
       {selectedChat && (
         <Dialog open={!!selectedChat} onOpenChange={() => setSelectedChat(null)}>
           <DialogContent className="max-w-md">
