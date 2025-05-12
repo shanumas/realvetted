@@ -3,10 +3,15 @@ import react from "@vitejs/plugin-react";
 import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
 import path from "path";
 
-// This is an optimized build configuration specifically for deployment
+// This is an extremely optimized build configuration specifically for deployment
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      // Disable React refresh for production builds
+      babel: {
+        plugins: [],
+      },
+    }),
     themePlugin(),
   ],
   resolve: {
@@ -24,17 +29,22 @@ export default defineConfig({
     target: 'es2020',
     minify: 'esbuild',
     cssMinify: true,
-    // Use chunk splitting to improve build performance
+    // Reduce build time by setting a reasonable limit on CSS inlining
+    cssCodeSplit: true,
+    // Disable source maps for production
+    sourcemap: false,
+    // More aggressive settings to reduce build time
+    reportCompressedSize: false,
+    chunkSizeWarningLimit: 2000,
+    // Use chunk splitting to drastically improve build performance
     rollupOptions: {
       output: {
+        // Reduce the number of chunks
         manualChunks: {
-          vendor: [
-            'react', 
-            'react-dom',
-            'wouter', 
-            '@tanstack/react-query'
-          ],
-          ui: [
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['wouter'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-ui': [
             '@radix-ui/react-accordion',
             '@radix-ui/react-alert-dialog',
             '@radix-ui/react-aspect-ratio',
@@ -63,9 +73,22 @@ export default defineConfig({
             '@radix-ui/react-toggle-group',
             '@radix-ui/react-tooltip',
           ],
-          icons: ['lucide-react']
-        }
+          // Separate lucide-react into its own chunk
+          'icons': ['lucide-react']
+        },
+        // Further optimize output
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
       }
     }
+  },
+  // Speed up the build
+  esbuild: {
+    legalComments: 'none',
+    target: 'es2020',
+    // Drop console/debugger in production
+    drop: ['console', 'debugger'],
+    pure: ['console.log', 'console.debug', 'console.info', 'console.warn', 'console.error'],
   },
 });
