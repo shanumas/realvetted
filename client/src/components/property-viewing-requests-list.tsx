@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { formatCaliforniaTime } from "@/lib/date-utils";
 import { getQueryFn, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -226,9 +227,9 @@ export function PropertyViewingRequestsList({
                         <div>
                           <span className="font-medium">
                             {request.date 
-                              ? format(new Date(request.date), "PPP")
+                              ? formatCaliforniaTime(request.date.toString(), "PPP")
                               : request.requestedDate 
-                                ? format(new Date(request.requestedDate), "PPP") 
+                                ? formatCaliforniaTime(request.requestedDate.toString(), "PPP") 
                                 : "Date not specified"}
                           </span>
                           {request.timeSlot 
@@ -239,7 +240,7 @@ export function PropertyViewingRequestsList({
                             )
                             : (request.requestedDate && request.requestedEndDate) && (
                               <span className="text-sm text-gray-500 ml-2">
-                                at {format(new Date(request.requestedDate), "h:mm a")} - {format(new Date(request.requestedEndDate), "h:mm a")}
+                                at {formatCaliforniaTime(request.requestedDate.toString(), "h:mm a")} - {formatCaliforniaTime(request.requestedEndDate.toString(), "h:mm a")}
                               </span>
                             )
                           }

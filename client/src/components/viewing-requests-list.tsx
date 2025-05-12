@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, parseISO } from "date-fns";
+import { formatCaliforniaTime } from "@/lib/date-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -301,14 +302,14 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-2 text-gray-500" />
                             <span className="text-sm">
-                              {format(parseISO(request.requestedDate.toString()), "MMMM d, yyyy")}
+                              {formatCaliforniaTime(request.requestedDate.toString(), "MMMM d, yyyy")}
                             </span>
                           </div>
                           
                           <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-2 text-gray-500" />
                             <span className="text-sm">
-                              {format(parseISO(request.requestedDate.toString()), "h:mm a")}
+                              {formatCaliforniaTime(request.requestedDate.toString(), "h:mm a")}
                             </span>
                           </div>
                         </div>
