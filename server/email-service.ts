@@ -215,7 +215,7 @@ export async function sendTourRequestEmail(
     "en-US",
     timeOptions,
   );
-  const formattedDateTime = `${formattedDate} between ${formattedStartTime} and ${formattedEndTime}`;
+  const formattedDateTime = `${formattedDate} at ${formattedStartTime}`;
 
   // Determine verification status
   const isKYCVerified =
@@ -245,38 +245,19 @@ BODY: ""
 
   // EmailJS is already initialized with keys at the top of the file
   const preQualURL = buyer.prequalificationDocUrl || "";
-  
-  // Get the buyer's BRBC agreement if it exists
-  let brbcURL = "";
-  try {
-    // Get the latest global BRBC agreement for this buyer
-    const buyerAgreements = await storage.getAgreementsByBuyer(buyer.id);
-    const brbcAgreement = buyerAgreements.find(
-      (agreement: Agreement) => agreement.type === "global_brbc" && agreement.documentUrl
-    );
-    
-    if (brbcAgreement && brbcAgreement.documentUrl) {
-      brbcURL = brbcAgreement.documentUrl;
-      console.log(`Found BRBC agreement for buyer ${buyer.id}: ${brbcURL}`);
-    } else {
-      console.log(`No BRBC agreement found for buyer ${buyer.id}`);
-    }
-  } catch (error) {
-    console.error(`Error fetching BRBC agreement for buyer ${buyer.id}:`, error);
-  }
 
   const baseUrl = process.env.PUBLIC_URL || "https://realvetted.replit.app";
 
   const cleanedPreQualUrl = preQualURL.replace(/^\/+/, ""); // removes leading slashes
   const fullPreQualUrl = `${baseUrl}/${cleanedPreQualUrl}`;
-  
-  // Also prepare the full BRBC URL if it exists
-  let fullBrbcUrl = "";
-  if (brbcURL) {
-    const cleanedBrbcUrl = brbcURL.replace(/^\/+/, ""); // removes leading slashes
-    fullBrbcUrl = `${baseUrl}/${cleanedBrbcUrl}`;
-    console.log(`Full BRBC URL: ${fullBrbcUrl}`);
-  }
+
+  console.log(`Full Prequal URL: ${fullPreQualUrl}`);
+
+  // Extract extension from URL
+  const extension = fullPreQualUrl.split(".").pop(); // returns 'docx'
+
+  // Construct the filename
+  const fileName = `prequal.${extension}`;
 
   try {
     // Prepare the message content
@@ -288,9 +269,10 @@ BODY: ""
       {
         to_email: to.join(", "),
         cc_email: cc.join(", "), // Include buyer's agent in CC
-
-        brbc_document: fullBrbcUrl || "", // Include BRBC document if available
-        prequalification_document: fullPreQualUrl || "", // Include prequalification document if available
+        prequal: {
+          uri: fullPreQualUrl,
+          name: fileName,
+        },
 
         buyer_name: buyer.firstName + " " + buyer.lastName,
         buyer_phone: buyer.phone,
@@ -301,7 +283,7 @@ BODY: ""
         calenderLink: publicViewingLink,
       },
     );
-    
+
     // Log BRBC URL information for debugging
     if (fullBrbcUrl) {
       console.log(`Sent tour request email with BRBC document: ${fullBrbcUrl}`);
