@@ -3,6 +3,7 @@ import { useQueryClient, QueryKey } from "@tanstack/react-query";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
+import { toCaliforniaTime } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Property, User } from "@shared/schema";
@@ -207,12 +208,12 @@ export default function BuyerPropertyDetail() {
         override: data.override,
       });
 
-      // Create request payload with proper date formatting
+      // Create request payload with California time zone
       const payload = {
         propertyId: propertyId,
-        requestedDate: `${data.date}T${data.time}:00`,
+        requestedDate: toCaliforniaTime(data.date, data.time),
         requestedEndDate: data.endTime
-          ? `${data.date}T${data.endTime}:00`
+          ? toCaliforniaTime(data.date, data.endTime)
           : undefined,
         notes: data.notes,
         override: data.override || false,
