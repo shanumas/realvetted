@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
+import { formatCaliforniaTime } from "@/lib/date-utils";
 import { Loader2, CalendarIcon, Clock, Home, DollarSign, BedDouble, Bath, SquareCode, User, Check, X, Calendar as CalendarIcon2, Clock1 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
