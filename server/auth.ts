@@ -168,6 +168,15 @@ export function setupAuth(app: Express) {
       });
     } catch (error) {
       console.error("Registration error:", error);
+      
+      // Check if it's a database connection issue
+      if (error.message && error.message.includes('endpoint is disabled')) {
+        return res.status(503).json({ 
+          success: false, 
+          error: "Database is temporarily unavailable. Please try again in a few minutes." 
+        });
+      }
+      
       res.status(500).json({ 
         success: false, 
         error: "Registration failed" 

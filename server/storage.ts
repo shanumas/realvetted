@@ -44,6 +44,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { eq, and, or, desc } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
+import { dbStatus } from "./database-status";
+import { fallbackStorage } from "./fallback-storage";
 
 const scryptAsync = promisify(scrypt);
 const PostgresSessionStore = connectPg(session);
@@ -262,7 +264,7 @@ export class PgStorage implements IStorage {
       console.error(`Database error in ${operationName}:`, error);
       
       if (error.message && error.message.includes('endpoint is disabled')) {
-        console.log(`Database endpoint is disabled for ${operationName}. Returning fallback value.`);
+        console.log(`Database endpoint is disabled for ${operationName}. Using fallback system.`);
         return fallback;
       }
       
@@ -283,17 +285,22 @@ export class PgStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return this.executeWithFallback(
-      async () => {
-        const result = await this.db
-          .select()
-          .from(users)
-          .where(eq(users.email, email.toLowerCase()));
-        return result[0];
-      },
-      undefined,
-      'getUserByEmail'
-    );
+    try {
+      const result = await this.db
+        .select()
+        .from(users)
+        .where(eq(users.email, email.toLowerCase()));
+      return result[0];
+    } catch (error) {
+      console.error('Database error in getUserByEmail:', error);
+      
+      if (error.message && error.message.includes('endpoint is disabled')) {
+        console.log('Database endpoint is disabled for getUserByEmail. Using fallback system.');
+        return await fallbackStorage.getUserByEmail(email);
+      }
+      
+      throw error;
+    }
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
@@ -305,30 +312,40 @@ export class PgStorage implements IStorage {
   }
 
   async createUser(userData: InsertUser): Promise<User> {
-    const result = await this.db
-      .insert(users)
-      .values({
-        email: userData.email.toLowerCase(),
-        password: userData.password,
-        firstName: userData.firstName || null,
-        lastName: userData.lastName || null,
-        phone: userData.phone || null,
-        role: userData.role,
-        profileStatus: userData.profileStatus || "pending",
-        addressLine1: userData.addressLine1 || null,
-        addressLine2: userData.addressLine2 || null,
-        city: userData.city || null,
-        state: userData.state || null,
-        zip: userData.zip || null,
-        dateOfBirth: userData.dateOfBirth || null,
-        createdAt: new Date(),
-        idFrontUrl: userData.idFrontUrl || null,
-        idBackUrl: userData.idBackUrl || null,
-        isBlocked: false,
-      })
-      .returning();
-
-    return result[0];
+    try {
+      const result = await this.db
+        .insert(users)
+        .values({
+          email: userData.email.toLowerCase(),
+          password: userData.password,
+          firstName: userData.firstName || null,
+          lastName: userData.lastName || null,
+          phone: userData.phone || null,
+          role: userData.role,
+          profileStatus: userData.profileStatus || "pending",
+          addressLine1: userData.addressLine1 || null,
+          addressLine2: userData.addressLine2 || null,
+          city: userData.city || null,
+          state: userData.state || null,
+          zip: userData.zip || null,
+          dateOfBirth: userData.dateOfBirth || null,
+          createdAt: new Date(),
+          idFrontUrl: userData.idFrontUrl || null,
+          idBackUrl: userData.idBackUrl || null,
+          isBlocked: false,
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Database error in createUser:', error);
+      
+      if (error.message && error.message.includes('endpoint is disabled')) {
+        console.log('Database endpoint is disabled for createUser. Using fallback system.');
+        return await fallbackStorage.createUser(userData);
+      }
+      
+      throw error;
+    }
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
