@@ -5326,11 +5326,30 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           });
         }
 
-        // Convert string dates to Date objects
+        // Convert string dates to Date objects with validation
+        const requestedDate = new Date(mergedData.requestedDate);
+        const requestedEndDate = new Date(mergedData.requestedEndDate);
+        
+        // Validate that the dates are valid
+        if (isNaN(requestedDate.getTime()) || isNaN(requestedEndDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            error: "Invalid date format. Please provide valid dates.",
+          });
+        }
+        
+        // Validate that the end date is after the start date
+        if (requestedEndDate <= requestedDate) {
+          return res.status(400).json({
+            success: false,
+            error: "End date must be after start date.",
+          });
+        }
+        
         const requestData = {
           ...mergedData,
-          requestedDate: new Date(mergedData.requestedDate),
-          requestedEndDate: new Date(mergedData.requestedEndDate),
+          requestedDate,
+          requestedEndDate,
         };
 
         console.log("Processed request data:", requestData);
