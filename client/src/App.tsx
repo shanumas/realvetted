@@ -10,6 +10,7 @@ const AgentEmailOutbox = lazy(() => import("@/pages/agent/email-outbox"));
 const AdminEmailOutbox = lazy(() => import("@/pages/admin/email-outbox"));
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
+import AdminLoginPage from "@/pages/admin-login";
 import NotFound from "@/pages/not-found";
 import BuyerDashboard from "@/pages/buyer/dashboard";
 import BuyerPropertyDetail from "@/pages/buyer/property-detail";
@@ -28,6 +29,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/admin" component={AdminLoginPage} />
       
       {/* Buyer Routes */}
       <ProtectedRoute path="/buyer/dashboard" component={BuyerDashboard} allowedRoles={["buyer"]} />

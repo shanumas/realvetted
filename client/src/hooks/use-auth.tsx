@@ -26,6 +26,7 @@ type LoginData = {
   email: string;
   password: string;
   role: "buyer" | "seller" | "agent" | "admin";
+  rememberMe?: boolean;
 };
 
 type RegisterData = {
@@ -218,6 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
   });
+
+  //console.log('DATABASE_URL:', process.env.DATABASE_URL);
 
   return (
     <AuthContext.Provider

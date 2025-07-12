@@ -267,7 +267,6 @@ export default function AuthPage() {
       password: values.password,
       firstName: values.firstName,
       lastName: values.lastName,
-      phone: values.phone,
       profilePhotoUrl: values.profilePhotoUrl,
       licenseNumber: values.licenseNumber,
       role: roleTab as any,
@@ -300,11 +299,9 @@ export default function AuthPage() {
           onValueChange={setRoleTab}
           className="w-full"
         >
-          <TabsList className="grid grid-cols-4 mb-8">
+          <TabsList className="grid grid-cols-2 mb-8">
             <TabsTrigger value="buyer">Buyer</TabsTrigger>
             <TabsTrigger value="agent">Agent</TabsTrigger>
-            <TabsTrigger value="seller">Seller</TabsTrigger>
-            <TabsTrigger value="admin">Admin</TabsTrigger>
           </TabsList>
 
           <Card>
@@ -319,9 +316,7 @@ export default function AuthPage() {
                       ? "Find your dream property with AI-powered matching"
                       : roleTab === "agent"
                         ? "Get matched with qualified buyers"
-                        : roleTab === "seller"
-                          ? "Connect with interested buyers"
-                          : "Manage platform users and properties"}
+                        : "Connect with interested buyers"}
                   </CardDescription>
                 </div>
                 <div>
