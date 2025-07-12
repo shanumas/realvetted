@@ -15,43 +15,18 @@ export function toCaliforniaTime(dateStr: string, timeStr: string): string {
     throw new Error('Both dateStr and timeStr are required');
   }
   
-  // Get the current date in local timezone
-  const localDate = new Date(`${dateStr}T${timeStr}:00`);
+  // Create a date object treating the input as if it were in California time
+  // This is a simpler approach that avoids complex timezone conversions
+  const isoString = `${dateStr}T${timeStr}:00`;
+  const date = new Date(isoString);
   
   // Validate that the date is valid
-  if (isNaN(localDate.getTime())) {
-    throw new Error(`Invalid date/time combination: ${dateStr}T${timeStr}:00`);
+  if (isNaN(date.getTime())) {
+    throw new Error(`Invalid date/time combination: ${isoString}`);
   }
   
-  // Define the California timezone (US Pacific)
-  const californiaTimeZone = 'America/Los_Angeles';
-  
-  // Construct a date that represents the input time as if it were in California
-  // For example, if input is "2023-10-01" and "14:00", this creates a date object
-  // that represents 2:00 PM on Oct 1, 2023 in California time, regardless of where the user is
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: californiaTimeZone
-  };
-  
-  // Format this as an ISO timestamp (in UTC)
-  const localeString = localDate.toLocaleString('en-US', options);
-  const pacificDate = new Date(
-    localeString.replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2T')
-  );
-  
-  // Validate the resulting date
-  if (isNaN(pacificDate.getTime())) {
-    throw new Error(`Failed to create valid Pacific date from: ${localeString}`);
-  }
-  
-  return pacificDate.toISOString();
+  // Return the ISO string directly - the backend will handle timezone conversion
+  return date.toISOString();
 }
 
 /**
@@ -100,32 +75,6 @@ export function createCaliforniaDate(date: Date | string, hours: number, minutes
     throw new Error(`Failed to create valid date with hours ${hours} and minutes ${minutes}`);
   }
   
-  // Define the California timezone
-  const californiaTimeZone = 'America/Los_Angeles';
-  
-  // We need to adjust the date to be interpreted as California time
-  // This approach ensures the local date is treated as if it were in California timezone
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZone: californiaTimeZone
-  };
-  
-  // Format this as an ISO timestamp (in UTC)
-  const localeString = newDate.toLocaleString('en-US', options);
-  const pacificDate = new Date(
-    localeString.replace(/(\d+)\/(\d+)\/(\d+),/, '$3-$1-$2T')
-  );
-  
-  // Validate the resulting date
-  if (isNaN(pacificDate.getTime())) {
-    throw new Error(`Failed to create valid Pacific date from: ${localeString}`);
-  }
-  
-  return pacificDate.toISOString();
+  // Return the ISO string directly - the backend will handle timezone conversion
+  return newDate.toISOString();
 }
