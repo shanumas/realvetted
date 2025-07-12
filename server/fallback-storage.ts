@@ -205,7 +205,17 @@ export class FallbackStorage {
   }
 
   async getPropertiesByBuyer(buyerId: number): Promise<Property[]> {
-    return Array.from(this.properties.values()).filter(p => p.buyerId === buyerId);
+    const allProperties = Array.from(this.properties.values());
+    console.log(`[DEBUG] Total properties in storage: ${allProperties.length}`);
+    console.log(`[DEBUG] Looking for properties with createdBy: ${buyerId}`);
+    
+    const buyerProperties = allProperties.filter(p => {
+      console.log(`[DEBUG] Property ${p.id}: createdBy=${p.createdBy}, matches=${p.createdBy === buyerId}`);
+      return p.createdBy === buyerId;
+    });
+    
+    console.log(`[DEBUG] Found ${buyerProperties.length} properties for buyer ${buyerId}`);
+    return buyerProperties;
   }
 
   async getPropertiesBySeller(sellerId: number): Promise<Property[]> {

@@ -1180,7 +1180,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
+        console.log(`[DEBUG] Getting properties for buyer ID: ${req.user.id}`);
         const properties = await storage.getPropertiesByBuyer(req.user.id);
+        console.log(`[DEBUG] Found ${properties.length} properties for buyer ${req.user.id}`);
         res.json(properties);
       } catch (error) {
         console.error("Get buyer properties error:", error);
