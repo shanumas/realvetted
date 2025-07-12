@@ -424,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/buyer/prequalification",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     (req, res, next) => {
       console.log("Received prequalification upload request");
       console.log("Content-Type:", req.headers["content-type"]);
@@ -1177,7 +1177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/properties/by-buyer",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         const properties = await storage.getPropertiesByBuyer(req.user.id);
@@ -6530,7 +6530,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.get(
     "/api/buyer/agreements",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         const buyerId = req.user?.id;
@@ -6624,7 +6624,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.post(
     "/api/global-brbc/pdf-signature",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       console.log("-----Pdf-signature request body:");
       try {
