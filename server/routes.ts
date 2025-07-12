@@ -5302,8 +5302,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     async (req, res) => {
       try {
         console.log("Viewing request payload:", req.body);
-        console.log("Viewing request payload - requestedDate:", req.body.requestedDate);
-        console.log("Viewing request payload - requestedEndDate:", req.body.requestedEndDate);
 
         // Add buyer ID explicitly
         const mergedData = {
@@ -5312,8 +5310,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         };
 
         console.log("Merged request data before validation:", mergedData);
-        console.log("Merged data - requestedDate:", mergedData.requestedDate);
-        console.log("Merged data - requestedEndDate:", mergedData.requestedEndDate);
 
         // We'll validate the data more manually to better handle errors
         if (!mergedData.propertyId) {
@@ -5331,22 +5327,11 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         }
 
         // Convert string dates to Date objects with validation
-        console.log("Converting dates - requestedDate input:", mergedData.requestedDate);
-        console.log("Converting dates - requestedEndDate input:", mergedData.requestedEndDate);
-        
         const requestedDate = new Date(mergedData.requestedDate);
         const requestedEndDate = new Date(mergedData.requestedEndDate);
         
-        console.log("Converted dates - requestedDate:", requestedDate);
-        console.log("Converted dates - requestedEndDate:", requestedEndDate);
-        console.log("Date validation - requestedDate.getTime():", requestedDate.getTime());
-        console.log("Date validation - requestedEndDate.getTime():", requestedEndDate.getTime());
-        console.log("Date validation - isNaN(requestedDate.getTime()):", isNaN(requestedDate.getTime()));
-        console.log("Date validation - isNaN(requestedEndDate.getTime()):", isNaN(requestedEndDate.getTime()));
-        
         // Validate that the dates are valid
         if (isNaN(requestedDate.getTime()) || isNaN(requestedEndDate.getTime())) {
-          console.log("Date validation failed - returning error");
           return res.status(400).json({
             success: false,
             error: "Invalid date format. Please provide valid dates.",

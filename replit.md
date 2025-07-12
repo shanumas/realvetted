@@ -40,13 +40,14 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 - **Impact**: Agent selection now works properly, agents appear in selection dialog
 
 ### Viewing Request Date Validation Fixed (July 12, 2025)
-- **Problem**: Viewing requests failed with "Invalid time value" error
+- **Problem**: Viewing requests failed with "Invalid time value" error in frontend date-utils.ts
 - **Solution**: 
-  - Added proper date validation in viewing request creation endpoint
-  - Validates date format before creating Date objects
-  - Ensures end date is after start date
-  - Returns clear error messages for invalid dates
-- **Impact**: Viewing requests now work properly with proper date validation
+  - Added comprehensive validation to `toCaliforniaTime` and `createCaliforniaDate` functions
+  - Validates input parameters and date objects at each step
+  - Added proper error handling with clear error messages
+  - Fixed date parsing logic to prevent invalid Date objects
+  - Cleaned up debug logging for better console output
+- **Impact**: Viewing requests now work properly with proper date validation and clear error messages
 
 ### Authentication and Role-Based Access Completely Fixed (July 12, 2025)
 - **Problem**: URL scraping failed with "insufficient permissions" due to role mismatches between admin and buyer accounts
