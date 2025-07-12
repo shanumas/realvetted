@@ -51,10 +51,12 @@ export class FallbackStorage {
   }
 
   private createDefaultAdmin() {
+    // Create a properly formatted hash for password "admin123"
+    // This uses the same format as the auth.ts hashPassword function: {hex}.{salt}
     const adminUser: User = {
       id: 1,
       email: 'admin@admin.com',
-      password: '$2b$10$adminhashedpassword', // This would be properly hashed in real implementation
+      password: 'e8a05f3abeaae0557287c28ac609ebecd06485491a9629e1e4abcad1193f138f54595b5192b341114d0882d8b8e52e947b74c114c2005719265991faf732ed01.08185be556467e5079235196da1706f7', // admin123
       firstName: 'Admin',
       lastName: 'User',
       phone: null,

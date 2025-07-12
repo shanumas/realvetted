@@ -1934,9 +1934,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/ai/extract-property",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
+        console.log(`[PROPERTY_EXTRACTION] Request from user: ${req.user?.email} (${req.user?.role})`);
+        
         const { address } = req.body;
 
         if (!address || typeof address !== "string") {
@@ -1946,8 +1948,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        console.log(`[PROPERTY_EXTRACTION] Processing address: ${address}`);
+        
         const propertyData = await extractPropertyData(address);
 
+        console.log(`[PROPERTY_EXTRACTION] Successfully extracted property data`);
         res.json(propertyData);
       } catch (error) {
         console.error("Property data extraction error:", error);
@@ -1966,9 +1971,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/ai/extract-property-from-url",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
+        console.log(`[URL_SCRAPING] Request from user: ${req.user?.email} (${req.user?.role})`);
+        
         const { url } = req.body;
 
         if (!url || typeof url !== "string") {
@@ -1978,6 +1985,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
+        console.log(`[URL_SCRAPING] Processing URL: ${url}`);
+        
         // Use enhanced extraction flow with SerpAPI integration
         // First tries to get a Realtor.com URL via SerpAPI, then scrapes that URL
         // This approach bypasses blocking mechanisms on sites like Zillow
@@ -1990,6 +1999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           _extractionSource: url,
         };
 
+        console.log(`[URL_SCRAPING] Successfully extracted property data`);
         res.json(resultWithMeta);
       } catch (error) {
         console.error("Property URL extraction error:", error);
