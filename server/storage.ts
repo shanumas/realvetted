@@ -1607,5 +1607,4 @@ export class PgStorage implements IStorage {
 }
 
 // Use the database storage implementation
-// Use fallback storage due to persistent database connectivity issues
-export const storage = fallbackStorage;
+export const storage = new PgStorage();

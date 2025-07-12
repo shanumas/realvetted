@@ -5,6 +5,15 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 
 ## Recent Changes (January 2025)
 
+### Database Persistence Fixed (July 12, 2025)
+- **Problem**: Data was not persisting after server restarts due to using in-memory storage
+- **Solution**: 
+  - Created PostgreSQL database with proper environment variables
+  - Switched from fallback storage to database storage (`PgStorage`)
+  - Ran database migrations to create all necessary tables
+  - Fixed storage interface to use correct field mappings
+- **Impact**: All data now persists properly after server restarts
+
 ### Authentication and Role-Based Access Completely Fixed (July 12, 2025)
 - **Problem**: URL scraping failed with "insufficient permissions" due to role mismatches between admin and buyer accounts
 - **Solution**: 
