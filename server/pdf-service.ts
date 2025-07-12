@@ -342,18 +342,21 @@ export async function fillBrbcForm(
 
   // Get current date for 'today' field
   const today = new Date();
-  const formattedToday = formatDate(formData?.startDate) || 
+  const formattedToday =
+    formatDate(formData?.startDate) ||
     `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
 
   // Calculate date 90 days from today for '3Months' field
   const threeMonthsLater = new Date(today);
   threeMonthsLater.setDate(today.getDate() + 90);
-  const formattedThreeMonths = formatDate(formData?.endDate) || 
+  const formattedThreeMonths =
+    formatDate(formData?.endDate) ||
     `${threeMonthsLater.getMonth() + 1}/${threeMonthsLater.getDate()}/${threeMonthsLater.getFullYear()}`;
 
   // Format dates for buyer2 if provided
   const formattedToday2 = formatDate(formData?.startDate2) || formattedToday;
-  const formattedThreeMonths2 = formatDate(formData?.endDate2) || formattedThreeMonths;
+  const formattedThreeMonths2 =
+    formatDate(formData?.endDate2) || formattedThreeMonths;
 
   // Extract initials from buyerName
   let buyerInitials = "";
@@ -380,7 +383,9 @@ export async function fillBrbcForm(
 
   // Handle custom form field values first if provided
   if (formData?.formFieldValues) {
-    for (const [fieldName, fieldValue] of Object.entries(formData.formFieldValues)) {
+    for (const [fieldName, fieldValue] of Object.entries(
+      formData.formFieldValues,
+    )) {
       try {
         const field = form.getTextField(fieldName);
         if (field) {
@@ -401,15 +406,27 @@ export async function fillBrbcForm(
     try {
       if (fieldName === "buyer1" && field instanceof PDFTextField) {
         field.setText(buyerName);
-      } else if (fieldName === "buyer2" && field instanceof PDFTextField && buyer2Name) {
+      } else if (
+        fieldName === "buyer2" &&
+        field instanceof PDFTextField &&
+        buyer2Name
+      ) {
         field.setText(buyer2Name);
       } else if (fieldName === "today" && field instanceof PDFTextField) {
         field.setText(formattedToday);
       } else if (fieldName === "3Months" && field instanceof PDFTextField) {
         field.setText(formattedThreeMonths);
-      } else if (fieldName === "today2" && field instanceof PDFTextField && buyer2Name) {
+      } else if (
+        fieldName === "today2" &&
+        field instanceof PDFTextField &&
+        buyer2Name
+      ) {
         field.setText(formattedToday2);
-      } else if (fieldName === "3Months2" && field instanceof PDFTextField && buyer2Name) {
+      } else if (
+        fieldName === "3Months2" &&
+        field instanceof PDFTextField &&
+        buyer2Name
+      ) {
         field.setText(formattedThreeMonths2);
       }
     } catch (error) {
@@ -420,7 +437,7 @@ export async function fillBrbcForm(
   // Helper function to format date strings
   function formatDate(dateString?: string): string | null {
     if (!dateString) return null;
-    
+
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return null;
@@ -462,7 +479,7 @@ export async function fillAgentReferralForm(
       process.cwd(),
       "uploads",
       "pdf",
-      "agent_referral_agreement.pdf",
+      "referral.pdf",
     );
 
     try {
