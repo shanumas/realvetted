@@ -263,7 +263,7 @@ export class PgStorage implements IStorage {
     } catch (error) {
       console.error(`Database error in ${operationName}:`, error);
       
-      if (error.message && error.message.includes('endpoint is disabled')) {
+      if (error instanceof Error && error.message && error.message.includes('endpoint is disabled')) {
         console.log(`Database endpoint is disabled for ${operationName}. Using fallback system.`);
         return fallback;
       }
@@ -294,8 +294,8 @@ export class PgStorage implements IStorage {
     } catch (error) {
       console.error('Database error in getUserByEmail:', error);
       
-      if (error.message && error.message.includes('endpoint is disabled')) {
-        console.log('Database endpoint is disabled for getUserByEmail. Using fallback system.');
+      if (error instanceof Error && error.message && (error.message.includes('endpoint is disabled') || error.message.includes('relation "users" does not exist'))) {
+        console.log('Database issue in getUserByEmail. Using fallback system.');
         return await fallbackStorage.getUserByEmail(email);
       }
       
@@ -339,8 +339,8 @@ export class PgStorage implements IStorage {
     } catch (error) {
       console.error('Database error in createUser:', error);
       
-      if (error.message && error.message.includes('endpoint is disabled')) {
-        console.log('Database endpoint is disabled for createUser. Using fallback system.');
+      if (error instanceof Error && error.message && (error.message.includes('endpoint is disabled') || error.message.includes('relation "users" does not exist'))) {
+        console.log('Database issue in createUser. Using fallback system.');
         return await fallbackStorage.createUser(userData);
       }
       
