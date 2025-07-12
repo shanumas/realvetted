@@ -1973,7 +1973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/ai/extract-property-from-url",
     isAuthenticated,
-    hasRole(["buyer", "admin"]),
+    hasRole(["buyer", "agent", "admin"]),
     async (req, res) => {
       try {
         console.log(`[URL_SCRAPING] Request from user: ${req.user?.email} (${req.user?.role})`);

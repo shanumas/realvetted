@@ -43,11 +43,18 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 - **Problem**: Viewing requests failed with "Invalid time value" error in frontend date-utils.ts
 - **Solution**: 
   - Added comprehensive validation to `toCaliforniaTime` and `createCaliforniaDate` functions
-  - Validates input parameters and date objects at each step
+  - Simplified date handling by removing complex timezone conversion logic
   - Added proper error handling with clear error messages
   - Fixed date parsing logic to prevent invalid Date objects
   - Cleaned up debug logging for better console output
 - **Impact**: Viewing requests now work properly with proper date validation and clear error messages
+
+### Property URL Extraction Permissions Fixed (July 12, 2025)
+- **Problem**: Agents getting 403 "Insufficient permissions" error when trying to extract property data from URLs
+- **Solution**: 
+  - Added "agent" role to the allowed roles for `/api/ai/extract-property-from-url` endpoint
+  - Updated permissions from `["buyer", "admin"]` to `["buyer", "agent", "admin"]`
+- **Impact**: Agents can now use the property URL extraction feature along with buyers and admins
 
 ### Authentication and Role-Based Access Completely Fixed (July 12, 2025)
 - **Problem**: URL scraping failed with "insufficient permissions" due to role mismatches between admin and buyer accounts
