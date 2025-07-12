@@ -1,13 +1,17 @@
 import { User, InsertUser } from "@shared/schema";
+import session from "express-session";
 
 // In-memory storage for when database is unavailable
 export class FallbackStorage {
   private users: Map<string, User> = new Map();
   private nextId = 1;
+  public sessionStore: session.Store;
 
   constructor() {
     // Initialize with default admin user
     this.createDefaultAdmin();
+    // Initialize session store
+    this.sessionStore = new session.MemoryStore();
   }
 
   private createDefaultAdmin() {
