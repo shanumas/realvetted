@@ -304,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/buyer/set-manual-approval-requested",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         const userId = req.user?.id;
@@ -333,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/buyer/prequalification-approval",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     upload.any(),
     async (req, res) => {
       try {
@@ -569,7 +569,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/buyer/verify-identity",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         // Update user's verification method
@@ -984,7 +984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/properties",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         // Clean up license numbers before validation
@@ -3175,7 +3175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put(
     "/api/properties/:id/choose-agent",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         const propertyId = parseInt(req.params.id);
@@ -5296,7 +5296,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.post(
     "/api/viewing-requests",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         console.log("Viewing request payload:", req.body);
@@ -5671,7 +5671,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
   app.get(
     "/api/viewing-requests/buyer",
     isAuthenticated,
-    hasRole(["buyer"]),
+    hasRole(["buyer", "admin"]),
     async (req, res) => {
       try {
         const viewingRequests = await storage.getViewingRequestsByBuyer(
