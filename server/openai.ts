@@ -8,10 +8,10 @@ import {
 import { Property, User } from "@shared/schema";
 import { extractPdfText } from "./pdf-wrapper";
 
-// Initialize OpenAI API client
-const openai = new OpenAI({
+// Initialize OpenAI API client with proper error handling
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // This will take API key from environment variable
-});
+}) : null;
 
 /**
  * Extract data from ID documents
@@ -114,6 +114,15 @@ export async function validatePrequalificationDocument(
       Return as a JSON object with these fields plus a "isValidDocument" boolean field.
       Format names with proper capitalization.
     `;
+
+    // Check if OpenAI client is available
+    if (!openai) {
+      return {
+        validated: false,
+        data: {},
+        message: "OpenAI API key is missing. Manual validation required."
+      };
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -250,6 +259,12 @@ async function rankAgentsByExpertise(
       Include a brief reason for each agent's ranking.
       Format as: { "rankedAgents": [{"id": 123, "reason": "explanation"}, {"id": 456, "reason": "explanation"}, ...] }
     `;
+
+    // Check if OpenAI client is available
+    if (!openai) {
+      console.log("OpenAI client not available, returning unranked agent list");
+      return agents;
+    }
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // Using the latest model for better ranking

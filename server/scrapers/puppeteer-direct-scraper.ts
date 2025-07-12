@@ -75,6 +75,21 @@ export async function extractPropertyWithPuppeteer(
 export async function extractAgentDataWithGPT(
   description: string,
 ): Promise<PropertyAIData> {
+  // Return empty data if no OpenAI API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.log("No OpenAI API key provided, returning empty property data");
+    return {
+      address: "",
+      price: "",
+      bedrooms: "",
+      bathrooms: "",
+      listingAgentName: "",
+      listingAgentPhone: "",
+      listingAgentLicenseNo: "",
+      listingAgentCompany: "",
+    };
+  }
+
   const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
   });
