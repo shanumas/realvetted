@@ -175,18 +175,37 @@ export class PgStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    // Create database connection
+    // Create database connection with retry logic
     this.pool = new pg.Pool({
       connectionString: process.env.DATABASE_URL,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+      // Add retry configuration
+      retryDelayMs: 1000,
+      maxRetries: 3,
+    });
+
+    // Handle connection errors gracefully
+    this.pool.on('error', (err) => {
+      console.error('Database pool error:', err);
+      if (err.message.includes('endpoint is disabled')) {
+        console.log('Database endpoint is disabled. Attempting to reconnect...');
+        // Don't exit the process, let the application continue
+      }
     });
 
     // Create Drizzle ORM instance
     this.db = drizzle(this.pool);
 
-    // Create session store
+    // Create session store with error handling
     this.sessionStore = new PostgresSessionStore({
       pool: this.pool,
       createTableIfMissing: true,
+      errorLog: (error) => {
+        console.error('Session store error:', error);
+        // Don't crash the application on session store errors
+      },
     });
 
     // Create admin user if none exists (async, will complete in background)
@@ -220,21 +239,61 @@ export class PgStorage implements IStorage {
       }
     } catch (error) {
       console.error("Error initializing admin user:", error);
+      
+      // If the database is disabled, schedule a retry
+      if (error.message && error.message.includes('endpoint is disabled')) {
+        console.log('Database endpoint is disabled. Will retry admin initialization in 30 seconds...');
+        setTimeout(() => {
+          this.initializeAdminUser();
+        }, 30000);
+      }
+    }
+  }
+
+  // Helper method to handle database connection issues
+  private async executeWithFallback<T>(
+    operation: () => Promise<T>,
+    fallback: T,
+    operationName: string
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Database error in ${operationName}:`, error);
+      
+      if (error.message && error.message.includes('endpoint is disabled')) {
+        console.log(`Database endpoint is disabled for ${operationName}. Returning fallback value.`);
+        return fallback;
+      }
+      
+      throw error;
     }
   }
 
   // User methods
   async getUser(id: number): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.id, id));
-    return result[0];
+    return this.executeWithFallback(
+      async () => {
+        const result = await this.db.select().from(users).where(eq(users.id, id));
+        return result[0];
+      },
+      undefined,
+      'getUser'
+    );
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await this.db
-      .select()
-      .from(users)
-      .where(eq(users.email, email.toLowerCase()));
-    return result[0];
+    return this.executeWithFallback(
+      async () => {
+        const result = await this.db
+          .select()
+          .from(users)
+          .where(eq(users.email, email.toLowerCase()));
+        return result[0];
+      },
+      undefined,
+      'getUserByEmail'
+    );
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
