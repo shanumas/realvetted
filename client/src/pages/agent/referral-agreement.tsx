@@ -181,7 +181,7 @@ export default function ReferralAgreementPage() {
       });
 
       // Redirect to KYC verification page
-      navigate("/agent/kyc");
+      navigate("/agent/dashboard");
     } catch (error) {
       console.error("Submission error:", error);
       toast({

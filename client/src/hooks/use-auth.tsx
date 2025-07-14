@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Redirect based on role and verification status
       if (user.role === "agent" && user.profileStatus !== "verified") {
-        setLocation("/agent/kyc");
+        setLocation("/agent/dashboard");
       } else if (user.role === "buyer") {
         // Always redirect buyers to dashboard regardless of verification status
         // Buyers can still use the platform and will see a verification banner on the dashboard

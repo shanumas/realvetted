@@ -5,6 +5,16 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 
 ## Recent Changes (January 2025)
 
+### Agent Verification Warning Added (July 14, 2025)
+- **Problem**: Non-verified agents needed clear guidance on how to expedite verification process
+- **Solution**: 
+  - Added verification warning banner to agent dashboard for non-verified agents
+  - Warning displays when user.profileStatus !== "verified"
+  - Includes pre-composed email button that opens mailto link with agent details
+  - Provides clear contact information (support@realvetted.com)
+  - Styled with yellow warning colors and alert icon for visibility
+- **Impact**: Streamlined verification process with clear guidance for agents to contact support team
+
 ### Approval Source Tracking Enhanced (July 14, 2025)
 - **Problem**: Dual approval system didn't clearly distinguish between approvals made through public viewing page vs agent dashboard
 - **Solution**: 
