@@ -167,6 +167,9 @@ export const tourRequests = pgTable("viewing_requests", { // Keeping the DB tabl
   buyerAgentApprovedById: integer("buyer_agent_approved_by_id"), // ID of the buyer's agent who approved
   sellerAgentApprovalDate: timestamp("seller_agent_approval_date"),
   buyerAgentApprovalDate: timestamp("buyer_agent_approval_date"),
+  // Track approval source
+  sellerAgentApprovalSource: text("seller_agent_approval_source"), // "public_viewing_page", "agent_dashboard"
+  buyerAgentApprovalSource: text("buyer_agent_approval_source"), // "public_viewing_page", "agent_dashboard"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

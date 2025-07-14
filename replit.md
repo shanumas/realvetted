@@ -5,6 +5,16 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 
 ## Recent Changes (January 2025)
 
+### Approval Source Tracking Enhanced (July 14, 2025)
+- **Problem**: Dual approval system didn't clearly distinguish between approvals made through public viewing page vs agent dashboard
+- **Solution**: 
+  - Added `seller_agent_approval_source` and `buyer_agent_approval_source` fields to viewing_requests table
+  - Updated public viewing request response endpoint to use seller agent approval system with source tracking
+  - Enhanced approval badges to show approval source ("Public Link" vs "Dashboard")
+  - Updated database schema and initialization to include new source tracking fields
+  - Modified approval endpoints to record source information ("public_viewing_page" vs "agent_dashboard")
+- **Impact**: Clear visibility of how approvals were made, improving transparency in the dual approval process
+
 ### Session Persistence Fixed (July 14, 2025)
 - **Problem**: Users were logged out after browser refresh due to session not persisting
 - **Solution**: 

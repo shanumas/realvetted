@@ -53,12 +53,12 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const [location, setLocation] = useLocation();
-  
+
   // Save current location whenever it changes
   useEffect(() => {
     saveCurrentLocation(location);
   }, [location]);
-  
+
   const {
     data: user,
     error,
@@ -73,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: 1, // Single retry is enough
     retryDelay: 1000, // Wait 1 second between retries
   });
-  
+
   // Connect to WebSocket when user is authenticated
   useEffect(() => {
     if (user?.id) {
@@ -81,14 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       websocketClient.setUserId(user.id);
     }
   }, [user?.id]);
-  
+
   // Restore last location on authentication if on the root path
   useEffect(() => {
     // Only run when authentication is confirmed and we're at the root
-    if (!isLoading && user && location === '/') {
+    if (!isLoading && user && location === "/") {
       const lastLocation = getLastLocation();
       if (lastLocation) {
-        console.log('Restoring last location:', lastLocation);
+        console.log("Restoring last location:", lastLocation);
         setLocation(lastLocation);
       }
     }
@@ -103,12 +103,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await res.json();
       } catch (error) {
         console.error("Login error:", error);
-        throw new Error(error instanceof Error ? error.message : "Login failed");
+        throw new Error(
+          error instanceof Error ? error.message : "Login failed",
+        );
       }
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      
+
       // Redirect based on role and verification status
       if (user.role === "agent" && user.profileStatus !== "verified") {
         setLocation("/agent/kyc");
@@ -123,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (user.role === "admin") {
         setLocation("/admin/dashboard");
       }
-      
+
       toast({
         title: "Login successful",
         description: `Welcome back, ${user.firstName || user.email}!`,
@@ -147,25 +149,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return await res.json();
       } catch (error) {
         console.error("Registration error:", error);
-        throw new Error(error instanceof Error ? error.message : "Registration failed");
+        throw new Error(
+          error instanceof Error ? error.message : "Registration failed",
+        );
       }
     },
     onSuccess: (user: User) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      
+
       // Redirect based on role
       if (user.role === "buyer") {
         // Send buyers directly to dashboard after signup
         setLocation("/buyer/dashboard");
       } else if (user.role === "agent") {
         // For agents, redirect to referral agreement page immediately after signup
-        setLocation("/agent/referral-agreement");
+        setLocation("/agent/dashboard");
       } else if (user.role === "seller") {
         setLocation("/seller/dashboard");
       } else if (user.role === "admin") {
         setLocation("/admin/dashboard");
       }
-      
+
       toast({
         title: "Registration successful",
         description: "Your account has been created successfully.",
@@ -187,25 +191,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: () => {
       // Clear user data from query client cache
       queryClient.setQueryData(["/api/auth/user"], null);
-      
+
       // Invalidate all queries to ensure clean state
       queryClient.invalidateQueries();
-      
+
       // Reset the query client completely to ensure no stale data persists
       queryClient.clear();
-      
+
       // Clear all localStorage items to ensure clean session
       localStorage.removeItem("lastLocation");
-      
+
       // Additional cleanup for any other stored items
       localStorage.removeItem("veriffSessionId");
-      
+
       // Disconnect WebSocket
       websocketClient.disconnect();
-      
+
       // Redirect to auth page
       setLocation("/auth");
-      
+
       toast({
         title: "Logged out",
         description: "You have been logged out successfully.",

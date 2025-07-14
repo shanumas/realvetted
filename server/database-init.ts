@@ -175,6 +175,8 @@ export async function initializeDatabase() {
         buyer_agent_approved_by_id INTEGER,
         seller_agent_approval_date TIMESTAMP,
         buyer_agent_approval_date TIMESTAMP,
+        seller_agent_approval_source TEXT,
+        buyer_agent_approval_source TEXT,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );

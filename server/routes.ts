@@ -2651,9 +2651,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Create update data object
+      // Create update data object for seller agent approval
       const updateData: Partial<ViewingRequest> = {
-        status,
+        // Don't update general status - use approval system instead
         responseMessage: responseMessage || null,
         updatedAt: new Date(),
       };
@@ -2667,6 +2667,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.confirmedEndDate = new Date(confirmedEndDate);
       }
 
+      // Update seller agent approval status based on response
+      if (status === "accepted") {
+        updateData.sellerAgentApprovalStatus = "approved";
+        updateData.sellerAgentApprovalSource = "public_viewing_page";
+        updateData.sellerAgentApprovalDate = new Date();
+        // Use property agent or seller as approver
+        updateData.sellerAgentApprovedById = validationResult.property.agentId || validationResult.property.sellerId;
+      } else if (status === "rejected") {
+        updateData.sellerAgentApprovalStatus = "rejected";
+        updateData.sellerAgentApprovalSource = "public_viewing_page";
+        updateData.sellerAgentApprovalDate = new Date();
+        updateData.sellerAgentApprovedById = validationResult.property.agentId || validationResult.property.sellerId;
+      } else if (status === "rescheduled") {
+        updateData.sellerAgentApprovalStatus = "approved";
+        updateData.sellerAgentApprovalSource = "public_viewing_page";
+        updateData.sellerAgentApprovalDate = new Date();
+        updateData.sellerAgentApprovedById = validationResult.property.agentId || validationResult.property.sellerId;
+      }
+
       // Update the viewing request
       const updatedRequest = await storage.updateViewingRequest(
         validationResult.viewingRequest.id,
@@ -2676,11 +2695,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log the activity
       await storage.createPropertyActivityLog({
         propertyId: validationResult.property.id,
-        userId: null, // No user ID since this is a public action
-        activity: `Viewing request ${status} by listing agent`,
+        userId: validationResult.property.agentId || validationResult.property.sellerId,
+        activity: `Viewing request ${status} by seller's agent via public link`,
         details: {
           requestId: updatedRequest.id,
-          status: updatedRequest.status,
+          approvalType: "seller_agent",
+          approvalSource: "public_viewing_page",
+          approvalStatus: status === "accepted" || status === "rescheduled" ? "approved" : "rejected",
           via: "public_link",
         },
       });
@@ -6215,6 +6236,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         sellerAgentApprovalStatus: approvalStatus,
         sellerAgentApprovedById: userId,
         sellerAgentApprovalDate: new Date(),
+        sellerAgentApprovalSource: "agent_dashboard",
         updatedAt: new Date()
       });
 
@@ -6286,6 +6308,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
         buyerAgentApprovalStatus: approvalStatus,
         buyerAgentApprovedById: userId,
         buyerAgentApprovalDate: new Date(),
+        buyerAgentApprovalSource: "agent_dashboard",
         updatedAt: new Date()
       });
 

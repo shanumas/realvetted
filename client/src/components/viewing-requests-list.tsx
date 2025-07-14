@@ -334,6 +334,11 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             >
                               Seller Agent: {request.sellerAgentApprovalStatus === 'approved' ? 'Approved' : 
                                             request.sellerAgentApprovalStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                              {request.sellerAgentApprovalSource && (
+                                <span className="ml-1 text-xs opacity-75">
+                                  ({request.sellerAgentApprovalSource === 'public_viewing_page' ? 'Public Link' : 'Dashboard'})
+                                </span>
+                              )}
                             </Badge>
                             
                             {/* Buyer's Agent Approval Badge */}
@@ -346,6 +351,11 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             >
                               Buyer Agent: {request.buyerAgentApprovalStatus === 'approved' ? 'Approved' : 
                                            request.buyerAgentApprovalStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                              {request.buyerAgentApprovalSource && (
+                                <span className="ml-1 text-xs opacity-75">
+                                  ({request.buyerAgentApprovalSource === 'public_viewing_page' ? 'Public Link' : 'Dashboard'})
+                                </span>
+                              )}
                             </Badge>
                           </div>
                         </div>

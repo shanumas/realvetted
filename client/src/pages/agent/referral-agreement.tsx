@@ -9,7 +9,14 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Card,
   CardContent,
@@ -57,13 +64,21 @@ export default function ReferralAgreementPage() {
     }
 
     // If agent has already signed the agreement and has completed KYC, redirect to dashboard
-    if (!isLoadingAgreement && existingAgreement?.data && user?.profileStatus === "verified") {
+    if (
+      !isLoadingAgreement &&
+      existingAgreement?.data &&
+      user?.profileStatus === "verified"
+    ) {
       navigate("/agent/dashboard");
     }
-    
+
     // If agent has already signed the agreement but hasn't completed KYC, redirect to KYC page
-    if (!isLoadingAgreement && existingAgreement?.data && user?.profileStatus !== "verified") {
-      navigate("/agent/kyc");
+    if (
+      !isLoadingAgreement &&
+      existingAgreement?.data &&
+      user?.profileStatus !== "verified"
+    ) {
+      //navigate("/agent/kyc");
     }
   }, [user, isLoadingAuth, isLoadingAgreement, existingAgreement, navigate]);
 
@@ -95,11 +110,11 @@ export default function ReferralAgreementPage() {
     try {
       // Request the pre-filled PDF with agent information already populated
       const response = await fetch("/api/agreements/agent-referral/pdf");
-      
+
       if (!response.ok) {
         throw new Error("Failed to load agreement PDF");
       }
-      
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
@@ -136,7 +151,7 @@ export default function ReferralAgreementPage() {
     try {
       setIsSubmitting(true);
       setIsConfirmDialogOpen(false);
-      
+
       // Get the user data to submit with the signature
       const response = await fetch("/api/agreements/agent-referral", {
         method: "POST",
@@ -154,23 +169,25 @@ export default function ReferralAgreementPage() {
       }
 
       const data = await response.json();
-      
+
       toast({
         title: "Agreement Submitted",
         description: "Your referral agreement has been submitted successfully",
       });
 
       // Invalidate the query to refetch the agreement status
-      queryClient.invalidateQueries({queryKey: ["/api/agreements/agent-referral"]});
-      
+      queryClient.invalidateQueries({
+        queryKey: ["/api/agreements/agent-referral"],
+      });
+
       // Redirect to KYC verification page
       navigate("/agent/kyc");
-      
     } catch (error) {
       console.error("Submission error:", error);
       toast({
         title: "Submission Failed",
-        description: error instanceof Error ? error.message : "Failed to submit agreement",
+        description:
+          error instanceof Error ? error.message : "Failed to submit agreement",
         variant: "destructive",
       });
     } finally {
@@ -215,8 +232,9 @@ export default function ReferralAgreementPage() {
         <CardHeader>
           <CardTitle>Agent Referral Agreement</CardTitle>
           <CardDescription>
-            Review and sign the referral agreement to join our platform. As an agent, you agree to pay a 25% referral fee to 
-            Randy Brummett for any transactions that result from leads provided through this service.
+            Review and sign the referral agreement to join our platform. As an
+            agent, you agree to pay a 25% referral fee to Randy Brummett for any
+            transactions that result from leads provided through this service.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -234,14 +252,14 @@ export default function ReferralAgreementPage() {
               </div>
             )}
           </div>
-          
+
           {/* Signature Area */}
           <div className="space-y-2">
             <h3 className="text-lg font-medium">Your Signature</h3>
             <p className="text-sm text-gray-500">
               Sign below to indicate your agreement to the referral terms.
             </p>
-            
+
             <div className="border border-gray-300 rounded-md p-2 bg-white">
               <SignatureCanvas
                 ref={signatureRef}
@@ -251,18 +269,14 @@ export default function ReferralAgreementPage() {
                 }}
               />
             </div>
-            
+
             <div className="flex justify-end space-x-2">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={clearSignature}
-              >
+              <Button type="button" variant="outline" onClick={clearSignature}>
                 Clear
               </Button>
             </div>
           </div>
-          
+
           {/* Agreement Checkbox */}
           <div className="flex items-start space-x-3 pt-4">
             <Checkbox
@@ -277,15 +291,16 @@ export default function ReferralAgreementPage() {
                 I agree to the referral fee agreement terms
               </Label>
               <p className="text-sm text-gray-500">
-                By checking this box, you agree to pay a 25% referral fee for any
-                transactions resulting from leads provided through this platform.
+                By checking this box, you agree to pay a 25% referral fee for
+                any transactions resulting from leads provided through this
+                platform.
               </p>
             </div>
           </div>
         </CardContent>
         <CardFooter className="flex justify-end gap-2">
-          <Button 
-            type="button" 
+          <Button
+            type="button"
             onClick={openConfirmDialog}
             disabled={isSubmitting || !signature || !agreeToTerms}
           >
@@ -303,17 +318,15 @@ export default function ReferralAgreementPage() {
           </Button>
         </CardFooter>
       </Card>
-      
+
       {/* Confirmation Dialog */}
-      <Dialog 
-        open={isConfirmDialogOpen} 
-        onOpenChange={setIsConfirmDialogOpen}
-      >
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Confirm Submission</DialogTitle>
             <DialogDescription>
-              Are you sure you want to submit this agreement? This action cannot be undone.
+              Are you sure you want to submit this agreement? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -323,17 +336,14 @@ export default function ReferralAgreementPage() {
             >
               Cancel
             </Button>
-            <Button
-              onClick={submitSignedAgreement}
-              disabled={isSubmitting}
-            >
+            <Button onClick={submitSignedAgreement} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Submitting...
                 </>
               ) : (
-                'Confirm and Submit'
+                "Confirm and Submit"
               )}
             </Button>
           </DialogFooter>
