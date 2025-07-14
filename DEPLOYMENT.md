@@ -1,58 +1,61 @@
 # Deployment Guide
 
-## Overview
-This guide explains how to deploy the Real Estate Platform on Replit.
+## Database Initialization
 
-## Deployment Process
+During deployment, the database tables are automatically created when the application starts. The initialization process is built into the server startup sequence.
 
-The project includes special deployment scripts to handle the large codebase without timing out during deployment.
+### Automatic Database Setup
 
-### Step 1: Deploy Using The Deployment Stub
+1. **On Server Start**: The application automatically calls `initializeDatabase()` when it starts
+2. **Table Creation**: All required tables are created using `CREATE TABLE IF NOT EXISTS` statements
+3. **Safe Deployment**: The process is idempotent - running it multiple times is safe
+4. **Graceful Fallback**: If database initialization fails, the app continues with fallback storage
 
-We've created a deployment stub that will deploy successfully without timing out, using the following files:
-- `dist/index.js` - The backend server
-- `dist/public/index.html` - A temporary loading page
-- `dist/public/assets/index-stub.css` - Minimal CSS for the loading page
+### Manual Database Initialization
 
-**To deploy with the stub:**
+If you need to initialize the database manually:
 
-1. Make sure the `dist` directory contains all the necessary files (run `node deployment-fix.js` if needed)
-2. Click the "Deploy" button in Replit
-3. Wait for the deployment to complete
+```bash
+# Run the database initialization script
+npm run db:init
 
-### Step 2: Rebuild the Full Application After Deployment
+# Or run directly with tsx
+tsx scripts/init-db.ts
+```
 
-After the initial deployment succeeds, you can rebuild the full application component by component:
+### Database Tables Created
 
-1. **Build Backend**:
-   ```
-   node build-backend.js
-   ```
+- `users` - User accounts (buyers, sellers, agents, admin)
+- `properties` - Property listings and details
+- `messages` - Chat messages between users
+- `support_messages` - Support chat messages
+- `agent_leads` - Agent lead management
+- `property_activity_logs` - Activity tracking
+- `agreements` - Legal agreements and contracts
+- `viewing_requests` - Property viewing requests
+- `session` - Session storage for authentication
 
-2. **Build Frontend** (in separate steps to avoid timeout):
-   ```
-   node build-frontend-minimal.js
-   ```
+### Environment Variables Required
 
-## Troubleshooting
+- `DATABASE_URL` - PostgreSQL connection string
 
-If deployment fails:
+### Production Deployment Steps
 
-1. Check that the `dist` directory contains all necessary files
-2. Run `node deployment-fix.js` to recreate the deployment stub
-3. Try deploying again
+1. **Set Environment Variables**: Ensure `DATABASE_URL` is configured
+2. **Deploy Application**: The database will be initialized automatically on first start
+3. **Verify Connection**: Check logs for "✅ Database tables initialized successfully"
 
-## Full Build Process (For Reference)
+### Troubleshooting
 
-The full build process is split into multiple scripts to prevent timeout:
+If database initialization fails:
+- Check that `DATABASE_URL` is correctly set
+- Verify database server is accessible
+- Application will continue with in-memory fallback storage
+- Check server logs for specific error messages
 
-- `build-backend.js` - Builds only the backend
-- `build-frontend.js` - Builds the frontend with chunking optimization
-- `build-frontend-minimal.js` - Builds a minimal frontend
-- `deployment-fix.js` - Creates a minimal deployment stub
-- `deploy-helper.js` - Main deployment script that coordinates the build process
+### Benefits of This Approach
 
-## Notes
-
-- The deployment stub shows a loading page that automatically refreshes every 30 seconds
-- You may need to manually run the build scripts after deployment to get the full application running
+- **Zero-downtime deployments**: Tables are created safely without conflicts
+- **Automatic setup**: No manual database migration steps required
+- **Resilient**: Application works even if database is temporarily unavailable
+- **Developer-friendly**: Easy to set up in development and production

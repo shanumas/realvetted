@@ -5,6 +5,20 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 
 ## Recent Changes (January 2025)
 
+### Automated Database Initialization (July 14, 2025)
+- **Problem**: Database tables needed manual creation during deployment
+- **Solution**: 
+  - Created `server/database-init.ts` with automatic table creation
+  - Added `initializeDatabase()` function that runs on server startup
+  - Uses `CREATE TABLE IF NOT EXISTS` for safe, idempotent deployments
+  - Integrated with server startup sequence in `server/index.ts`
+  - Created deployment documentation in `DEPLOYMENT.md`
+- **Impact**: 
+  - Zero-downtime deployments with automatic database setup
+  - No manual migration steps required
+  - Graceful fallback if database is unavailable
+  - Simplified deployment process for production
+
 ### Database Persistence Fixed (July 12, 2025)
 - **Problem**: Data was not persisting after server restarts due to using in-memory storage
 - **Solution**: 
