@@ -37,8 +37,9 @@ function Router() {
       <ProtectedRoute path="/buyer/profile" component={BuyerProfile} allowedRoles={["buyer"]} />
       
       {/* Agent Routes */}
-      <ProtectedRoute path="/agent/kyc" component={AgentKYC} allowedRoles={["agent"]} />
-      <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} />
+      {/* KYC and referral agreement routes hidden for simplified agent onboarding */}
+      {/* <ProtectedRoute path="/agent/kyc" component={AgentKYC} allowedRoles={["agent"]} /> */}
+      {/* <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} /> */}
       <ProtectedRoute path="/agent/dashboard" component={AgentDashboard} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/property/:id" component={AgentPropertyDetail} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/email-outbox" component={(props) => (
@@ -127,7 +128,8 @@ function HomePage() {
     const isDefaultPath = !lastLocation || 
                           lastLocation === '/' || 
                           lastLocation === '/auth' || 
-                          lastLocation.includes('/kyc');
+                          lastLocation.includes('/kyc') || 
+                          lastLocation.includes('/referral-agreement');
     
     // Only redirect if there's no valid saved location
     if (isDefaultPath) {
@@ -139,28 +141,8 @@ function HomePage() {
       } else if (user.role === "admin") {
         setLocation("/admin/dashboard");
       } else if (user.role === "agent") {
-        if (user.profileStatus !== "verified") {
-          setLocation("/agent/kyc");
-        } else {
-          // For verified agents, check if they've signed the referral agreement
-          const checkReferralAgreement = async () => {
-            try {
-              const response = await fetch('/api/agreements/agent-referral');
-              const data = await response.json();
-              
-              if (!data.data) {
-                setLocation("/agent/referral-agreement");
-              } else {
-                setLocation("/agent/dashboard");
-              }
-            } catch (error) {
-              console.error("Error checking referral agreement:", error);
-              setLocation("/agent/dashboard");
-            }
-          };
-          
-          checkReferralAgreement();
-        }
+        // Simplified agent onboarding - skip KYC and referral agreement checks
+        setLocation("/agent/dashboard");
       }
     } else {
       // Restore the last visited location

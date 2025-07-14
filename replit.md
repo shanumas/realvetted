@@ -72,7 +72,9 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
   - Removed license lookup verification step
   - Removed referral agreement requirement during registration
   - Disabled KYC verification requirements
-- **Impact**: Streamlined agent onboarding process with faster registration
+  - Commented out KYC and referral agreement routes in App.tsx
+  - Updated HomePage redirect logic to skip verification steps
+- **Impact**: Streamlined agent onboarding process with immediate access to dashboard after registration
 
 ### Viewing Request Date Validation Fixed (July 12, 2025)
 - **Problem**: Viewing requests failed with "Invalid time value" error in frontend date-utils.ts
