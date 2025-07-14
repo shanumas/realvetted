@@ -51,6 +51,7 @@ const registerSchema = z.object({
   phone: z.string().min(1, "Phone number is required"),
   profilePhotoUrl: z.string().optional(),
   licenseNumber: z.string().optional(),
+  brokerageName: z.string().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -75,9 +76,8 @@ export default function AuthPage() {
           user.profileStatus === "verified" ? "/buyer/dashboard" : "/buyer/kyc",
         );
       } else if (user.role === "agent") {
-        navigate(
-          user.profileStatus === "verified" ? "/agent/dashboard" : "/agent/kyc",
-        );
+        // Always redirect agents to dashboard, regardless of profile status
+        navigate("/agent/dashboard");
       } else if (user.role === "seller") {
         navigate("/seller/dashboard");
       } else if (user.role === "admin") {
@@ -105,6 +105,7 @@ export default function AuthPage() {
       phone: "",
       profilePhotoUrl: "",
       licenseNumber: "",
+      brokerageName: "",
     },
     mode: "onChange",
   });
@@ -260,15 +261,15 @@ export default function AuthPage() {
   const onRegisterSubmit = (values: RegisterFormValues) => {
     console.log("Register form values:", values);
 
-    // Agent profile photo and license number are now collected after signup
-
     registerMutation.mutate({
       email: values.email,
       password: values.password,
       firstName: values.firstName,
       lastName: values.lastName,
+      phone: values.phone,
       profilePhotoUrl: values.profilePhotoUrl,
       licenseNumber: values.licenseNumber,
+      brokerageName: values.brokerageName,
       role: roleTab as any,
     });
   };
@@ -524,11 +525,50 @@ export default function AuthPage() {
 
                     {roleTab === "agent" && (
                       <>
-                        {/* Additional agent fields will be collected after signup */}
-                        <FormDescription className="text-center mt-2 mb-2">
-                          You will be asked to provide your license number and
-                          profile photo after creating your account.
-                        </FormDescription>
+                        <div>
+                          <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">
+                            DRE License Number <span className="text-red-500">*</span>
+                          </label>
+                          <div className="mt-1">
+                            <input
+                              id="licenseNumber"
+                              name="licenseNumber"
+                              type="text"
+                              placeholder="01234567"
+                              className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                              value={registerForm.watch('licenseNumber')}
+                              onChange={(e) => registerForm.setValue('licenseNumber', e.target.value)}
+                              required
+                            />
+                          </div>
+                          {registerForm.formState.errors.licenseNumber && (
+                            <p className="text-sm text-red-500 mt-1">
+                              {registerForm.formState.errors.licenseNumber.message}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <label htmlFor="brokerageName" className="block text-sm font-medium text-gray-700">
+                            Brokerage Name <span className="text-red-500">*</span>
+                          </label>
+                          <div className="mt-1">
+                            <input
+                              id="brokerageName"
+                              name="brokerageName"
+                              type="text"
+                              placeholder="Keller Williams, Coldwell Banker, etc."
+                              className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                              value={registerForm.watch('brokerageName')}
+                              onChange={(e) => registerForm.setValue('brokerageName', e.target.value)}
+                              required
+                            />
+                          </div>
+                          {registerForm.formState.errors.brokerageName && (
+                            <p className="text-sm text-red-500 mt-1">
+                              {registerForm.formState.errors.brokerageName.message}
+                            </p>
+                          )}
+                        </div>
                       </>
                     )}
 

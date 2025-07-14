@@ -39,32 +39,9 @@ export default function AgentDashboard() {
   const [selectedPropertyId, setSelectedPropertyId] = useState<number | null>(null);
   const [checkingAgreement, setCheckingAgreement] = useState(true);
   
-  // Check if agent has signed the referral agreement
+  // Simplify agent onboarding - no more complex agreement checking
   useEffect(() => {
-    if (user && user.role === 'agent' && user.profileStatus === 'verified') {
-      const checkReferralAgreement = async () => {
-        try {
-          const response = await fetch('/api/agent/referral-agreement');
-          const data = await response.json();
-          
-          if (data.success) {
-            // If agreement doesn't exist or is not completed, redirect to sign it
-            if (!data.data || data.data.status !== 'completed') {
-              window.location.href = '/agent/referral-agreement';
-              return;
-            }
-          }
-          setCheckingAgreement(false);
-        } catch (error) {
-          console.error('Error checking referral agreement:', error);
-          setCheckingAgreement(false);
-        }
-      };
-      
-      checkReferralAgreement();
-    } else {
-      setCheckingAgreement(false);
-    }
+    setCheckingAgreement(false);
   }, [user]);
 
   // Form for adding seller email

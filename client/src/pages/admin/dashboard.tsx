@@ -503,6 +503,8 @@ export default function AdminDashboard() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Brokerage</TableHead>
+                        <TableHead>DRE #</TableHead>
                         <TableHead>Profile Status</TableHead>
                         <TableHead>Account Status</TableHead>
                         <TableHead>Actions</TableHead>
@@ -513,6 +515,8 @@ export default function AdminDashboard() {
                         <TableRow key={user.id}>
                           <TableCell>{user.firstName} {user.lastName}</TableCell>
                           <TableCell>{user.email}</TableCell>
+                          <TableCell>{user.brokerageName || "N/A"}</TableCell>
+                          <TableCell>{user.licenseNumber || "N/A"}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs ${
                               user.profileStatus === "verified" ? "bg-green-100 text-green-800" :

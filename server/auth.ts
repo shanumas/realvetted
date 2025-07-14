@@ -194,12 +194,8 @@ export function setupAuth(app: Express) {
         // Return user without password
         const { password, ...userWithoutPassword } = user;
         
-        // For agents, add a redirect to the referral agreement page
-        const redirectUrl = user.role === 'agent' ? '/agent/referral-agreement' : null;
-        
         res.status(201).json({
-          ...userWithoutPassword,
-          redirectUrl
+          ...userWithoutPassword
         });
       });
     } catch (error) {
