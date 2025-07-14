@@ -5,6 +5,15 @@ A comprehensive GenAI-powered real estate platform built with React.js frontend 
 
 ## Recent Changes (January 2025)
 
+### Session Persistence Fixed (July 14, 2025)
+- **Problem**: Users were logged out after browser refresh due to session not persisting
+- **Solution**: 
+  - Replaced MemoryStore with PostgreSQL session store (connect-pg-simple)
+  - Updated session configuration for better persistence
+  - Improved cookie settings with proper path and maxAge
+  - Sessions now persist across server restarts using database storage
+- **Impact**: Users stay logged in across browser refreshes and server restarts
+
 ### Automated Database Initialization (July 14, 2025)
 - **Problem**: Database tables needed manual creation during deployment
 - **Solution**: 

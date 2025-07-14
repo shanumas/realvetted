@@ -200,8 +200,12 @@ export class PgStorage implements IStorage {
     // Create Drizzle ORM instance
     this.db = drizzle(this.pool);
 
-    // Use memory store instead of PostgreSQL due to database connectivity issues
-    this.sessionStore = new session.MemoryStore();
+    // Use PostgreSQL session store for persistent sessions
+    this.sessionStore = new PostgresSessionStore({
+      pool: this.pool,
+      tableName: 'session',
+      createTableIfMissing: true,
+    });
 
     // Create admin user if none exists (async, will complete in background)
     this.initializeAdminUser();
