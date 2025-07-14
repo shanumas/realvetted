@@ -174,6 +174,19 @@ export async function initializeDatabase() {
       );
     `);
 
+    // Create viewing tokens table for public access
+    await connection(`
+      CREATE TABLE IF NOT EXISTS viewing_tokens (
+        id SERIAL PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        viewing_request_id INTEGER NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        last_accessed_at TIMESTAMP
+      );
+    `);
+
     // Create session table for express-session
     await connection(`
       CREATE TABLE IF NOT EXISTS session (
