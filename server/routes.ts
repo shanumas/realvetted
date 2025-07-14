@@ -6166,6 +6166,158 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
 
+  // Agent approval endpoints for viewing requests
+  // Seller's agent approval
+  app.patch("/api/viewing-requests/:id/seller-agent-approval", isAuthenticated, hasRole(["agent", "admin"]), async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      const { approvalStatus } = req.body;
+      
+      if (!["approved", "rejected"].includes(approvalStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid approval status. Must be 'approved' or 'rejected'"
+        });
+      }
+
+      const viewingRequest = await storage.getViewingRequest(requestId);
+      if (!viewingRequest) {
+        return res.status(404).json({
+          success: false,
+          error: "Viewing request not found"
+        });
+      }
+
+      // Get the property to determine if user is authorized
+      const property = await storage.getProperty(viewingRequest.propertyId);
+      if (!property) {
+        return res.status(404).json({
+          success: false,
+          error: "Property not found"
+        });
+      }
+
+      // Check if user is authorized (seller's agent or admin)
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      const isAuthorized = role === "admin" || 
+                          (role === "agent" && (property.agentId === userId || viewingRequest.sellerAgentId === userId));
+
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to approve this viewing request as seller's agent"
+        });
+      }
+
+      // Update the viewing request
+      const updatedRequest = await storage.updateViewingRequest(requestId, {
+        sellerAgentApprovalStatus: approvalStatus,
+        sellerAgentApprovedById: userId,
+        sellerAgentApprovalDate: new Date(),
+        updatedAt: new Date()
+      });
+
+      // Send WebSocket notification
+      const notifyUserIds = [viewingRequest.buyerId];
+      if (viewingRequest.buyerAgentId) {
+        notifyUserIds.push(viewingRequest.buyerAgentId);
+      }
+
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: "viewing_request_approval",
+        data: {
+          requestId: requestId,
+          approvalType: "seller_agent",
+          status: approvalStatus,
+          message: `Seller's agent has ${approvalStatus} the viewing request`
+        }
+      });
+
+      res.json({
+        success: true,
+        data: updatedRequest
+      });
+    } catch (error) {
+      console.error("Seller agent approval error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update seller agent approval"
+      });
+    }
+  });
+
+  // Buyer's agent approval
+  app.patch("/api/viewing-requests/:id/buyer-agent-approval", isAuthenticated, hasRole(["agent", "admin"]), async (req, res) => {
+    try {
+      const requestId = parseInt(req.params.id);
+      const { approvalStatus } = req.body;
+      
+      if (!["approved", "rejected"].includes(approvalStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid approval status. Must be 'approved' or 'rejected'"
+        });
+      }
+
+      const viewingRequest = await storage.getViewingRequest(requestId);
+      if (!viewingRequest) {
+        return res.status(404).json({
+          success: false,
+          error: "Viewing request not found"
+        });
+      }
+
+      // Check if user is authorized (buyer's agent or admin)
+      const userId = req.user!.id;
+      const role = req.user!.role;
+      const isAuthorized = role === "admin" || 
+                          (role === "agent" && viewingRequest.buyerAgentId === userId);
+
+      if (!isAuthorized) {
+        return res.status(403).json({
+          success: false,
+          error: "You don't have permission to approve this viewing request as buyer's agent"
+        });
+      }
+
+      // Update the viewing request
+      const updatedRequest = await storage.updateViewingRequest(requestId, {
+        buyerAgentApprovalStatus: approvalStatus,
+        buyerAgentApprovedById: userId,
+        buyerAgentApprovalDate: new Date(),
+        updatedAt: new Date()
+      });
+
+      // Send WebSocket notification
+      const notifyUserIds = [viewingRequest.buyerId];
+      if (viewingRequest.sellerAgentId) {
+        notifyUserIds.push(viewingRequest.sellerAgentId);
+      }
+
+      websocketServer.broadcastToUsers(notifyUserIds, {
+        type: "viewing_request_approval",
+        data: {
+          requestId: requestId,
+          approvalType: "buyer_agent",
+          status: approvalStatus,
+          message: `Buyer's agent has ${approvalStatus} the viewing request`
+        }
+      });
+
+      res.json({
+        success: true,
+        data: updatedRequest
+      });
+    } catch (error) {
+      console.error("Buyer agent approval error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to update buyer agent approval"
+      });
+    }
+  });
+
   // Agent Referral Agreement routes
   // Get agent referral agreement
   app.get(

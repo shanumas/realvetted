@@ -160,6 +160,13 @@ export const tourRequests = pgTable("viewing_requests", { // Keeping the DB tabl
   notes: text("notes"),
   confirmedById: integer("confirmed_by_id"), // ID of the agent who confirmed the tour
   responseMessage: text("response_message"), // Message from the confirming agent with any changes
+  // New approval fields
+  sellerAgentApprovalStatus: text("seller_agent_approval_status").default("pending"), // pending, approved, rejected
+  buyerAgentApprovalStatus: text("buyer_agent_approval_status").default("pending"), // pending, approved, rejected
+  sellerAgentApprovedById: integer("seller_agent_approved_by_id"), // ID of the seller's agent who approved
+  buyerAgentApprovedById: integer("buyer_agent_approved_by_id"), // ID of the buyer's agent who approved
+  sellerAgentApprovalDate: timestamp("seller_agent_approval_date"),
+  buyerAgentApprovalDate: timestamp("buyer_agent_approval_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

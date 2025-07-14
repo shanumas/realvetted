@@ -169,6 +169,12 @@ export async function initializeDatabase() {
         notes TEXT,
         confirmed_by_id INTEGER,
         response_message TEXT,
+        seller_agent_approval_status TEXT DEFAULT 'pending',
+        buyer_agent_approval_status TEXT DEFAULT 'pending',
+        seller_agent_approved_by_id INTEGER,
+        buyer_agent_approved_by_id INTEGER,
+        seller_agent_approval_date TIMESTAMP,
+        buyer_agent_approval_date TIMESTAMP,
         created_at TIMESTAMP DEFAULT NOW(),
         updated_at TIMESTAMP DEFAULT NOW()
       );

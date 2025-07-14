@@ -28,6 +28,9 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [showAgreementModal, setShowAgreementModal] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<ViewingRequestWithParticipants | null>(null);
+  
+  // Make userId available in component scope
+  const currentUserId = userId;
 
   // Determine the API endpoint based on the user's role
   const endpoint = role === "agent" 
@@ -173,6 +176,50 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
     },
   });
 
+  // Seller agent approval mutation
+  const sellerAgentApprovalMutation = useMutation({
+    mutationFn: async ({ id, approvalStatus }: { id: number; approvalStatus: string }) => {
+      const response = await apiRequest("PATCH", `/api/viewing-requests/${id}/seller-agent-approval`, { approvalStatus });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Approval updated",
+        description: "Seller agent approval has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: [endpoint] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating approval",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Buyer agent approval mutation
+  const buyerAgentApprovalMutation = useMutation({
+    mutationFn: async ({ id, approvalStatus }: { id: number; approvalStatus: string }) => {
+      const response = await apiRequest("PATCH", `/api/viewing-requests/${id}/buyer-agent-approval`, { approvalStatus });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Approval updated",
+        description: "Buyer agent approval has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: [endpoint] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating approval",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusChange = (id: number, status: string) => {
     updateRequestMutation.mutate({ id, status });
   };
@@ -276,17 +323,31 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                           <CardTitle className="text-lg">
                             Viewing Request #{request.id}
                           </CardTitle>
-                          <Badge 
-                            variant={
-                              request.status === 'pending' ? 'outline' : 
-                              request.status === 'accepted' ? 'success' :
-                              (request.status === 'rejected' || request.status === 'cancelled') ? 'destructive' : 'default'
-                            }
-                          >
-                            {request.status === 'accepted' ? 'Approved' : 
-                             request.status === 'cancelled' ? 'Cancelled' : 
-                             request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                          </Badge>
+                          <div className="flex gap-2">
+                            {/* Seller's Agent Approval Badge */}
+                            <Badge 
+                              variant={
+                                request.sellerAgentApprovalStatus === 'approved' ? 'success' :
+                                request.sellerAgentApprovalStatus === 'rejected' ? 'destructive' : 'outline'
+                              }
+                              className="text-xs"
+                            >
+                              Seller Agent: {request.sellerAgentApprovalStatus === 'approved' ? 'Approved' : 
+                                            request.sellerAgentApprovalStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                            </Badge>
+                            
+                            {/* Buyer's Agent Approval Badge */}
+                            <Badge 
+                              variant={
+                                request.buyerAgentApprovalStatus === 'approved' ? 'success' :
+                                request.buyerAgentApprovalStatus === 'rejected' ? 'destructive' : 'outline'
+                              }
+                              className="text-xs"
+                            >
+                              Buyer Agent: {request.buyerAgentApprovalStatus === 'approved' ? 'Approved' : 
+                                           request.buyerAgentApprovalStatus === 'rejected' ? 'Rejected' : 'Pending'}
+                            </Badge>
+                          </div>
                         </div>
                       </CardHeader>
                       
@@ -362,28 +423,62 @@ export function ViewingRequestsList({ userId, role }: ViewingRequestsListProps) 
                             </Button>
                           )}
                           
+                          {/* Agent approval buttons */}
                           {role === 'agent' && request.status === 'pending' && (
                             <>
-                              <Button 
-                                variant="success"
-                                size="sm"
-                                onClick={() => handleStatusChange(request.id, 'accepted')}
-                                disabled={updateRequestMutation.isPending}
-                              >
-                                {updateRequestMutation.isPending ? (
-                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                ) : null}
-                                Approve
-                              </Button>
+                              {/* Seller Agent Approval (if user is property agent or seller agent) */}
+                              {(property.agentId === currentUserId || request.sellerAgentId === currentUserId) && 
+                               request.sellerAgentApprovalStatus === 'pending' && (
+                                <>
+                                  <Button 
+                                    variant="success"
+                                    size="sm"
+                                    onClick={() => sellerAgentApprovalMutation.mutate({ id: request.id, approvalStatus: 'approved' })}
+                                    disabled={sellerAgentApprovalMutation.isPending}
+                                  >
+                                    {sellerAgentApprovalMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : null}
+                                    Approve (Seller Agent)
+                                  </Button>
+                                  
+                                  <Button 
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => sellerAgentApprovalMutation.mutate({ id: request.id, approvalStatus: 'rejected' })}
+                                    disabled={sellerAgentApprovalMutation.isPending}
+                                  >
+                                    Reject (Seller Agent)
+                                  </Button>
+                                </>
+                              )}
                               
-                              <Button 
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => handleStatusChange(request.id, 'rejected')}
-                                disabled={updateRequestMutation.isPending}
-                              >
-                                Reject
-                              </Button>
+                              {/* Buyer Agent Approval (if user is buyer agent) */}
+                              {request.buyerAgentId === currentUserId && 
+                               request.buyerAgentApprovalStatus === 'pending' && (
+                                <>
+                                  <Button 
+                                    variant="success"
+                                    size="sm"
+                                    onClick={() => buyerAgentApprovalMutation.mutate({ id: request.id, approvalStatus: 'approved' })}
+                                    disabled={buyerAgentApprovalMutation.isPending}
+                                  >
+                                    {buyerAgentApprovalMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : null}
+                                    Approve (Buyer Agent)
+                                  </Button>
+                                  
+                                  <Button 
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => buyerAgentApprovalMutation.mutate({ id: request.id, approvalStatus: 'rejected' })}
+                                    disabled={buyerAgentApprovalMutation.isPending}
+                                  >
+                                    Reject (Buyer Agent)
+                                  </Button>
+                                </>
+                              )}
                             </>
                           )}
                           
