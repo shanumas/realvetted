@@ -3173,6 +3173,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
+  // Approve/reject agent endpoint
+  app.put(
+    "/api/admin/users/:id/approve",
+    isAuthenticated,
+    hasRole(["admin"]),
+    async (req, res) => {
+      try {
+        const userId = parseInt(req.params.id);
+        const { profileStatus } = req.body;
+
+        if (!profileStatus || !["verified", "rejected", "pending"].includes(profileStatus)) {
+          return res.status(400).json({
+            success: false,
+            error: "Valid profile status is required (verified, rejected, or pending)",
+          });
+        }
+
+        const user = await storage.getUser(userId);
+
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            error: "User not found",
+          });
+        }
+
+        // Only allow approving agents
+        if (user.role !== "agent") {
+          return res.status(400).json({
+            success: false,
+            error: "Only agents can be approved",
+          });
+        }
+
+        const updatedUser = await storage.updateUser(userId, {
+          profileStatus: profileStatus,
+        });
+
+        res.json({
+          success: true,
+          data: updatedUser,
+        });
+      } catch (error) {
+        console.error("Approve agent error:", error);
+        res.status(500).json({
+          success: false,
+          error: "Failed to update agent status",
+        });
+      }
+    },
+  );
+
   // Endpoint for buyers to choose their own agent
   app.put(
     "/api/properties/:id/choose-agent",

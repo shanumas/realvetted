@@ -223,6 +223,28 @@ export default function AdminDashboard() {
     },
   });
 
+  // Approve/reject agent mutation
+  const approveAgentMutation = useMutation({
+    mutationFn: async ({ userId, profileStatus }: { userId: number; profileStatus: string }) => {
+      const response = await apiRequest("PUT", `/api/admin/users/${userId}/approve`, { profileStatus });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Agent status updated",
+        description: "The agent's profile status has been updated successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to update agent",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Reassign agent mutation
   const reassignAgentMutation = useMutation({
     mutationFn: async ({ propertyId, agentId }: { propertyId: number; agentId: number }) => {
@@ -249,7 +271,13 @@ export default function AdminDashboard() {
   });
 
   const handleToggleBlock = (userId: number, currentlyBlocked: boolean) => {
+    setSelectedUserId(userId);
     toggleBlockMutation.mutate({ userId, block: !currentlyBlocked });
+  };
+
+  const handleApproveAgent = (userId: number, profileStatus: string) => {
+    setSelectedUserId(userId);
+    approveAgentMutation.mutate({ userId, profileStatus });
   };
 
   const openReassignDialog = (property: Property) => {
@@ -475,7 +503,8 @@ export default function AdminDashboard() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>Profile Status</TableHead>
+                        <TableHead>Account Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -486,27 +515,100 @@ export default function AdminDashboard() {
                           <TableCell>{user.email}</TableCell>
                           <TableCell>
                             <span className={`px-2 py-1 rounded-full text-xs ${
+                              user.profileStatus === "verified" ? "bg-green-100 text-green-800" :
+                              user.profileStatus === "rejected" ? "bg-red-100 text-red-800" :
+                              "bg-yellow-100 text-yellow-800"
+                            }`}>
+                              {user.profileStatus === "verified" ? "Verified" :
+                               user.profileStatus === "rejected" ? "Rejected" :
+                               "Pending"}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`px-2 py-1 rounded-full text-xs ${
                               user.isBlocked ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
                             }`}>
                               {user.isBlocked ? "Blocked" : "Active"}
                             </span>
                           </TableCell>
                           <TableCell>
-                            <Button
-                              variant={user.isBlocked ? "outline" : "destructive"}
-                              size="sm"
-                              onClick={() => handleToggleBlock(user.id, user.isBlocked === true)}
-                              disabled={toggleBlockMutation.isPending && selectedUserId === user.id}
-                            >
-                              {toggleBlockMutation.isPending && selectedUserId === user.id ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              ) : user.isBlocked ? (
-                                <UserCheck className="h-4 w-4 mr-1" />
-                              ) : (
-                                <UserX className="h-4 w-4 mr-1" />
+                            <div className="flex space-x-2">
+                              {user.profileStatus === "pending" && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleApproveAgent(user.id, "verified")}
+                                    disabled={approveAgentMutation.isPending && selectedUserId === user.id}
+                                  >
+                                    {approveAgentMutation.isPending && selectedUserId === user.id ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : (
+                                      <UserCheck className="h-4 w-4 mr-1" />
+                                    )}
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleApproveAgent(user.id, "rejected")}
+                                    disabled={approveAgentMutation.isPending && selectedUserId === user.id}
+                                  >
+                                    {approveAgentMutation.isPending && selectedUserId === user.id ? (
+                                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                    ) : (
+                                      <UserX className="h-4 w-4 mr-1" />
+                                    )}
+                                    Reject
+                                  </Button>
+                                </>
                               )}
-                              {user.isBlocked ? "Unblock" : "Block"}
-                            </Button>
+                              {user.profileStatus === "rejected" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleApproveAgent(user.id, "verified")}
+                                  disabled={approveAgentMutation.isPending && selectedUserId === user.id}
+                                >
+                                  {approveAgentMutation.isPending && selectedUserId === user.id ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <UserCheck className="h-4 w-4 mr-1" />
+                                  )}
+                                  Approve
+                                </Button>
+                              )}
+                              {user.profileStatus === "verified" && (
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleApproveAgent(user.id, "rejected")}
+                                  disabled={approveAgentMutation.isPending && selectedUserId === user.id}
+                                >
+                                  {approveAgentMutation.isPending && selectedUserId === user.id ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <UserX className="h-4 w-4 mr-1" />
+                                  )}
+                                  Revoke
+                                </Button>
+                              )}
+                              <Button
+                                variant={user.isBlocked ? "outline" : "destructive"}
+                                size="sm"
+                                onClick={() => handleToggleBlock(user.id, user.isBlocked === true)}
+                                disabled={toggleBlockMutation.isPending && selectedUserId === user.id}
+                              >
+                                {toggleBlockMutation.isPending && selectedUserId === user.id ? (
+                                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                ) : user.isBlocked ? (
+                                  <UserCheck className="h-4 w-4 mr-1" />
+                                ) : (
+                                  <UserX className="h-4 w-4 mr-1" />
+                                )}
+                                {user.isBlocked ? "Unblock" : "Block"}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
