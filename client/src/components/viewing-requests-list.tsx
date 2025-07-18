@@ -433,10 +433,9 @@ export function ViewingRequestsList({
                             {/* Seller's Agent Approval Badge */}
                             <Badge
                               variant={
-                                request.sellerAgentApprovalStatus === "approved"
+                                request.status === "accepted"
                                   ? "success"
-                                  : request.sellerAgentApprovalStatus ===
-                                      "rejected"
+                                  : request.status === "rejected"
                                     ? "destructive"
                                     : "outline"
                               }
@@ -448,16 +447,6 @@ export function ViewingRequestsList({
                                 : request.status === "cancelled"
                                   ? "Rejected"
                                   : "Pending"}
-                              {request.sellerAgentApprovalSource && (
-                                <span className="ml-1 text-xs opacity-75">
-                                  (
-                                  {request.sellerAgentApprovalSource ===
-                                  "public_viewing_page"
-                                    ? "Public Link"
-                                    : "Dashboard"}
-                                  )
-                                </span>
-                              )}
                             </Badge>
 
                             {/* Buyer's Agent Approval Badge */}
@@ -472,23 +461,13 @@ export function ViewingRequestsList({
                               }
                               className="text-xs"
                             >
-                              Buyer Agent:{" "}
+                              You:{" "}
                               {request.buyerAgentApprovalStatus === "approved"
                                 ? "Approved"
                                 : request.buyerAgentApprovalStatus ===
                                     "rejected"
                                   ? "Rejected"
                                   : "Pending"}
-                              {request.buyerAgentApprovalSource && (
-                                <span className="ml-1 text-xs opacity-75">
-                                  (
-                                  {request.buyerAgentApprovalSource ===
-                                  "public_viewing_page"
-                                    ? "Public Link"
-                                    : "Dashboard"}
-                                  )
-                                </span>
-                              )}
                             </Badge>
                           </div>
                         </div>
@@ -589,49 +568,6 @@ export function ViewingRequestsList({
                           {/* Agent approval buttons */}
                           {role === "agent" && request.status === "pending" && (
                             <>
-                              {/* Seller Agent Approval (if user is property agent or seller agent) */}
-                              {(property.agentId === currentUserId ||
-                                request.sellerAgentId === currentUserId) &&
-                                request.sellerAgentApprovalStatus ===
-                                  "pending" && (
-                                  <>
-                                    <Button
-                                      variant="success"
-                                      size="sm"
-                                      onClick={() =>
-                                        sellerAgentApprovalMutation.mutate({
-                                          id: request.id,
-                                          approvalStatus: "approved",
-                                        })
-                                      }
-                                      disabled={
-                                        sellerAgentApprovalMutation.isPending
-                                      }
-                                    >
-                                      {sellerAgentApprovalMutation.isPending ? (
-                                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                                      ) : null}
-                                      Approve (Seller Agent)
-                                    </Button>
-
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={() =>
-                                        sellerAgentApprovalMutation.mutate({
-                                          id: request.id,
-                                          approvalStatus: "rejected",
-                                        })
-                                      }
-                                      disabled={
-                                        sellerAgentApprovalMutation.isPending
-                                      }
-                                    >
-                                      Reject (Seller Agent)
-                                    </Button>
-                                  </>
-                                )}
-
                               {/* Buyer Agent Approval (if user is buyer agent) */}
                               {request.buyerAgentId === currentUserId &&
                                 request.buyerAgentApprovalStatus ===
@@ -653,7 +589,7 @@ export function ViewingRequestsList({
                                       {buyerAgentApprovalMutation.isPending ? (
                                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                                       ) : null}
-                                      Approve (Buyer Agent)
+                                      Approve
                                     </Button>
 
                                     <Button
@@ -669,7 +605,7 @@ export function ViewingRequestsList({
                                         buyerAgentApprovalMutation.isPending
                                       }
                                     >
-                                      Reject (Buyer Agent)
+                                      Reject
                                     </Button>
                                   </>
                                 )}
