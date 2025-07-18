@@ -30,4 +30,18 @@ export default defineConfig({
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    // Enable HMR
+    hmr: {
+      overlay: true,
+      // Explicitly set the client port to match the server
+      clientPort: 3000,
+      // Enable WebSocket connection for faster updates
+      protocol: 'ws',
+    },
+    // Enable hot reload for static assets
+    watch: {
+      usePolling: true,
+    },
+  },
 });

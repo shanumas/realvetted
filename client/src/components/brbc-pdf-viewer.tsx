@@ -1050,8 +1050,8 @@ export function BRBCPdfViewer({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b">
+        <DialogContent className="max-w-12xl w-[100vw] h-[100vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-6 border-b bg-gray-50">
             <DialogTitle className="text-xl font-semibold">
               <div className="flex items-center">
                 <FileText className="mr-2 h-5 w-5 text-primary" />
@@ -1405,7 +1405,7 @@ export function BRBCPdfViewer({
             ) : (
               /* PDF Viewer - Only shown after terms agreement */
               <div
-                className={`flex-grow ${isSigning ? "w-2/3" : "w-full"} overflow-hidden relative`}
+                className={`flex-grow ${isSigning ? "w-3/4" : "w-full"} overflow-hidden relative`}
               >
                 {isLoading && (
                   <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-70 z-10">
@@ -1657,6 +1657,89 @@ export function BRBCPdfViewer({
                         ? "Goto Buyer 2"
                         : "Goto Buyer 1"}
                     </Button>
+                    {hasSigned ? (
+                      <div className="flex items-center text-green-600 font-medium">
+                        <Check className="mr-1.5 h-5 w-5" />
+                        Successfully signed
+                      </div>
+                    ) : (
+                      !showKeyTermsSummaryPage &&
+                      !showAgreementTermsPage && (
+                        <div className="flex-1 flex items-center">
+                          <div className="flex items-center">
+                            {/* Preview button - shows PDF with signatures without submitting */}
+                            <Button
+                              variant="outline"
+                              onClick={previewSignedPdf}
+                              disabled={isPreviewing || isSubmitting}
+                              className="mr-2"
+                            >
+                              {isPreviewing ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Previewing...
+                                </>
+                              ) : (
+                                <>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  Preview before Submit
+                                </>
+                              )}
+                            </Button>
+
+                            {/* Submit button - now shows confirmation dialog */}
+                            <div className="flex flex-col">
+                              <Button
+                                onClick={() => {
+                                  // Force a final check of all signatures before submission
+                                  if (signatureRef.current) {
+                                    setSignatureIsEmpty(signatureRef.current.isEmpty());
+                                  }
+                                  if (initialsRef.current) {
+                                    setInitialsIsEmpty(initialsRef.current.isEmpty());
+                                  }
+
+                                  // Use a short timeout to let state update before submitting
+                                  setTimeout(() => {
+                                    handleSubmitSignature();
+                                  }, 50);
+                                }}
+                                disabled={
+                                  isSubmitting ||
+                                  isPreviewing ||
+                                  (!savedSignatures.primary && signatureIsEmpty) ||
+                                  (!savedSignatures.initials && initialsIsEmpty) ||
+                                  !termsAgreed ||
+                                  !hasPreviewedOnce
+                                }
+                                className="mr-2"
+                              >
+                                {isSubmitting ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Submitting...
+                                  </>
+                                ) : (
+                                  "Submit Agreement"
+                                )}
+                              </Button>
+
+                              {!hasPreviewedOnce &&
+                                !isPreviewing &&
+                                !showAgreementTermsPage && (
+                                  <span className="text-xs text-amber-600 mt-1">
+                                    Please view preview at least once before submitting
+                                  </span>
+                                )}
+                            </div>
+                          </div>
+
+                          <Button variant="outline" onClick={handleClose}>
+                            {hasSigned ? "Close" : "Cancel"}
+                          </Button>
+                        </div>
+                      )
+                    )}
                   </div>
                 </Tabs>
               </div>
@@ -1664,89 +1747,7 @@ export function BRBCPdfViewer({
           </div>
 
           <DialogFooter className="p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-2">
-            {hasSigned ? (
-              <div className="flex items-center text-green-600 font-medium">
-                <Check className="mr-1.5 h-5 w-5" />
-                Successfully signed
-              </div>
-            ) : (
-              !showKeyTermsSummaryPage &&
-              !showAgreementTermsPage && (
-                <div className="flex-1 flex items-center">
-                  <div className="flex items-center">
-                    {/* Preview button - shows PDF with signatures without submitting */}
-                    <Button
-                      variant="outline"
-                      onClick={previewSignedPdf}
-                      disabled={isPreviewing || isSubmitting}
-                      className="mr-2"
-                    >
-                      {isPreviewing ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Previewing...
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Preview before Submit
-                        </>
-                      )}
-                    </Button>
 
-                    {/* Submit button - now shows confirmation dialog */}
-                    <div className="flex flex-col">
-                      <Button
-                        onClick={() => {
-                          // Force a final check of all signatures before submission
-                          if (signatureRef.current) {
-                            setSignatureIsEmpty(signatureRef.current.isEmpty());
-                          }
-                          if (initialsRef.current) {
-                            setInitialsIsEmpty(initialsRef.current.isEmpty());
-                          }
-
-                          // Use a short timeout to let state update before submitting
-                          setTimeout(() => {
-                            handleSubmitSignature();
-                          }, 50);
-                        }}
-                        disabled={
-                          isSubmitting ||
-                          isPreviewing ||
-                          (!savedSignatures.primary && signatureIsEmpty) ||
-                          (!savedSignatures.initials && initialsIsEmpty) ||
-                          !termsAgreed ||
-                          !hasPreviewedOnce
-                        }
-                        className="mr-2"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          "Submit Agreement"
-                        )}
-                      </Button>
-
-                      {!hasPreviewedOnce &&
-                        !isPreviewing &&
-                        !showAgreementTermsPage && (
-                          <span className="text-xs text-amber-600 mt-1">
-                            Please view preview at least once before submitting
-                          </span>
-                        )}
-                    </div>
-                  </div>
-
-                  <Button variant="outline" onClick={handleClose}>
-                    {hasSigned ? "Close" : "Cancel"}
-                  </Button>
-                </div>
-              )
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
