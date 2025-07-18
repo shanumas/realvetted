@@ -1493,19 +1493,21 @@ export function BRBCPdfViewer({
                         </div>
                       </div>
 
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center mt-4">
                         <h4 className="font-medium">
                           Signature - full signature
                         </h4>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => clearSignature("primary")}
-                          disabled={signatureIsEmpty}
-                          className="h-8 px-2 py-0"
-                        >
-                          Clear
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => clearSignature("primary")}
+                            disabled={signatureIsEmpty}
+                            className="h-8 px-2 py-0"
+                          >
+                            Clear
+                          </Button>
+                        </div>
                       </div>
                       <div className="border border-gray-300 rounded-md flex-grow bg-white h-32">
                         <SignatureCanvas
@@ -1634,112 +1636,52 @@ export function BRBCPdfViewer({
 
                   <div className="flex justify-end items-center">
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => {
-                        // Save current signature and form values before switching tabs
-                        saveCurrentSignature();
-                        captureFormValues();
+                        if (!hasPreviewedOnce) {
+                          // If not previewed yet, show preview
+                          previewSignedPdf();
+                        } else {
+                          // If already previewed, handle submit
+                          if (signatureRef.current) {
+                            setSignatureIsEmpty(signatureRef.current.isEmpty());
+                          }
+                          if (initialsRef.current) {
+                            setInitialsIsEmpty(initialsRef.current.isEmpty());
+                          }
 
-                        // Toggle between Buyer 1 and Buyer 2 tabs
-                        const nextTab =
-                          activeTab === "buyer1-signature"
-                            ? "buyer2-signature"
-                            : "buyer1-signature";
-
-                        // Set new tab and restore any saved signature
-                        setActiveTab(nextTab);
-                        restoreSignaturesOnTabLoad(nextTab);
+                          setTimeout(() => {
+                            handleSubmitSignature();
+                          }, 50);
+                        }
                       }}
-                      className="w-24"
+                      disabled={
+                        isSubmitting ||
+                        isPreviewing ||
+                        (!savedSignatures.primary && signatureIsEmpty) ||
+                        (!savedSignatures.initials && initialsIsEmpty) ||
+                        !termsAgreed
+                      }
+                      className="w-48"
                     >
-                      {activeTab === "buyer1-signature"
-                        ? "Goto Buyer 2"
-                        : "Goto Buyer 1"}
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : isPreviewing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Previewing...
+                        </>
+                      ) : !hasPreviewedOnce ? (
+                        <>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview Agreement
+                        </>
+                      ) : (
+                        "Submit Agreement"
+                      )}
                     </Button>
-                    {hasSigned ? (
-                      <div className="flex items-center text-green-600 font-medium">
-                        <Check className="mr-1.5 h-5 w-5" />
-                        Successfully signed
-                      </div>
-                    ) : (
-                      !showKeyTermsSummaryPage &&
-                      !showAgreementTermsPage && (
-                        <div className="flex-1 flex items-center">
-                          <div className="flex items-center">
-                            {/* Preview button - shows PDF with signatures without submitting */}
-                            <Button
-                              variant="outline"
-                              onClick={previewSignedPdf}
-                              disabled={isPreviewing || isSubmitting}
-                              className="mr-2"
-                            >
-                              {isPreviewing ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Previewing...
-                                </>
-                              ) : (
-                                <>
-                                  <Eye className="mr-2 h-4 w-4" />
-                                  Preview before Submit
-                                </>
-                              )}
-                            </Button>
-
-                            {/* Submit button - now shows confirmation dialog */}
-                            <div className="flex flex-col">
-                              <Button
-                                onClick={() => {
-                                  // Force a final check of all signatures before submission
-                                  if (signatureRef.current) {
-                                    setSignatureIsEmpty(signatureRef.current.isEmpty());
-                                  }
-                                  if (initialsRef.current) {
-                                    setInitialsIsEmpty(initialsRef.current.isEmpty());
-                                  }
-
-                                  // Use a short timeout to let state update before submitting
-                                  setTimeout(() => {
-                                    handleSubmitSignature();
-                                  }, 50);
-                                }}
-                                disabled={
-                                  isSubmitting ||
-                                  isPreviewing ||
-                                  (!savedSignatures.primary && signatureIsEmpty) ||
-                                  (!savedSignatures.initials && initialsIsEmpty) ||
-                                  !termsAgreed ||
-                                  !hasPreviewedOnce
-                                }
-                                className="mr-2"
-                              >
-                                {isSubmitting ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Submitting...
-                                  </>
-                                ) : (
-                                  "Submit Agreement"
-                                )}
-                              </Button>
-
-                              {!hasPreviewedOnce &&
-                                !isPreviewing &&
-                                !showAgreementTermsPage && (
-                                  <span className="text-xs text-amber-600 mt-1">
-                                    Please view preview at least once before submitting
-                                  </span>
-                                )}
-                            </div>
-                          </div>
-
-                          <Button variant="outline" onClick={handleClose}>
-                            {hasSigned ? "Close" : "Cancel"}
-                          </Button>
-                        </div>
-                      )
-                    )}
                   </div>
                 </Tabs>
               </div>
