@@ -188,22 +188,22 @@ export async function extractPropertyFromUrl(
   } catch (error) {
     console.error("Error in property URL extraction:", error);
 
-    // Create a fallback property result with minimal data
-    const fallbackResult: PropertyAIData = {
-      address: "Address could not be extracted",
+    // Return minimal property data with just the URL, allowing agent to fill in details later
+    const minimalPropertyData: PropertyAIData = {
+      address: "",
       bedrooms: null,
       bathrooms: null,
       price: null,
-      description: "Property information could not be extracted",
+      description: "Property details pending - to be filled by agent",
       listingAgentName: "",
       listingAgentPhone: "",
       listingAgentEmail: "",
       listingAgentCompany: "",
       listingAgentLicenseNo: "",
-      propertyUrl: url,
+      propertyUrl: url
     };
 
-    return fallbackResult;
+    return minimalPropertyData;
   }
 }
 
@@ -349,33 +349,16 @@ async function extractFromUrlStructure(url: string): Promise<PropertyAIData> {
     // Ensure we have the minimum required data
     const propertyData: PropertyAIData = {
       address: apiResult.address || addressFromUrl || "Address unavailable",
-      city: apiResult.city || cityFromUrl || "",
-      state: apiResult.state || stateFromUrl || "",
-      zip: apiResult.zip || zipFromUrl || "",
-      propertyType: apiResult.propertyType || "Unknown",
-      bedrooms: apiResult.bedrooms || "",
-      bathrooms: apiResult.bathrooms || "",
-      squareFeet: apiResult.squareFeet || "",
-      price: apiResult.price || "",
-      yearBuilt: apiResult.yearBuilt || "",
-      description:
-        apiResult.description || "Property information extracted from URL",
-      features: apiResult.features || [],
-      listingAgentName: apiResult.sellerName || apiResult.agentName || "",
-      listingAgentPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-      listingAgentEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
-      listingAgentCompany:
-        apiResult.sellerCompany || apiResult.agentCompany || "",
-      listingAgentLicenseNo:
-        apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
-      propertyUrl: url,
-      imageUrls: [],
-      sellerName: apiResult.sellerName || apiResult.agentName || "",
-      sellerPhone: apiResult.sellerPhone || apiResult.agentPhone || "",
-      sellerCompany: apiResult.sellerCompany || apiResult.agentCompany || "",
-      sellerLicenseNo:
-        apiResult.sellerLicenseNo || apiResult.licenseNumber || "",
-      sellerEmail: apiResult.sellerEmail || apiResult.agentEmail || "",
+      bedrooms: apiResult.bedrooms || null,
+      bathrooms: apiResult.bathrooms || null,
+      price: apiResult.price || null,
+      description: apiResult.description || "Property information extracted from URL",
+      listingAgentName: apiResult.listingAgentName || "",
+      listingAgentPhone: apiResult.listingAgentPhone || "",
+      listingAgentEmail: apiResult.listingAgentEmail || "",
+      listingAgentCompany: apiResult.listingAgentCompany || "",
+      listingAgentLicenseNo: apiResult.listingAgentLicenseNo || "",
+      propertyUrl: url
     };
 
     return propertyData;
