@@ -7292,5 +7292,72 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
     }
   });
 
+  async function findNearestAgent(geographicalArea: string) {
+    try {
+      // Find agents who serve this area
+      // Using a simple LIKE query for now - could be enhanced with proper geocoding later
+      const agents = await storage.findAgentsByServiceArea(geographicalArea);
+      
+      if (agents && agents.length > 0) {
+        // For now, just return the first matching agent
+        // Could be enhanced with load balancing, ratings, etc.
+        return agents[0];
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error finding nearest agent:", error);
+      return null;
+    }
+  }
+
+  // In your registration route handler:
+  app.post("/api/register", async (req, res) => {
+    try {
+      const userData = req.body;
+      
+      // Create the user
+      const user = await storage.createUser({
+        ...userData,
+        role: userData.role || "buyer",
+      });
+
+      // If this is a buyer, try to match them with an agent
+      if (user.role === "buyer" && userData.geographicalArea) {
+        const matchedAgent = await findNearestAgent(userData.geographicalArea);
+        
+        if (matchedAgent) {
+          // Assign the agent to the buyer
+          await storage.assignAgentToBuyer(user.id, matchedAgent.id);
+          
+          // Send notification email to both buyer and agent
+          try {
+            await sendAgentMatchEmail(user, matchedAgent);
+          } catch (emailError) {
+            console.error("Error sending match notification email:", emailError);
+          }
+        }
+      }
+
+      // Create session
+      req.session.userId = user.id;
+      await req.session.save();
+
+      res.json({
+        success: true,
+        data: {
+          user,
+          assignedAgent: matchedAgent || null,
+        },
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Registration failed",
+      });
+    }
+  });
+
   return httpServer;
 }

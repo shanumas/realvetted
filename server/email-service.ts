@@ -677,3 +677,100 @@ ${body}
     return null;
   }
 }
+
+export async function sendAgentMatchEmail(buyer: User, agent: User): Promise<SentEmail> {
+  // Prepare recipient emails
+  const to = [buyer.email];
+  const cc = [agent.email];
+
+  // Format names
+  const buyerName = `${buyer.firstName || ""} ${buyer.lastName || ""}`.trim() || buyer.email;
+  const agentName = `${agent.firstName || ""} ${agent.lastName || ""}`.trim() || agent.email;
+
+  // Construct the email subject
+  const subject = `Your REALVetted Buyer's Agent Match`;
+
+  // Construct the email body
+  const body = `
+Dear ${buyerName},
+
+Great news! We've matched you with a buyer's agent in your area. Meet ${agentName}, your dedicated REALVetted buyer's agent.
+
+Agent Details:
+- Name: ${agentName}
+- Phone: ${agent.phone || "Contact information will be provided"}
+- Email: ${agent.email}
+- Service Area: ${agent.serviceArea || "Your local area"}
+
+Your agent will be reaching out to you shortly to discuss your home buying goals and help you start your property search.
+
+If you have any questions in the meantime, please don't hesitate to contact us at support@realvetted.com.
+
+Best regards,
+The REALVetted Team
+`;
+
+  try {
+    // Send email using EmailJS
+    const response = await emailjs.send(
+      "service_z8eslzt",
+      "template_4bptn9b",
+      {
+        to_email: to.join(", "),
+        cc_email: cc.join(", "),
+        subject: subject,
+        message: body,
+        buyer_name: buyerName,
+        agent_name: agentName,
+      },
+    );
+
+    console.log("Agent match email sent successfully:", response);
+  } catch (error) {
+    console.error("Error sending agent match email:", error);
+  }
+
+  // Create a sent email record
+  const emailId = generateUUID();
+
+  // For legacy compatibility
+  const sentEmail: SentEmail = {
+    id: emailId,
+    to,
+    cc,
+    subject,
+    body,
+    timestamp: new Date(),
+    sentBy: {
+      id: buyer.id,
+      role: "system",
+    },
+    relatedEntity: {
+      type: "agreement",
+      id: buyer.id,
+    },
+  };
+
+  // Store the email in the database
+  try {
+    await storage.createEmail({
+      externalId: emailId,
+      to,
+      cc,
+      subject,
+      body,
+      status: "sent",
+      sentById: buyer.id,
+      sentByRole: "system",
+      relatedEntityType: "agreement",
+      relatedEntityId: buyer.id,
+    });
+  } catch (error) {
+    console.error("Error storing agent match email in database:", error);
+  }
+
+  // Also keep for legacy compatibility
+  sentEmails.push(sentEmail);
+
+  return sentEmail;
+}

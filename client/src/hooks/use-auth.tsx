@@ -154,7 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       }
     },
-    onSuccess: (user: User) => {
+    onSuccess: (response) => {
+      const user = response.data;
       queryClient.setQueryData(["/api/auth/user"], user);
 
       // Redirect based on role
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Send buyers directly to dashboard after signup
         setLocation("/buyer/dashboard");
       } else if (user.role === "agent") {
-        // For agents, redirect to referral agreement page immediately after signup
+        // For agents, redirect to dashboard immediately after signup
         setLocation("/agent/dashboard");
       } else if (user.role === "seller") {
         setLocation("/seller/dashboard");
@@ -172,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       toast({
         title: "Registration successful",
-        description: "Your account has been created successfully.",
+        description: response.message || "Your account has been created successfully.",
       });
     },
     onError: (error: Error) => {

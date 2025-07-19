@@ -28,6 +28,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Loader2, Upload, ImageIcon, Image } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
   email: z
@@ -52,6 +53,8 @@ const registerSchema = z.object({
   profilePhotoUrl: z.string().optional(),
   licenseNumber: z.string().optional(),
   brokerageName: z.string().optional(),
+  geographicalArea: z.string().optional(),
+  serviceArea: z.string().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -106,6 +109,8 @@ export default function AuthPage() {
       profilePhotoUrl: "",
       licenseNumber: "",
       brokerageName: "",
+      geographicalArea: "",
+      serviceArea: "",
     },
     mode: "onChange",
   });
@@ -270,6 +275,8 @@ export default function AuthPage() {
       profilePhotoUrl: values.profilePhotoUrl,
       licenseNumber: values.licenseNumber,
       brokerageName: values.brokerageName,
+      geographicalArea: values.geographicalArea,
+      serviceArea: values.serviceArea,
       role: roleTab as any,
     });
   };
@@ -429,99 +436,85 @@ export default function AuthPage() {
                     onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
                     className="space-y-4"
                   >
-                    <div>
-                      <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
-                        First Name
-                      </label>
-                      <div className="mt-1">
-                        <input
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
                           id="firstName"
-                          name="firstName"
-                          type="text"
                           placeholder="John"
-                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                          value={registerForm.watch('firstName')}
-                          onChange={(e) => registerForm.setValue('firstName', e.target.value)}
+                          {...registerForm.register("firstName")}
                         />
                       </div>
-                    </div>
-                    <div>
-                      <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
-                        Last Name
-                      </label>
-                      <div className="mt-1">
-                        <input
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
                           id="lastName"
-                          name="lastName"
-                          type="text"
                           placeholder="Doe"
-                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                          value={registerForm.watch('lastName')}
-                          onChange={(e) => registerForm.setValue('lastName', e.target.value)}
+                          {...registerForm.register("lastName")}
                         />
                       </div>
-                    </div>
-                    <div>
-                      <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-                        Phone Number <span className="text-red-500">*</span>
-                      </label>
-                      <div className="mt-1">
-                        <input
-                          id="phone"
-                          name="phone"
-                          type="tel"
-                          placeholder="(123) 456-7890"
-                          className="px-3 py-2 block w-full rounded-md border border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
-                          value={registerForm.watch('phone')}
-                          onChange={(e) => registerForm.setValue('phone', e.target.value)}
-                          required
-                        />
-                      </div>
-                      {registerForm.formState.errors.phone && (
-                        <p className="text-sm text-red-500 mt-1">
-                          {registerForm.formState.errors.phone.message}
-                        </p>
-                      )}
                     </div>
 
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="name@example.com"
-                              type="email"
-                              autoComplete="email"
-                              {...field}
-                              onChange={(e) => {
-                                field.onChange(e.target.value.trim());
-                              }}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="password"
-                              placeholder="••••••"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="john@example.com"
+                        {...registerForm.register("email")}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="(555) 555-5555"
+                        {...registerForm.register("phone")}
+                      />
+                    </div>
+
+                    {roleTab === "buyer" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="geographicalArea">
+                          Where are you looking to buy? (City, State or Area)
+                        </Label>
+                        <Input
+                          id="geographicalArea"
+                          placeholder="e.g., San Francisco Bay Area, CA"
+                          {...registerForm.register("geographicalArea")}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          This helps us match you with a local buyer's agent
+                        </p>
+                      </div>
+                    )}
+
+                    {roleTab === "agent" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="serviceArea">
+                          What areas do you serve? (Cities, Counties, or Regions)
+                        </Label>
+                        <Input
+                          id="serviceArea"
+                          placeholder="e.g., Greater Los Angeles Area"
+                          {...registerForm.register("serviceArea")}
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          This helps us match you with buyers in your service area
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password">Password</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        {...registerForm.register("password")}
+                      />
+                    </div>
 
                     {roleTab === "agent" && (
                       <>

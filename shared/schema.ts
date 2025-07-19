@@ -10,8 +10,8 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),
-  role: text("role").notNull(), // "buyer", "seller", "agent", "admin"
-  profileStatus: text("profile_status").notNull().default("pending"), // "pending", "verified", "rejected"
+  role: text("role").notNull().default("buyer"), // "buyer", "seller", "agent", "admin"
+  profileStatus: text("profile_status").default("pending"), // "pending", "verified", "rejected"
   addressLine1: text("address_line1"),
   addressLine2: text("address_line2"),
   city: text("city"),
@@ -19,6 +19,7 @@ export const users = pgTable("users", {
   zip: text("zip"),
   dateOfBirth: text("date_of_birth"),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   idFrontUrl: text("id_front_url"),
   idBackUrl: text("id_back_url"),
   profilePhotoUrl: text("profile_photo_url"), // URL to the user's profile photo
@@ -34,6 +35,8 @@ export const users = pgTable("users", {
   manualApprovalRequested: boolean("manual_approval_requested").default(false), // Whether the user has requested manual approval
   prequalificationAttempts: integer("prequalification_attempts").default(0), // Number of attempted uploads
   failedPrequalificationUrls: text("failed_prequalification_urls").array(), // Array of URLs to failed pre-qualification documents
+  geographicalArea: text("geographical_area"), // Area where buyer is looking to purchase
+  serviceArea: text("service_area"), // Area where agent provides service
 });
 
 // Property listings

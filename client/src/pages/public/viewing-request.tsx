@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
 import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -90,8 +91,13 @@ interface PublicViewingResponse {
   error?: string;
 }
 
-export default function PublicViewingRequest() {
-  const { token } = useParams();
+interface ViewingRequestProps {
+  token?: string;
+}
+
+export default function PublicViewingRequest({ token }: ViewingRequestProps) {
+  const params = useParams();
+  const actualToken = token || params.token;
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState<string>("16:00"); // Default to 4:00 PM
@@ -100,9 +106,9 @@ export default function PublicViewingRequest() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery<PublicViewingResponse>({
-    queryKey: ["publicViewingRequest", token],
+    queryKey: ["publicViewingRequest", actualToken],
     queryFn: async () => {
-      const response = await fetch(`/api/public/viewing/${token}`);
+      const response = await fetch(`/api/public/viewing/${actualToken}`);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to fetch viewing request");
@@ -127,7 +133,7 @@ export default function PublicViewingRequest() {
   const handleAccept = async () => {
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/public/viewing/${token}`, {
+      const response = await fetch(`/api/public/viewing/${actualToken}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -174,7 +180,7 @@ export default function PublicViewingRequest() {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/public/viewing/${token}`, {
+      const response = await fetch(`/api/public/viewing/${actualToken}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -235,7 +241,7 @@ export default function PublicViewingRequest() {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch(`/api/public/viewing/${token}`, {
+      const response = await fetch(`/api/public/viewing/${actualToken}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",

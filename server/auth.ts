@@ -1,179 +1,256 @@
+import { type Express, type Request, type Response, type NextFunction } from "express";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
+import { storage } from "./storage";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
-import { User } from "@shared/schema";
+import { type User, registerUserSchema, type InsertUser } from "@shared/schema";
+
+// Extend the User type to match our database schema
+type DbUser = {
+  id: number;
+  email: string;
+  password: string;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  role: string;
+  profileStatus: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  dateOfBirth: string | null;
+  createdAt: string;
+  updatedAt: string;
+  idFrontUrl: string | null;
+  idBackUrl: string | null;
+  profilePhotoUrl: string | null;
+  licenseNumber: string | null;
+  brokerageName: string | null;
+  isBlocked: boolean;
+  verificationMethod: string | null;
+  prequalificationDocUrl: string | null;
+  prequalificationValidated: boolean;
+  prequalificationData: any | null;
+  prequalificationMessage: string | null;
+  manualApprovalRequested: boolean;
+  prequalificationAttempts: number;
+  failedPrequalificationUrls: string[];
+  serviceArea: string | null;
+  geographicalArea: string | null;
+};
+
 declare global {
   namespace Express {
-    interface User {
-      id: number;
-      email: string;
-      password: string;
-      firstName: string | null;
-      lastName: string | null;
-      phone: string | null;
-      role: string;
-      profileStatus: string;
-      addressLine1: string | null;
-      addressLine2: string | null;
-      city: string | null;
-      state: string | null;
-      zip: string | null;
-      dateOfBirth: Date | null;
-      createdAt: Date;
-      idFrontUrl: string | null;
-      idBackUrl: string | null;
-      isBlocked: boolean;
-    }
+    interface User extends DbUser {}
+  }
+}
+
+// Extend passport types
+declare module 'passport' {
+  interface Authenticator {
+    serializeUser<TUser = DbUser, TID = number>(fn: (user: TUser, done: (err: Error | null, id?: TID) => void) => void): void;
+    deserializeUser<TID = number, TUser = DbUser>(fn: (id: TID, done: (err: Error | null, user?: TUser | false) => void) => void): void;
+  }
+}
+
+// Extend passport-local types
+declare module 'passport-local' {
+  interface IVerifyOptions {
+    message: string;
+  }
+
+  interface IStrategyOptions {
+    usernameField?: string;
+    passwordField?: string;
+    session?: boolean;
+    passReqToCallback?: false;
+  }
+
+  interface VerifyFunction {
+    (username: string, password: string, done: (error: Error | null, user?: DbUser | false, options?: IVerifyOptions) => void): void;
   }
 }
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
-}
-
-async function comparePasswords(supplied: string, stored: string) {
-  try {
-    const [hashed, salt] = stored.split(".");
-    
-    if (!hashed || !salt) {
-      console.error(`[AUTH] Invalid password format: ${stored}`);
-      return false;
-    }
-    
-    const hashedBuf = Buffer.from(hashed, "hex");
-    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-    return timingSafeEqual(hashedBuf, suppliedBuf);
-  } catch (error) {
-    console.error(`[AUTH] Password comparison error:`, error);
-    return false;
-  }
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString('hex');
+  const derivedKey = await scryptAsync(password, salt, 64) as Buffer;
+  return salt + ':' + derivedKey.toString('hex');
 }
 
 export function setupAuth(app: Express) {
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "propertymatch-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    name: 'connect.sid',
-    cookie: {
-      secure: process.env.NODE_ENV === "production",
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      path: '/'
-    }
-  };
-
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  passport.use(
-    new LocalStrategy({ 
-      usernameField: 'email',
-      passwordField: 'password'
-    }, async (email, password, done) => {
-      try {
-        console.log(`[AUTH] Login attempt for email: ${email}`);
-        const user = await storage.getUserByEmail(email);
-        
-        if (!user) {
-          console.log(`[AUTH] No user found for email: ${email}`);
-          return done(null, false, { message: "Invalid email or password" });
-        }
-        
-        console.log(`[AUTH] Found user: ${user.email} with role: ${user.role}`);
-        
-        if (user.isBlocked) {
-          console.log(`[AUTH] User ${user.email} is blocked`);
-          return done(null, false, { message: "Your account has been blocked. Please contact an administrator." });
-        }
-        
-        // Special handling for admin user with simple password check
-        let passwordValid = false;
-        if (user.email === 'admin@admin.com' && password === 'admin123') {
-          passwordValid = true;
-          console.log(`[AUTH] Admin user authenticated with simple password`);
-        } else {
-          passwordValid = await comparePasswords(password, user.password);
-        }
-        
-        if (!passwordValid) {
-          console.log(`[AUTH] Invalid password for user: ${user.email}`);
-          return done(null, false, { message: "Invalid email or password" });
-        }
-        
-        console.log(`[AUTH] Successful login for user: ${user.email} (${user.role})`);
-        return done(null, user);
-      } catch (err) {
-        console.error(`[AUTH] Authentication error for ${email}:`, err);
-        return done(err);
-      }
+  // Set up session middleware
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "your-secret-key",
+      resave: false,
+      saveUninitialized: false,
     })
   );
 
-  passport.serializeUser((user, done) => {
-    done(null, user.id);
-  });
-
-  passport.deserializeUser(async (id: number, done) => {
-    try {
-      const user = await storage.getUser(id);
-      
-      if (user) {
-        console.log(`[AUTH] Deserializing user: ${user.email} (${user.role})`);
-        
-        // Convert dateOfBirth to a Date object if it exists and is a string
-        if (user.dateOfBirth && typeof user.dateOfBirth === 'string') {
-          user.dateOfBirth = new Date(user.dateOfBirth);
-        }
-      } else {
-        console.log(`[AUTH] No user found for ID: ${id}`);
-      }
-      
-      done(null, user);
-    } catch (err) {
-      console.error(`[AUTH] Deserialize error for ID ${id}:`, err);
-      done(err);
-    }
-  });
+  // Initialize Passport and restore authentication state from session
+  app.use(passport.initialize());
+  app.use(passport.session());
 
   // Middleware to check if user is authenticated
-  const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+  function isAuthenticated(req: Request, res: Response, next: NextFunction) {
     if (req.isAuthenticated()) {
       return next();
     }
-    res.status(401).json({ success: false, error: "Not authenticated" });
-  };
+    res.status(401).json({ success: false, error: "Unauthorized" });
+  }
 
-  // Middleware to check if user has specific role
-  const hasRole = (roles: string[]) => {
+  // Middleware to check if user has required role
+  function hasRole(roles: string[]) {
     return (req: Request, res: Response, next: NextFunction) => {
       if (!req.isAuthenticated()) {
-        return res.status(401).json({ success: false, error: "Not authenticated" });
+        return res.status(401).json({ success: false, error: "Unauthorized" });
       }
-      if (!roles.includes(req.user.role)) {
-        return res.status(403).json({ success: false, error: "Insufficient permissions" });
+      if (!req.user || !roles.includes(req.user.role)) {
+        return res.status(403).json({ success: false, error: "Forbidden" });
       }
       next();
     };
-  };
+  }
+
+  // Define passport local strategy
+  passport.use(new LocalStrategy(
+    { usernameField: "email" },
+    async (
+      email: string,
+      password: string,
+      done: (error: Error | null, user?: DbUser | false, options?: { message: string }) => void
+    ) => {
+      try {
+        const user = await storage.getUserByEmail(email);
+        if (!user) {
+          return done(null, false, { message: "Invalid email or password" });
+        }
+
+        // Convert dates to strings and ensure required fields
+        const userWithStringDates: DbUser = {
+          id: user.id,
+          email: user.email,
+          password: user.password,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          phone: user.phone,
+          role: user.role,
+          profileStatus: 'pending',
+          addressLine1: user.addressLine1,
+          addressLine2: user.addressLine2,
+          city: user.city,
+          state: user.state,
+          zip: user.zip,
+          dateOfBirth: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          idFrontUrl: user.idFrontUrl,
+          idBackUrl: user.idBackUrl,
+          profilePhotoUrl: user.profilePhotoUrl,
+          licenseNumber: user.licenseNumber,
+          brokerageName: user.brokerageName,
+          isBlocked: false,
+          verificationMethod: user.verificationMethod,
+          prequalificationDocUrl: user.prequalificationDocUrl,
+          prequalificationValidated: false,
+          prequalificationData: user.prequalificationData,
+          prequalificationMessage: user.prequalificationMessage,
+          manualApprovalRequested: false,
+          prequalificationAttempts: 0,
+          failedPrequalificationUrls: user.failedPrequalificationUrls || [],
+          serviceArea: user.serviceArea,
+          geographicalArea: user.geographicalArea
+        };
+
+        const [salt, storedHash] = userWithStringDates.password.split(':');
+        const derivedKey = await scryptAsync(password, salt, 64) as Buffer;
+        const suppliedHash = derivedKey.toString('hex');
+
+        const match = timingSafeEqual(
+          Buffer.from(storedHash, 'hex'),
+          Buffer.from(suppliedHash, 'hex')
+        );
+
+        if (!match) {
+          return done(null, false, { message: "Invalid email or password" });
+        }
+
+        return done(null, userWithStringDates);
+      } catch (error) {
+        return done(error instanceof Error ? error : new Error('Unknown error'));
+      }
+    }
+  ));
+
+  // Serialize user for the session
+  passport.serializeUser((user: DbUser, done: (err: Error | null, id?: number) => void) => {
+    done(null, user.id);
+  });
+
+  // Deserialize user from the session
+  passport.deserializeUser(async (id: number, done: (err: Error | null, user?: DbUser | false) => void) => {
+    try {
+      const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
+
+      // Convert dates to strings and ensure required fields
+      const userWithStringDates: DbUser = {
+        id: user.id,
+        email: user.email,
+        password: user.password,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        role: user.role,
+        profileStatus: 'pending',
+        addressLine1: user.addressLine1,
+        addressLine2: user.addressLine2,
+        city: user.city,
+        state: user.state,
+        zip: user.zip,
+        dateOfBirth: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        idFrontUrl: user.idFrontUrl,
+        idBackUrl: user.idBackUrl,
+        profilePhotoUrl: user.profilePhotoUrl,
+        licenseNumber: user.licenseNumber,
+        brokerageName: user.brokerageName,
+        isBlocked: false,
+        verificationMethod: user.verificationMethod,
+        prequalificationDocUrl: user.prequalificationDocUrl,
+        prequalificationValidated: false,
+        prequalificationData: user.prequalificationData,
+        prequalificationMessage: user.prequalificationMessage,
+        manualApprovalRequested: false,
+        prequalificationAttempts: 0,
+        failedPrequalificationUrls: user.failedPrequalificationUrls || [],
+        serviceArea: user.serviceArea,
+        geographicalArea: user.geographicalArea
+      };
+
+      done(null, userWithStringDates);
+    } catch (error) {
+      done(error instanceof Error ? error : new Error('Unknown error'));
+    }
+  });
 
   // Auth routes
-  app.post("/api/auth/register", async (req, res, next) => {
+  app.post("/api/auth/register", async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Validate request body against schema
+      const validatedData = registerUserSchema.parse(req.body);
+
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(req.body.email);
+      const existingUser = await storage.getUserByEmail(validatedData.email);
       if (existingUser) {
         return res.status(400).json({ 
           success: false, 
@@ -182,30 +259,82 @@ export function setupAuth(app: Express) {
       }
 
       // Create user with hashed password
-      const hashedPassword = await hashPassword(req.body.password);
-      const user = await storage.createUser({
-        ...req.body,
-        password: hashedPassword
-      });
+      const hashedPassword = await hashPassword(validatedData.password);
+      
+      // Prepare user data with required fields
+      const userData: InsertUser = {
+        email: validatedData.email,
+        password: hashedPassword,
+        role: validatedData.role,
+        firstName: validatedData.firstName || null,
+        lastName: validatedData.lastName || null,
+        profileStatus: validatedData.role === 'agent' ? 'pending' : 'verified',
+        serviceArea: validatedData.role === 'agent' ? (req.body.serviceArea || '') : '',
+        geographicalArea: validatedData.role === 'buyer' ? (req.body.geographicalArea || '') : '',
+        phone: null,
+        addressLine1: null,
+        addressLine2: null,
+        city: null,
+        state: null,
+        zip: null,
+        dateOfBirth: null,
+        idFrontUrl: null,
+        idBackUrl: null,
+        profilePhotoUrl: null,
+        licenseNumber: null,
+        brokerageName: null,
+        isBlocked: false,
+        verificationMethod: null,
+        prequalificationDocUrl: null,
+        prequalificationValidated: false,
+        prequalificationData: null,
+        prequalificationMessage: null,
+        manualApprovalRequested: false,
+        prequalificationAttempts: 0,
+        failedPrequalificationUrls: [],
+      };
+
+      const user = await storage.createUser(userData);
 
       // Log user in
-      req.login(user, (err) => {
-        if (err) return next(err);
+      req.login(user as unknown as DbUser, (loginErr: Error | null) => {
+        if (loginErr) return next(loginErr);
+        
         // Return user without password
         const { password, ...userWithoutPassword } = user;
         
-        res.status(201).json({
-          ...userWithoutPassword
-        });
+        // Add a message for agents about pending verification
+        const response: {
+          success: boolean;
+          data: Omit<typeof userWithoutPassword, 'password'>;
+          message?: string;
+        } = {
+          success: true,
+          data: userWithoutPassword
+        };
+        
+        if (user.role === 'agent') {
+          response.message = "Your registration is pending approval. Our team will review your information and verify your account.";
+        }
+        
+        res.status(201).json(response);
       });
     } catch (error) {
       console.error("Registration error:", error);
       
       // Check if it's a database connection issue
-      if (error.message && error.message.includes('endpoint is disabled')) {
+      if (error instanceof Error && error.message.includes('endpoint is disabled')) {
         return res.status(503).json({ 
           success: false, 
           error: "Database is temporarily unavailable. Please try again in a few minutes." 
+        });
+      }
+      
+      // Check if it's a validation error
+      if (error instanceof Error && error.name === 'ZodError') {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid registration data"
         });
       }
       

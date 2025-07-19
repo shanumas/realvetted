@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from "./hooks/use-auth";
 // Lazy load pages
 const PublicViewingRequest = lazy(() => import("@/pages/public/viewing-request"));
 const AgentEmailOutbox = lazy(() => import("@/pages/agent/email-outbox"));
-const AdminEmailOutbox = lazy(() => import("@/pages/admin/email-outbox"));
 import { ProtectedRoute } from "./lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import AdminLoginPage from "@/pages/admin-login";
@@ -15,15 +14,18 @@ import NotFound from "@/pages/not-found";
 import BuyerDashboard from "@/pages/buyer/dashboard";
 import BuyerPropertyDetail from "@/pages/buyer/property-detail";
 import BuyerProfile from "@/pages/buyer/profile";
-import AgentKYC from "@/pages/agent/kyc-verification";
 import AgentDashboard from "@/pages/agent/dashboard";
 import AgentPropertyDetail from "@/pages/agent/property-detail";
-import AgentReferralAgreement from "@/pages/agent/referral-agreement";
 import SellerDashboard from "@/pages/seller/dashboard";
 import SellerPropertyDetail from "@/pages/seller/property-detail";
 import SellerPropertyView from "@/pages/seller/property-view";
 import AdminDashboard from "@/pages/admin/dashboard";
 import { Loader2 } from "lucide-react";
+
+interface RouteParams {
+  token?: string;
+  id?: string;
+}
 
 function Router() {
   return (
@@ -37,19 +39,18 @@ function Router() {
       <ProtectedRoute path="/buyer/profile" component={BuyerProfile} allowedRoles={["buyer"]} />
       
       {/* Agent Routes */}
-      {/* KYC and referral agreement routes hidden for simplified agent onboarding */}
-      {/* <ProtectedRoute path="/agent/kyc" component={AgentKYC} allowedRoles={["agent"]} /> */}
-      {/* <ProtectedRoute path="/agent/referral-agreement" component={AgentReferralAgreement} allowedRoles={["agent"]} /> */}
       <ProtectedRoute path="/agent/dashboard" component={AgentDashboard} allowedRoles={["agent"]} />
       <ProtectedRoute path="/agent/property/:id" component={AgentPropertyDetail} allowedRoles={["agent"]} />
-      <ProtectedRoute path="/agent/email-outbox" component={(props) => (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-2">Loading email outbox...</p>
-        </div>}>
-          <AgentEmailOutbox {...props} />
-        </Suspense>
-      )} allowedRoles={["agent"]} />
+      <Route path="/agent/email-outbox">
+        {() => (
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Loading email outbox...</p>
+          </div>}>
+            <AgentEmailOutbox />
+          </Suspense>
+        )}
+      </Route>
       
       {/* Seller Routes */}
       <ProtectedRoute path="/seller/dashboard" component={SellerDashboard} allowedRoles={["seller"]} />
@@ -58,46 +59,25 @@ function Router() {
       
       {/* Admin Routes */}
       <ProtectedRoute path="/admin/dashboard" component={AdminDashboard} allowedRoles={["admin"]} />
-      <ProtectedRoute path="/admin/email-outbox" component={(props) => (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-2">Loading admin email outbox...</p>
-        </div>}>
-          <AdminEmailOutbox {...props} />
-        </Suspense>
-      )} allowedRoles={["admin"]} />
       
-      {/* Public Routes (No Authentication Required) */}
-      <Route path="/public/viewing-request/:token" component={(props) => (
-        <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="ml-2">Loading viewing request...</p>
-        </div>}>
-          <PublicViewingRequest {...props} />
-        </Suspense>
-      )} />
+      {/* Public Routes */}
+      <Route path="/viewing-request/:token">
+        {(params) => (
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="ml-2">Loading viewing request...</p>
+          </div>}>
+            <PublicViewingRequest token={params.token} />
+          </Suspense>
+        )}
+      </Route>
       
-      {/* Default route redirects to auth page */}
+      {/* Home Page */}
       <Route path="/" component={HomePage} />
       
-      {/* Fallback to 404 */}
+      {/* 404 Page */}
       <Route component={NotFound} />
     </Switch>
-  );
-}
-
-// Import support chat bubble
-import SupportChatBubble from "./components/support/support-chat-bubble";
-
-function App() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router />
-        {/* Support chat bubble available on all pages */}
-        <SupportChatBubble />
-      </AuthProvider>
-    </QueryClientProvider>
   );
 }
 
@@ -151,6 +131,7 @@ function HomePage() {
     }
   }, [user, isLoading, setLocation]);
   
+  // Show loading spinner while checking auth status
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -159,17 +140,16 @@ function HomePage() {
     );
   }
   
-  // If not logged in, show the auth page
-  if (!user) {
-    return <AuthPage />;
-  }
-  
-  // This will show briefly during redirection
-  return (
-    <div className="flex items-center justify-center min-h-screen">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
+  // This component doesn't render anything as it only handles redirects
+  return null;
 }
 
-export default App;
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Router />
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+}

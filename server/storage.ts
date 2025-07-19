@@ -1608,6 +1608,37 @@ export class PgStorage implements IStorage {
 
     return result.rows;
   }
+
+  async findAgentsByServiceArea(area: string) {
+    try {
+      const agents = await this.db.query.users.findMany({
+        where: and(
+          eq(users.role, "agent"),
+          eq(users.profileStatus, "verified"),
+          eq(users.serviceArea, area),
+        ),
+        orderBy: [desc(users.createdAt)],
+      });
+      return agents;
+    } catch (error) {
+      console.error("Error finding agents by service area:", error);
+      return [];
+    }
+  }
+
+  async assignAgentToBuyer(buyerId: number, agentId: number) {
+    try {
+      // Update the buyer's agent ID
+      await this.db.update(users)
+        .set({ buyerAgentId: agentId })
+        .where(eq(users.id, buyerId));
+      
+      return true;
+    } catch (error) {
+      console.error("Error assigning agent to buyer:", error);
+      return false;
+    }
+  }
 }
 
 // Use the database storage implementation
