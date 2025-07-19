@@ -68,7 +68,9 @@ export function BRBCPdfViewer({
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [showTermsDetails, setShowTermsDetails] = useState(false);
   const [showKeyTermsSummaryPage, setShowKeyTermsSummaryPage] = useState(true);
+  const [showVideoPage, setShowVideoPage] = useState(false);
   const [showAgreementTermsPage, setShowAgreementTermsPage] = useState(false);
+  const [videoWatched, setVideoWatched] = useState(false);
   const [hasPreviewedOnce, setHasPreviewedOnce] = useState(false);
 
   // Calculate today's date and end date (90 days from today)
@@ -1050,7 +1052,7 @@ export function BRBCPdfViewer({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <DialogContent className="max-w-12xl w-[100vw] h-[100vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="max-w-12xl w-[90vw] h-[90vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="p-6 border-b bg-gray-50">
             <DialogTitle className="text-xl font-semibold">
               <div className="flex items-center">
@@ -1162,7 +1164,7 @@ export function BRBCPdfViewer({
                   </div>
                 </div>
               </div>
-            ) : showAgreementTermsPage ? (
+            ) :  showAgreementTermsPage ? (
               <div className="flex-grow p-6 overflow-y-auto">
                 <div className="max-w-3xl mx-auto">
                   <div className="mb-6">
@@ -1393,7 +1395,7 @@ export function BRBCPdfViewer({
                     <Button
                       onClick={() => {
                         setShowAgreementTermsPage(false);
-                        setIsSigning(true);
+                        setShowVideoPage(true);
                       }}
                       disabled={!termsAgreed}
                     >
@@ -1402,7 +1404,47 @@ export function BRBCPdfViewer({
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : showVideoPage ? (
+              <div className="flex-grow p-6 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                      Understanding Your Agreement
+                    </h2>
+                    <p className="text-gray-600 mb-6">
+                      Please watch this short video explaining the key aspects of the Buyer Representation Agreement:
+                    </p>
+                    
+                    <div className="aspect-video mb-8">
+                      <iframe
+                        width="100%"
+                        height="100%"
+                        src="https://www.youtube.com/embed/-Az2GY6bta4"
+                        title="Buyer Representation Agreement Explanation"
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 mt-8">
+                    <Button variant="outline" onClick={handleClose}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowVideoPage(false);
+                        setVideoWatched(true);
+                        setIsSigning(true);
+                      }}
+                    >
+                      I Have Watched the Video
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) :(
               /* PDF Viewer - Only shown after terms agreement */
               <div
                 className={`flex-grow ${isSigning ? "w-3/4" : "w-full"} overflow-hidden relative`}
@@ -1426,7 +1468,7 @@ export function BRBCPdfViewer({
               </div>
             )}
             {/* Signature Panel (only visible when signing) */}
-            {!showKeyTermsSummaryPage && !showAgreementTermsPage && (
+            {!showKeyTermsSummaryPage && !showAgreementTermsPage && !showVideoPage && (
               <div className="w-full md:w-1/3 border-l border-gray-200 flex flex-col">
                 <Tabs
                   value={activeTab}
