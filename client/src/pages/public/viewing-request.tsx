@@ -94,8 +94,7 @@ export default function PublicViewingRequest() {
   const { token } = useParams();
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [startTime, setStartTime] = useState<string>("12:00");
-  const [endTime, setEndTime] = useState<string>("13:00");
+  const [startTime, setStartTime] = useState<string>("16:00"); // Default to 4:00 PM
   const [responseMessage, setResponseMessage] = useState("");
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,13 +116,11 @@ export default function PublicViewingRequest() {
       // Pre-fill with the requested date and times for rescheduling
       setSelectedDate(new Date(data.viewingRequest.requestedDate));
       
-      // Extract times from the date strings
+      // Extract time from the date string
       const requestedTime = new Date(data.viewingRequest.requestedDate);
-      const requestedEndTime = new Date(data.viewingRequest.requestedEndDate);
       
       // Still using 24-hour format for internal storage
       setStartTime(format(requestedTime, "HH:mm"));
-      setEndTime(format(requestedEndTime, "HH:mm"));
     }
   }, [data]);
 
@@ -231,12 +228,10 @@ export default function PublicViewingRequest() {
 
     // Create date objects with the selected date and time in California timezone
     const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [endHours, endMinutes] = endTime.split(":").map(Number);
     
     // Use our helper to create dates in California timezone
     // We already checked if selectedDate exists, but add the non-null assertion to satisfy TypeScript
     const confirmedDateStr = createCaliforniaDate(selectedDate!, startHours, startMinutes);
-    const confirmedEndDateStr = createCaliforniaDate(selectedDate!, endHours, endMinutes);
 
     try {
       setIsSubmitting(true);
@@ -248,7 +243,6 @@ export default function PublicViewingRequest() {
         body: JSON.stringify({
           status: "rescheduled",
           confirmedDate: confirmedDateStr,
-          confirmedEndDate: confirmedEndDateStr,
           responseMessage,
         }),
       });
@@ -317,19 +311,16 @@ export default function PublicViewingRequest() {
   
   // Format dates for display
   const requestedDate = new Date(viewingRequest.requestedDate);
-  const requestedEndDate = new Date(viewingRequest.requestedEndDate);
-  
   const formattedRequestedDate = formatCaliforniaTime(viewingRequest.requestedDate.toString(), "EEEE, MMMM d, yyyy");
-  const formattedRequestedTime = `${formatCaliforniaTime(viewingRequest.requestedDate.toString(), "h:mm a")} - ${formatCaliforniaTime(viewingRequest.requestedEndDate.toString(), "h:mm a")}`;
+  const formattedRequestedTime = formatCaliforniaTime(viewingRequest.requestedDate.toString(), "h:mm a");
   
   const confirmedDate = viewingRequest.confirmedDate ? new Date(viewingRequest.confirmedDate) : null;
-  const confirmedEndDate = viewingRequest.confirmedEndDate ? new Date(viewingRequest.confirmedEndDate) : null;
   
   const formattedConfirmedDate = viewingRequest.confirmedDate 
     ? formatCaliforniaTime(viewingRequest.confirmedDate.toString(), "EEEE, MMMM d, yyyy") 
     : null;
-  const formattedConfirmedTime = viewingRequest.confirmedDate && viewingRequest.confirmedEndDate 
-    ? `${formatCaliforniaTime(viewingRequest.confirmedDate.toString(), "h:mm a")} - ${formatCaliforniaTime(viewingRequest.confirmedEndDate.toString(), "h:mm a")}`
+  const formattedConfirmedTime = viewingRequest.confirmedDate 
+    ? formatCaliforniaTime(viewingRequest.confirmedDate.toString(), "h:mm a")
     : null;
   
   // Determine if the viewing request can be acted upon
@@ -652,20 +643,11 @@ export default function PublicViewingRequest() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start-time">Start Time</Label>
+                    <Label htmlFor="start-time">Time</Label>
                     <TimeInput
                       id="start-time"
                       value={startTime}
                       onChange={setStartTime}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="end-time">End Time</Label>
-                    <TimeInput
-                      id="end-time"
-                      value={endTime}
-                      onChange={setEndTime}
                     />
                   </div>
                 </div>

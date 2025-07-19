@@ -1406,7 +1406,7 @@ export function BRBCPdfViewer({
               </div>
             ) : showVideoPage ? (
               <div className="flex-grow p-6 overflow-y-auto">
-                <div className="max-w-3xl mx-auto">
+                <div className="max-w-8xl mx-auto">
                   <div className="mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mb-4">
                       Understanding Your Agreement

@@ -5392,37 +5392,20 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
           });
         }
 
-        if (!mergedData.requestedDate || !mergedData.requestedEndDate) {
-          return res.status(400).json({
-            success: false,
-            error: "Requested viewing dates are required",
-          });
-        }
-
         // Convert string dates to Date objects with validation
         const requestedDate = new Date(mergedData.requestedDate);
-        const requestedEndDate = new Date(mergedData.requestedEndDate);
         
         // Validate that the dates are valid
-        if (isNaN(requestedDate.getTime()) || isNaN(requestedEndDate.getTime())) {
+        if (isNaN(requestedDate.getTime()) ) {
           return res.status(400).json({
             success: false,
             error: "Invalid date format. Please provide valid dates.",
           });
         }
         
-        // Validate that the end date is after the start date
-        if (requestedEndDate <= requestedDate) {
-          return res.status(400).json({
-            success: false,
-            error: "End date must be after start date.",
-          });
-        }
-        
         const requestData = {
           ...mergedData,
           requestedDate,
-          requestedEndDate,
         };
 
         console.log("Processed request data:", requestData);
@@ -5542,7 +5525,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
             details: {
               requestId: viewingRequest.id,
               requestedDate: viewingRequest.requestedDate,
-              requestedEndDate: viewingRequest.requestedEndDate,
               agentId: property.agentId,
               publicViewingLink: publicViewingLink,
             },
@@ -5956,7 +5938,7 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       }
 
       // Parse the update data
-      const { status, confirmedDate, confirmedEndDate, responseMessage } =
+      const { status, confirmedDate, responseMessage } =
         req.body;
 
       // Validate the status
@@ -5981,8 +5963,6 @@ This Agreement may be terminated by mutual consent of the parties or as otherwis
       const updateData: Partial<ViewingRequest> = {};
       if (status) updateData.status = status;
       if (confirmedDate) updateData.confirmedDate = new Date(confirmedDate);
-      if (confirmedEndDate)
-        updateData.confirmedEndDate = new Date(confirmedEndDate);
       if (responseMessage) updateData.responseMessage = responseMessage;
 
       // If accepting or rescheduling, record who confirmed

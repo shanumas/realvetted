@@ -153,9 +153,7 @@ export const tourRequests = pgTable("viewing_requests", { // Keeping the DB tabl
   buyerAgentId: integer("buyer_agent_id"),
   sellerAgentId: integer("seller_agent_id"),
   requestedDate: timestamp("requested_date").notNull(),
-  requestedEndDate: timestamp("requested_end_date").notNull(),
   confirmedDate: timestamp("confirmed_date"),
-  confirmedEndDate: timestamp("confirmed_end_date"),
   status: text("status").notNull().default("pending"), // pending, accepted, rejected, rescheduled, completed, cancelled
   notes: text("notes"),
   confirmedById: integer("confirmed_by_id"), // ID of the agent who confirmed the tour
@@ -246,7 +244,6 @@ export const tourRequestSchema = createInsertSchema(tourRequests)
   .extend({
     // Convert string dates to Date objects
     requestedDate: z.string().transform((str) => new Date(str)),
-    requestedEndDate: z.string().transform((str) => new Date(str)),
     // Override flag (not stored in DB, used for API logic)
     override: z.boolean().optional(),
   });

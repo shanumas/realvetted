@@ -90,14 +90,12 @@ export default function BuyerPropertyDetail() {
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const [isViewingModalOpen, setIsViewingModalOpen] = useState<boolean>(false);
   const [viewingDate, setViewingDate] = useState<string>("");
-  const [viewingTime, setViewingTime] = useState<string>("");
-  const [viewingEndTime, setViewingEndTime] = useState<string>("");
+  const [viewingTime, setViewingTime] = useState<string>("09:00"); // Default to 9:00 AM
   const [viewingNotes, setViewingNotes] = useState<string>("");
   // State for disclosure form removed
   const [viewingRequestData, setViewingRequestData] = useState<{
     date: string;
     time: string;
-    endTime: string;
     notes: string;
   } | null>(null);
 
@@ -106,7 +104,6 @@ export default function BuyerPropertyDetail() {
   const [pendingRequestData, setPendingRequestData] = useState<{
     date: string;
     time: string;
-    endTime: string;
     notes: string;
     listingAgentEmail?: string;
     listingAgentPhone?: string;
@@ -193,7 +190,6 @@ export default function BuyerPropertyDetail() {
     mutationFn: async (data: {
       date: string;
       time: string;
-      endTime: string;
       notes: string;
       override?: boolean;
       listingAgentEmail?: string;
@@ -203,7 +199,6 @@ export default function BuyerPropertyDetail() {
         propertyId,
         date: data.date,
         time: data.time,
-        endTime: data.endTime,
         notes: data.notes,
         override: data.override,
       });
@@ -212,19 +207,20 @@ export default function BuyerPropertyDetail() {
       const payload = {
         propertyId: propertyId,
         requestedDate: toCaliforniaTime(data.date, data.time),
-        requestedEndDate: data.endTime
-          ? toCaliforniaTime(data.date, data.endTime)
-          : undefined,
         notes: data.notes,
         override: data.override || false,
-        listingAgentEmail: data.listingAgentEmail, // Include agent email if available
-        listingAgentPhone: data.listingAgentPhone, // Include agent email if available
+        listingAgentEmail: data.listingAgentEmail,
+        listingAgentPhone: data.listingAgentPhone,
       };
 
       console.log("Sending viewing request payload:", payload);
 
       try {
         const res = await apiRequest("POST", `/api/viewing-requests`, payload);
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to request viewing");
+        }
         const responseData = await res.json();
         console.log("Viewing request response:", responseData);
         return responseData;
@@ -241,8 +237,7 @@ export default function BuyerPropertyDetail() {
       });
       setIsViewingModalOpen(false);
       setViewingDate("");
-      setViewingTime("");
-      setViewingEndTime("");
+      setViewingTime("09:00");
       setViewingNotes("");
 
       // Reset override dialog state
@@ -265,7 +260,7 @@ export default function BuyerPropertyDetail() {
               `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
               user.email,
             message: `A new tour request has been submitted for property at ${property.address}.
-            Requested date: ${viewingDate} from ${viewingTime} to ${viewingEndTime || "unspecified"}
+            Requested date: ${viewingDate} at ${viewingTime}
             Notes: ${viewingNotes || "No additional notes provided"}`,
             buyer_name:
               `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
@@ -385,15 +380,6 @@ export default function BuyerPropertyDetail() {
       return;
     }
 
-    if (viewingEndTime && viewingEndTime <= viewingTime) {
-      toast({
-        title: "Invalid end time",
-        description: "End time must be after start time.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     // Check if agent is assigned
     if (!property?.agentId) {
       toast({
@@ -405,43 +391,17 @@ export default function BuyerPropertyDetail() {
       return;
     }
 
-    // Store viewing request data for later submission after signing the disclosure form
+    // Store viewing request data for later submission
     const requestData = {
       date: viewingDate,
       time: viewingTime,
-      endTime: viewingEndTime,
       notes: viewingNotes,
-      listingAgentEmail: property.listingAgentEmail,
-      listingAgentPhone: property.listingAgentPhone,
+      listingAgentEmail: property.listingAgentEmail || undefined,
+      listingAgentPhone: property.listingAgentPhone || undefined,
     };
 
-    console.log(" property.listingAgentEmail :", property.listingAgentEmail);
-
-    setViewingRequestData(requestData);
-
-    // Close the viewing modal
-    setIsViewingModalOpen(false);
-
-    // Disclosure form check removed
-    // Submit viewing request directly instead
-    // Create a properly typed object for the mutation
-    const mutationData = {
-      date: requestData.date,
-      time: requestData.time,
-      endTime: requestData.endTime,
-      notes: requestData.notes,
-      // Explicitly convert null to undefined
-      listingAgentEmail:
-        typeof requestData.listingAgentEmail === "string"
-          ? requestData.listingAgentEmail
-          : undefined,
-      listingAgentPhone:
-        typeof requestData.listingAgentPhone === "string"
-          ? requestData.listingAgentPhone
-          : undefined,
-      override: true,
-    };
-    requestViewingMutation.mutate(mutationData);
+    // Submit the request directly
+    requestViewingMutation.mutate(requestData);
   };
 
   // Disclosure form related handlers removed
@@ -910,7 +870,6 @@ export default function BuyerPropertyDetail() {
                 Date
               </label>
               <div className="col-span-3">
-                {/* Date Selection (placeholder for now) */}
                 <input
                   type="date"
                   id="viewingDate"
@@ -926,29 +885,13 @@ export default function BuyerPropertyDetail() {
                 htmlFor="viewingTime"
                 className="text-right text-sm font-medium col-span-1"
               >
-                Start Time
+                Time
               </label>
               <div className="col-span-3">
                 <TimeInput
                   id="viewingTime"
                   value={viewingTime}
                   onChange={setViewingTime}
-                  className="w-full"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <label
-                htmlFor="viewingEndTime"
-                className="text-right text-sm font-medium col-span-1"
-              >
-                End Time
-              </label>
-              <div className="col-span-3">
-                <TimeInput
-                  id="viewingEndTime"
-                  value={viewingEndTime}
-                  onChange={setViewingEndTime}
                   className="w-full"
                 />
               </div>
@@ -1108,7 +1051,6 @@ export default function BuyerPropertyDetail() {
                   const mutationData = {
                     date: pendingRequestData.date,
                     time: pendingRequestData.time,
-                    endTime: pendingRequestData.endTime,
                     notes: pendingRequestData.notes,
                     // Explicitly convert null to undefined
                     listingAgentEmail:

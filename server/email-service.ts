@@ -188,7 +188,6 @@ export async function sendTourRequestEmail(
 ): Promise<SentEmail> {
   // Format the date and time for the email
   const requestDate = new Date(viewingRequest.requestedDate);
-  const requestEndDate = new Date(viewingRequest.requestedEndDate);
 
   const dateOptions: Intl.DateTimeFormatOptions = {
     weekday: "long",
@@ -203,15 +202,8 @@ export async function sendTourRequestEmail(
   };
 
   const formattedDate = requestDate.toLocaleDateString("en-US", dateOptions);
-  const formattedStartTime = requestDate.toLocaleTimeString(
-    "en-US",
-    timeOptions,
-  );
-  const formattedEndTime = requestEndDate.toLocaleTimeString(
-    "en-US",
-    timeOptions,
-  );
-  const formattedDateTime = `${formattedDate} at ${formattedStartTime}`;
+  const formattedTime = requestDate.toLocaleTimeString("en-US", timeOptions);
+  const formattedDateTime = `${formattedDate} at ${formattedTime}`;
 
   // Determine verification status
   const isKYCVerified =
