@@ -92,40 +92,34 @@ DOCUMENT: ${documentUrl}
   `);
 
   try {
-    // Prepare the full document URL (ensure it starts with http or https)
-    console.log(
-      "--------Lets send brbc to buyer: Inside the sending function 1:",
-      documentUrl,
-    );
-    let fullDocumentUrl = documentUrl;
-    if (!documentUrl.startsWith("http")) {
-      // Create a full URL to the document
-      console.log(
-        "--------Lets send brbc to buyer: Inside the sending function 2:",
-        documentUrl,
-      );
-      const baseUrl = process.env.PUBLIC_URL || "https://realvetted.replit.app";
-      const cleanedDocumentUrl = documentUrl.replace(/^\/+/, ""); // removes leading slashes
-      fullDocumentUrl = `${baseUrl}/${cleanedDocumentUrl}`;
-    }
-
-    console.log("--------Full documet URL:", fullDocumentUrl);
-
-    // Send email using EmailJS with the credentials provided
+  
+    // 🔄 Convert the document to Base64
+    const base64Content = await filePathToBase64(documentUrl);
+    console.log("base64Content: ", base64Content.length);
+  
+    // 🚀 Send email via EmailJS with Base64 attachment
     const response = await emailjs.send(
-      "service_z8eslzt", // Service ID from the provided credentials
-      "template_viismmd", // Template ID from the provided credentials
+      "service_z8eslzt",
+      "template_viismmd",
       {
         buyer_name: buyerName,
         buyer_email: to.join(", "),
-        brbc: fullDocumentUrl, // Include the BRBC document URL
+        brbc: base64Content, // <-- Now sending the base64 data URI
       },
     );
-
+  
     console.log("BRBC document email sent successfully:", response);
   } catch (error) {
     console.error("Error sending BRBC document email with EmailJS:", error);
   }
+
+  async function filePathToBase64(filePath: string): Promise<string> {
+    // Ensure we're using a proper local file path
+    const absolutePath = path.join(process.cwd(), filePath);
+    const buffer = await fs.promises.readFile(absolutePath);
+    return `data:application/pdf;base64,${buffer.toString('base64')}`;
+  }
+  
 
   // Create a sent email record
   const emailId = generateUUID();
@@ -179,6 +173,8 @@ DOCUMENT: ${documentUrl}
  * @param buyer The buyer user object
  * @param agent The buyer's agent user object
  * @param listingAgentEmail Email of the listing agent
+ * @param listingAgentName Name of the listing agent
+ * @param publicViewingLink The public link for the viewing
  * @returns The sent email record
  */
 export async function sendTourRequestEmail(
@@ -285,11 +281,11 @@ BODY: ""
     );
 
     // Log BRBC URL information for debugging
-    if (fullBrbcUrl) {
+/*     if (fullBrbcUrl) {
       console.log(`Sent tour request email with BRBC document: ${fullBrbcUrl}`);
     } else {
       console.log("No BRBC document included in tour request email");
-    }
+    } */
 
     console.log("Email sent successfully:", response);
   } catch (error) {
